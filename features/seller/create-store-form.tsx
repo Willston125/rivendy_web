@@ -148,7 +148,7 @@ export function CreateStoreForm() {
           seller_price: rawPrice,
           commission_amount: commissionAmount,
           category: p.category,
-          condition: p.condition,
+          condition: ["restaurant", "alimentation"].includes(p.category) ? "Neuf" : p.condition,
           photos: urls,
           status: "active",
           stock_quantity: 1,
@@ -380,17 +380,19 @@ export function CreateStoreForm() {
           </select>
         </FormField>
 
-        <FormField label="État">
-          <select
-            value={current.condition}
-            onChange={(e) => updateProduct(globalIdx, { condition: e.target.value })}
-            className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#007168] focus:ring-2 focus:ring-[#009688]/20"
-          >
-            {CONDITIONS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </FormField>
+        {!["restaurant", "alimentation"].includes(current.category) && (
+          <FormField label="État">
+            <select
+              value={current.condition}
+              onChange={(e) => updateProduct(globalIdx, { condition: e.target.value })}
+              className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#007168] focus:ring-2 focus:ring-[#009688]/20"
+            >
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </FormField>
+        )}
 
         <FormField label="Description (facultatif)">
           <textarea

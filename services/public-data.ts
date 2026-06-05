@@ -174,11 +174,13 @@ export async function getAdvertisements({
 export async function getProducts({
   countryId = DEFAULT_COUNTRY_ID,
   category,
+  subcategory,
   search,
   limit = 60,
 }: {
   countryId?: string;
   category?: CategoryId | string;
+  subcategory?: string;
   search?: string;
   limit?: number;
 }) {
@@ -191,6 +193,7 @@ export async function getProducts({
 
   if (countryId && countryId !== "all") query = query.eq("seller_country_id", countryId);
   if (category && category !== "all") query = query.eq("category", category);
+  if (subcategory?.trim()) query = query.eq("subcategory", subcategory.trim());
   if (search?.trim()) query = query.ilike("title", `%${search.trim()}%`);
 
   const { data, error } = await query;

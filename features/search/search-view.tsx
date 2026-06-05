@@ -5,7 +5,7 @@ import { Search, X } from "lucide-react";
 import { useCountry } from "@/features/country/country-provider";
 import { ProductCard } from "@/features/products/product-card";
 import { supabase } from "@/lib/supabase/client";
-import { CATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
+import { CATEGORIES, SUBCATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
 
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -24,13 +24,16 @@ export function SearchView() {
   const { country } = useCountry();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryId | null>(null);
+  const [subcategory, setSubcategory] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function doSearch(q: string, cat: CategoryId | null) {
+  const subcategories = category ? SUBCATEGORIES[category] ?? [] : [];
+
+  async function doSearch(q: string, cat: CategoryId | null, sub: string | null) {
     setLoading(true);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,6 +48,7 @@ export function SearchView() {
     if (country?.id && country.id !== "all")
       dbQuery = dbQuery.eq("seller_country_id", country.id);
     if (cat) dbQuery = dbQuery.eq("category", cat);
+    if (sub?.trim()) dbQuery = dbQuery.eq("subcategory", sub.trim());
     if (q.trim()) dbQuery = dbQuery.ilike("title", `%${q.trim()}%`);
 
     const { data } = await dbQuery;
@@ -68,16 +72,17 @@ export function SearchView() {
       return;
     }
 
-    timerRef.current = setTimeout(() => void doSearch(query, category), 400);
+    timerRef.current = setTimeout(() => void doSearch(query, category, subcategory), 400);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, country?.id]);
+  }, [query, category, subcategory, country?.id]);
 
   function clearAll() {
     setQuery("");
     setCategory(null);
+    setSubcategory(null);
     setProducts([]);
     setSearched(false);
     inputRef.current?.focus();
@@ -126,7 +131,10 @@ export function SearchView() {
             <button
               key={c.id}
               type="button"
-              onClick={() => setCategory(c.id === category ? null : c.id)}
+              onClick={() => {
+                setCategory(c.id === category ? null : c.id);
+                setSubcategory(null);
+              }}
               className={cn(
                 "shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold transition",
                 category === c.id
@@ -138,6 +146,39 @@ export function SearchView() {
             </button>
           ))}
         </div>
+
+        {/* Subcatégories (2e niveau) */}
+        {category && subcategories.length > 0 && (
+          <div className="no-scrollbar mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5">
+            <button
+              type="button"
+              onClick={() => setSubcategory(null)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition",
+                !subcategory
+                  ? "bg-[#1A1A1A] text-white"
+                  : "border border-slate-200 bg-white text-slate-400 hover:border-slate-300",
+              )}
+            >
+              Tout
+            </button>
+            {subcategories.map((sub) => (
+              <button
+                key={sub}
+                type="button"
+                onClick={() => setSubcategory(sub === subcategory ? null : sub)}
+                className={cn(
+                  "shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition",
+                  subcategory === sub
+                    ? "bg-[#1A1A1A] text-white"
+                    : "border border-slate-200 bg-white text-slate-400 hover:border-slate-300",
+                )}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Corps ───────────────────────────────────────────────── */}

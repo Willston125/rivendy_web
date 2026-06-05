@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Loader2, Mail, Phone, Save, User } from "lucide-react";
+import { Camera, Loader2, Mail, Phone, Save, User, Store } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { compressImage } from "@/services/image-upload";
@@ -14,6 +14,11 @@ export function ProfileInfoForm() {
   const [phone, setPhone] = useState(profile?.whatsapp_number ?? "");
   const [email, setEmail] = useState(profile?.real_email ?? "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? "");
+  const [storeName, setStoreName] = useState(profile?.store_name ?? "");
+  const [storeDescription, setStoreDescription] = useState(profile?.store_description ?? "");
+  const [facebook, setFacebook] = useState(profile?.facebook_url ?? "");
+  const [instagram, setInstagram] = useState(profile?.instagram_url ?? "");
+  const [tiktok, setTiktok] = useState(profile?.tiktok_url ?? "");
 
   // Synchronise les champs si le profil arrive après le premier rendu
   useEffect(() => {
@@ -22,6 +27,11 @@ export function ProfileInfoForm() {
     setPhone(profile.whatsapp_number ?? "");
     setEmail(profile.real_email ?? "");
     setAvatarUrl(profile.avatar_url ?? "");
+    setStoreName(profile.store_name ?? "");
+    setStoreDescription(profile.store_description ?? "");
+    setFacebook(profile.facebook_url ?? "");
+    setInstagram(profile.instagram_url ?? "");
+    setTiktok(profile.tiktok_url ?? "");
   }, [profile]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,7 +43,12 @@ export function ProfileInfoForm() {
     fullName !== (profile?.full_name ?? "") ||
     phone !== (profile?.whatsapp_number ?? "") ||
     email !== (profile?.real_email ?? "") ||
-    avatarUrl !== (profile?.avatar_url ?? "");
+    avatarUrl !== (profile?.avatar_url ?? "") ||
+    storeName !== (profile?.store_name ?? "") ||
+    storeDescription !== (profile?.store_description ?? "") ||
+    facebook !== (profile?.facebook_url ?? "") ||
+    instagram !== (profile?.instagram_url ?? "") ||
+    tiktok !== (profile?.tiktok_url ?? "");
 
   // ── Upload avatar ──────────────────────────────────────────
   async function pickAvatar(file: File | null) {
@@ -71,6 +86,11 @@ export function ProfileInfoForm() {
       whatsapp_number: phone.trim(),
       real_email: email.trim(),
       avatar_url: avatarUrl,
+      store_name: storeName.trim() || null,
+      store_description: storeDescription.trim() || null,
+      facebook_url: facebook.trim() || null,
+      instagram_url: instagram.trim() || null,
+      tiktok_url: tiktok.trim() || null,
       updated_at: new Date().toISOString(),
     }).eq("id", user.id);
 
@@ -154,6 +174,60 @@ export function ProfileInfoForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="exemple@email.com"
+            className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+          />
+        </FormField>
+
+        {/* Champs Boutique */}
+        <div className="pt-4 pb-2">
+          <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Boutique & Réseaux Sociaux</p>
+        </div>
+
+        <FormField label="Nom de la boutique" icon={<Store className="h-4 w-4 text-[#009688]" />}>
+          <input
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder="Ma Super Boutique"
+            className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+          />
+        </FormField>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-black text-slate-600">Description de la boutique</label>
+          <textarea
+            value={storeDescription}
+            onChange={(e) => setStoreDescription(e.target.value)}
+            placeholder="Décrivez votre boutique..."
+            className="h-24 w-full resize-none rounded-2xl border border-slate-200 p-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+          />
+        </div>
+
+        <FormField label="Lien Facebook (optionnel)" icon={<span className="text-[#009688] font-bold">f</span>}>
+          <input
+            type="url"
+            value={facebook}
+            onChange={(e) => setFacebook(e.target.value)}
+            placeholder="https://facebook.com/..."
+            className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+          />
+        </FormField>
+
+        <FormField label="Lien Instagram (optionnel)" icon={<span className="text-[#009688] font-bold">IG</span>}>
+          <input
+            type="url"
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+            placeholder="https://instagram.com/..."
+            className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+          />
+        </FormField>
+
+        <FormField label="Lien TikTok (optionnel)" icon={<span className="text-[#009688] font-bold">TK</span>}>
+          <input
+            type="url"
+            value={tiktok}
+            onChange={(e) => setTiktok(e.target.value)}
+            placeholder="https://tiktok.com/@..."
             className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
           />
         </FormField>

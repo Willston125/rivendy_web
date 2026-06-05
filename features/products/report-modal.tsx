@@ -17,12 +17,13 @@ const REPORT_REASONS = [
 ] as const;
 
 interface ReportModalProps {
-  productId: string;
+  targetId: string;
+  type: "product" | "seller";
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function ReportModal({ productId, isOpen, onClose }: ReportModalProps) {
+export function ReportModal({ targetId, type, isOpen, onClose }: ReportModalProps) {
   const { user } = useAuth();
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [details, setDetails] = useState("");
@@ -32,22 +33,24 @@ export function ReportModal({ productId, isOpen, onClose }: ReportModalProps) {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Vérifier si l'utilisateur a déjà signalé ce produit
   const checkReportStatus = useCallback(async () => {
     if (!user || !isOpen) return;
     setChecking(true);
     try {
+      const table = type === "seller" ? "seller_reports" : "product_reports";
+      const targetColumn = type === "seller" ? "seller_id" : "product_id";
+
       const { data } = await supabase
-        .from("product_reports")
+        .from(table)
         .select("id")
-        .eq("product_id", productId)
+        .eq(targetColumn, targetId)
         .eq("reported_by", user.id)
         .limit(1);
 
       setAlreadyReported((data ?? []).length > 0);
     } catch (_) {}
     setChecking(false);
-  }, [user, productId, isOpen]);
+  }, [user, targetId, type, isOpen]);
 
   useEffect(() => {
     checkReportStatus();
@@ -78,13 +81,24 @@ export function ReportModal({ productId, isOpen, onClose }: ReportModalProps) {
     setErrorMsg(null);
 
     try {
-      const { error } = await supabase.from("product_reports").insert({
-        product_id: productId,
-        reported_by: user.id,
-        reason: selectedReason,
-        details: details.trim(),
-        status: "pending",
-      });
+      const table = type === "seller" ? "seller_reports" : "product_reports";
+      const payload = type === "seller"
+        ? {
+            seller_id: targetId,
+            reported_by: user.id,
+            reason: selectedReason,
+            details: details.trim(),
+            status: "pending",
+          }
+        : {
+            product_id: targetId,
+            reported_by: user.id,
+            reason: selectedReason,
+            details: details.trim(),
+            status: "pending",
+          };
+
+      const { error } = await supabase.from(table).insert(payload);
 
       if (error) throw error;
 
@@ -136,8 +150,8 @@ export function ReportModal({ productId, isOpen, onClose }: ReportModalProps) {
                 <CheckCircle className="h-8 w-8" />
               </span>
               <p className="text-sm font-black text-slate-900">Signalement envoyé</p>
-              <p className="text-xs leading-relaxed text-slate-500">
-                L&apos;équipe Rivendy va examiner cet article sous 24h. Merci pour votre aide.
+              <p className="text-sm font-semibold text-slate-500">
+                Merci pour votre signalement. Notre équipe examinera cette {type === "seller" ? "boutique" : "annonce"} dans les plus brefs délais.
               </p>
             </div>
           ) : alreadyReported ? (
@@ -145,9 +159,9 @@ export function ReportModal({ productId, isOpen, onClose }: ReportModalProps) {
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-500">
                 <AlertTriangle className="h-6 w-6" />
               </span>
-              <p className="text-sm font-black text-slate-900">Article déjà signalé</p>
-              <p className="text-xs leading-relaxed text-slate-500">
-                Vous avez déjà envoyé un signalement pour ce produit. Il est en cours de révision par la modération.
+              <p className="text-sm font-black text-slate-900">Déjà signalé</p>
+              <p className="text-sm font-semibold text-slate-500">
+                Vous avez déjà signalé {type === "seller" ? "cette boutique" : "ce produit"}. Notre équipe traite votre demande.
               </p>
               <button
                 onClick={onClose}

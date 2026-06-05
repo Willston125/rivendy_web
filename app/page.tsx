@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Zap } from "lucide-react";
-import { CATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
+import { CATEGORIES, SUBCATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
 import { AdBanner } from "@/features/ads/ad-banner";
 import { ProductGrid } from "@/features/products/product-grid";
 import { LeftSidebar } from "@/components/home/left-sidebar";
@@ -41,6 +41,7 @@ export const metadata: Metadata = {
 type HomeSearchParams = Promise<{
   country?: string;
   category?: string;
+  subcategory?: string;
   q?: string;
 }>;
 
@@ -52,21 +53,24 @@ export default async function HomePage({
   const params = await searchParams;
   const countryId = params.country || DEFAULT_COUNTRY_ID;
   const category = params.category as CategoryId | undefined;
+  const subcategory = params.subcategory;
   const q = params.q;
 
   const [country, products, ads, inlineAds, stories] = await Promise.all([
     getCountry(countryId),
-    getProducts({ countryId, category, search: q }),
+    getProducts({ countryId, category, subcategory, search: q }),
     getAdvertisements({ countryId, positions: ["web_home_banner", "home_banner"] }),
     getAdvertisements({ countryId, positions: ["web_feed_inline", "feed_inline"] }),
     getStoryProducts(countryId),
   ]);
 
+  const isAlimentation = category === "alimentation";
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
   const recent  = products.filter((p) => p.status !== "boosted");
 
   const categoryObj   = category ? CATEGORIES.find((c) => c.id === category) : null;
   const categoryLabel = categoryObj?.label ?? category ?? null;
+  const subcategories = category ? SUBCATEGORIES[category] ?? [] : [];
 
   return (
     <div className="mx-auto max-w-[1440px] px-3 py-4 md:px-5 lg:px-6">
@@ -149,6 +153,37 @@ export default async function HomePage({
             </Link>
           </div>
 
+          {/* ── Subcatégories (2e niveau de filtre) ──────────────── */}
+          {category && subcategories.length > 0 && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              <Link
+                href={`/?country=${countryId}&category=${category}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                className={cn(
+                  "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                  !subcategory
+                    ? "bg-[#1A1A1A] text-white shadow-sm"
+                    : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                )}
+              >
+                Tout
+              </Link>
+              {subcategories.map((sub) => (
+                <Link
+                  key={sub}
+                  href={`/?country=${countryId}&category=${category}&subcategory=${encodeURIComponent(sub)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                  className={cn(
+                    "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                    subcategory === sub
+                      ? "bg-[#1A1A1A] text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                  )}
+                >
+                  {sub}
+                </Link>
+              ))}
+            </div>
+          )}
+
           {/* ── Cartes promo (Offres · Sur commande) ────────────── */}
           {!q && !category && <PromoCards />}
 
@@ -183,7 +218,57 @@ export default async function HomePage({
             </div>
           )}
 
-          {/* ── Section Nouveautés / Résultats ────────────────────── */}
+          {/* ── Section Supermarché (layout spécial) ───────────────── */}
+          {isAlimentation && recent.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-xl">🛒</span>
+                <h2 className="text-[15px] font-black text-slate-900">Supermarché</h2>
+                <span className="rounded-full bg-[#E8F5E9] px-2 py-0.5 text-[11px] font-bold text-[#2E7D32]">
+                  {recent.length} article{recent.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {recent.map((p) => (
+                  <Link key={p.id} href={`/products/${p.id}`} className="group flex gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:shadow-md">
+                    {/* Photo grande */}
+                    <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                      {p.photos[0] && (
+                        <img src={p.photos[0]} alt={p.title} className="h-full w-full object-cover transition group-hover:scale-105" />
+                      )}
+                      {p.status === "boosted" && (
+                        <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-[#1A1A1A]">
+                          <Zap className="h-3 w-3 fill-white text-white" />
+                        </span>
+                      )}
+                    </div>
+                    {/* Infos */}
+                    <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+                      <div>
+                        <h3 className="line-clamp-2 text-sm font-bold text-[#1A1A1A]">{p.title}</h3>
+                        {p.package_contents && (
+                          <p className="mt-1 line-clamp-1 text-xs text-slate-400">{p.package_contents}</p>
+                        )}
+                      </div>
+                      <div className="mt-auto flex items-end justify-between">
+                        <p className="text-lg font-black text-[#007168]">
+                          {p.price.toLocaleString("fr-FR")} {country.currency_symbol}
+                        </p>
+                        {p.stock_quantity > 0 ? (
+                          <span className="rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[10px] font-bold text-[#2E7D32]">En stock</span>
+                        ) : (
+                          <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-500">Épuisé</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
+          {!isAlimentation && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">
@@ -213,6 +298,7 @@ export default async function HomePage({
               }
             />
           </section>
+          )}
         </div>
 
         {/* ══ SIDEBAR DROITE (lg+) ══════════════════════════════ */}

@@ -9,6 +9,8 @@ import {
   ShoppingBag,
   Truck,
   XCircle,
+  KeyRound,
+  Timer
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -101,8 +103,99 @@ function OrdersSkeleton() {
   );
 }
 
+/* ── Bannière Code de Livraison ─────────────────────────────────── */
+function DeliveryCodeBanner({ orderId, userId }: { orderId: string, userId: string }) {
+  const [code, setCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [expired, setExpired] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+
+    async function loadCode() {
+      const { data } = await supabase
+        .from("app_notifications")
+        .select("body, metadata")
+        .eq("user_id", userId)
+        .eq("type", "delivery_code")
+        .contains("metadata", { order_id: orderId })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        const body = data.body || "";
+        const match = body.match(/\b(\d{6})\b/);
+        if (match) setCode(match[1]);
+
+        const expiresStr = (data.metadata as Record<string, unknown>)?.expires_at as string | undefined;
+        if (expiresStr) {
+          const expiresAt = new Date(expiresStr).getTime();
+          
+          const updateTimer = () => {
+            const now = Date.now();
+            const remaining = Math.floor((expiresAt - now) / 1000);
+            
+            if (remaining <= 0) {
+              setExpired(true);
+              setTimeLeft("00:00");
+              if (timer) clearInterval(timer);
+            } else {
+              setExpired(false);
+              const m = Math.floor(remaining / 60).toString().padStart(2, "0");
+              const s = (remaining % 60).toString().padStart(2, "0");
+              setTimeLeft(`${m}:${s}`);
+            }
+          };
+
+          updateTimer();
+          timer = setInterval(updateTimer, 1000);
+        }
+      }
+      setLoading(false);
+    }
+
+    loadCode();
+    return () => { if (timer) clearInterval(timer); };
+  }, [orderId, userId]);
+
+  if (loading) return null;
+
+  return (
+    <div className={cn(
+      "mb-3 rounded-xl p-4 text-white shadow-sm",
+      expired ? "bg-gradient-to-r from-slate-500 to-slate-400" : "bg-gradient-to-r from-amber-600 to-amber-500"
+    )}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 font-bold text-[13px]">
+          {expired ? <Clock className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+          <span>{expired ? "Code expiré" : "Le livreur est là !"}</span>
+        </div>
+        {!expired && timeLeft && (
+          <div className="flex items-center gap-1 text-[13px] font-black tabular-nums">
+            <Timer className="h-3.5 w-3.5" />
+            {timeLeft}
+          </div>
+        )}
+      </div>
+      
+      {expired ? (
+        <p className="text-[11px] text-white/80">Demandez au livreur de régénérer un nouveau code.</p>
+      ) : code ? (
+        <>
+          <p className="text-[11px] text-white/80 mb-1">Communiquez ce code au livreur :</p>
+          <p className="text-3xl font-black tracking-[0.3em]">{code}</p>
+        </>
+      ) : (
+        <p className="text-[11px] text-white/80">Consultez votre notification pour le code.</p>
+      )}
+    </div>
+  );
+}
+
 /* ── Carte commande ─────────────────────────────────────────────── */
-function OrderCard({ order, country }: { order: AppOrder; country: ReturnType<typeof useCountry>["country"] }) {
+function OrderCard({ order, country, userId }: { order: AppOrder; country: ReturnType<typeof useCountry>["country"], userId: string }) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
   const shortRef = order.id.split("-")[0].toUpperCase();
   const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(order.created_at));
@@ -110,6 +203,7 @@ function OrderCard({ order, country }: { order: AppOrder; country: ReturnType<ty
   const isCancelled = order.status === "cancelled";
   const isActive    = !["delivered", "delivered_by_rider", "completed", "cancelled"].includes(order.status);
   const curStep     = stepIndex(order.status);
+  const isAwaitingCode = ["arrived", "code_generated", "awaiting_customer_confirmation"].includes(order.status);
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
@@ -153,6 +247,13 @@ function OrderCard({ order, country }: { order: AppOrder; country: ReturnType<ty
           )}
         </div>
       </div>
+
+      {/* Code de confirmation */}
+      {isAwaitingCode && (
+        <div className="px-4">
+          <DeliveryCodeBanner orderId={order.id} userId={userId} />
+        </div>
+      )}
 
       {/* Stepper livraison (ordres actifs uniquement) */}
       {isActive && !isCancelled && curStep >= 0 && (
@@ -332,7 +433,7 @@ export function OrdersView() {
       ) : (
         <div className="space-y-3">
           {filtered.map((order) => (
-            <OrderCard key={order.id} order={order} country={country} />
+            <OrderCard key={order.id} order={order} country={country} userId={user?.id || ""} />
           ))}
         </div>
       )}

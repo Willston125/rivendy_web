@@ -4,16 +4,48 @@ export const RIVENDY_TEAL = "#009688";
 export const CATEGORIES = [
   { id: "femme", label: "Femme" },
   { id: "homme", label: "Homme" },
-  { id: "bebeEnfants", label: "Bebe & Enfants" },
-  { id: "electronique", label: "Electronique" },
+  { id: "bebeEnfants", label: "Bébé & Enfants" },
+  { id: "electronique", label: "Électronique" },
   { id: "maison", label: "Maison" },
-  { id: "beauteParfums", label: "Beaute & Parfums" },
+  { id: "beauteParfums", label: "Beauté & Parfums" },
   { id: "artisanatLocal", label: "Artisanat local" },
   { id: "materiauxConstruction", label: "Construction" },
-  { id: "alimentation", label: "Alimentation" },
+  { id: "alimentation", label: "Supermarché" },
+  { id: "location", label: "Location" },
+  { id: "mariage", label: "Mariage" },
+  { id: "restaurant", label: "Restaurant" },
+  { id: "personnels", label: "Personnels" },
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
+
+/** Subcategories per main category — mirrors Flutter _subcategoriesMap */
+export const SUBCATEGORIES: Partial<Record<CategoryId, string[]>> = {
+  femme: [
+    "Robes", "Hauts & Tops", "Pantalons & Jeans", "Abaya & Djellaba",
+    "Vêtements de sport", "Sous-vêtements", "Sacs & Maroquinerie",
+    "Chaussures", "Bijoux & Montres", "Accessoires",
+  ],
+  homme: [
+    "Chemises & Polos", "T-shirts", "Pantalons & Jeans", "Djellaba & Boubou",
+    "Vêtements de sport", "Sous-vêtements", "Chaussures",
+    "Ceintures & Accessoires", "Montres", "Parfums",
+  ],
+  bebeEnfants: [
+    "Vêtements fille 0–2 ans", "Vêtements garçon 0–2 ans",
+    "Vêtements fille 3–12 ans", "Vêtements garçon 3–12 ans",
+    "Chaussures enfants", "Jouets", "Puériculture", "Sacs à dos",
+  ],
+  electronique: [
+    "Smartphones", "Tablettes", "Ordinateurs & Laptops", "TV & Écrans",
+    "Accessoires téléphone", "Casques & Écouteurs", "Appareils photo",
+    "Consoles de jeu", "Câbles & Chargeurs", "Petits électroménagers",
+  ],
+  maison: [
+    "Meubles", "Décoration", "Literie", "Vaisselle & Cuisine",
+    "Électroménager", "Luminaires", "Jardinage", "Rangement",
+  ],
+};
 
 export type ProductStatus =
   | "active"
@@ -62,6 +94,9 @@ export interface Profile {
   voice_note_url: string | null;
   is_certified: boolean;
   total_sales: number;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  tiktok_url?: string | null;
   role?: string | null;
   created_at: string;
   updated_at?: string;
@@ -87,6 +122,8 @@ export interface Product {
   delivery_days: number | null;
   show_in_catalog: boolean;
   is_story: boolean;
+  story_started_at?: string | null;
+  story_expires_at?: string | null;
   package_contents: string;
   epuise_at?: string | null;
   sold_at?: string | null;

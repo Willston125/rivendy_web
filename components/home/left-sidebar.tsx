@@ -17,6 +17,8 @@ import {
   Sparkles,
   Store,
   UtensilsCrossed,
+  Facebook,
+  Instagram,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -224,14 +226,17 @@ export function LeftSidebar({
         <p className="text-xs font-bold text-slate-900">Rivendy</p>
         <p className="mt-1 text-[10px] text-slate-400">© 2024 Rivendy. Tous droits réservés.</p>
         <div className="mt-2.5 flex items-center gap-2.5">
-          <a href="#" className="text-slate-300 transition hover:text-[#009688]" aria-label="Website">
-            <Globe className="h-3.5 w-3.5" />
+          <a href="https://facebook.com/rivendy" target="_blank" rel="noreferrer" className="text-slate-300 transition hover:text-[#1877F2]" aria-label="Facebook">
+            <Facebook className="h-3.5 w-3.5" />
           </a>
-          <a href="#" className="text-slate-300 transition hover:text-[#009688]" aria-label="Email">
+          <a href="https://instagram.com/rivendy" target="_blank" rel="noreferrer" className="text-slate-300 transition hover:text-[#E4405F]" aria-label="Instagram">
+            <Instagram className="h-3.5 w-3.5" />
+          </a>
+          <a href="https://tiktok.com/@rivendy" target="_blank" rel="noreferrer" className="text-slate-300 transition hover:text-slate-900" aria-label="TikTok">
+            <span className="font-bold text-[10px]">TK</span>
+          </a>
+          <a href="mailto:contact@rivendy.com" className="text-slate-300 transition hover:text-[#009688]" aria-label="Email">
             <Mail className="h-3.5 w-3.5" />
-          </a>
-          <a href="#" className="text-slate-300 transition hover:text-[#009688]" aria-label="Chat">
-            <MessageSquare className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>

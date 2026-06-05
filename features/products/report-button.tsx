@@ -3,28 +3,31 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { ReportModal } from "./report-modal";
+import { cn } from "@/lib/utils/cn";
 
 interface ReportButtonProps {
-  productId: string;
+  targetId: string;
+  type?: "product" | "seller";
+  className?: string;
 }
 
-export function ReportButton({ productId }: ReportButtonProps) {
+export function ReportButton({ targetId, type = "product", className }: ReportButtonProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <div className="pt-2 text-center">
+      <div className={cn("pt-2 text-center", className)}>
         <button
           type="button"
           onClick={() => setOpen(true)}
           className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors"
         >
           <AlertTriangle className="h-3.5 w-3.5" />
-          Signaler cette annonce
+          {type === "seller" ? "Signaler cette boutique" : "Signaler cette annonce"}
         </button>
       </div>
 
-      <ReportModal productId={productId} isOpen={open} onClose={() => setOpen(false)} />
+      <ReportModal targetId={targetId} type={type} isOpen={open} onClose={() => setOpen(false)} />
     </>
   );
 }

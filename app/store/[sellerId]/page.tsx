@@ -11,11 +11,16 @@ import {
   ShoppingBag,
   Star,
   Zap,
+  Facebook,
+  Instagram,
+  Link2
 } from "lucide-react";
 import { ProductGrid } from "@/features/products/product-grid";
 import { StoreRatings } from "@/features/store/store-ratings";
 import { FollowButton } from "@/features/store/follow-button";
 import { PrintCatalog } from "@/features/store/print-catalog";
+import { ShareButton } from "@/components/ui/share-button";
+import { ReportButton } from "@/features/products/report-button";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import {
   getCountry,
@@ -154,6 +159,11 @@ export default async function StorePage({
                     </span>
                   )}
                   <FollowButton sellerId={seller.id} />
+                  <ShareButton
+                    title={sellerName}
+                    text={`Découvrez la boutique ${sellerName} sur Rivendy !`}
+                    className="h-8 w-8 bg-slate-100 hover:bg-slate-200"
+                  />
                 </div>
 
                 {/* Description */}
@@ -176,6 +186,27 @@ export default async function StorePage({
                     </span>
                   )}
                 </div>
+
+                {/* Réseaux sociaux */}
+                {(seller.facebook_url || seller.instagram_url || seller.tiktok_url) && (
+                  <div className="mt-3 flex items-center gap-2">
+                    {seller.facebook_url && (
+                      <a href={seller.facebook_url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[#1877F2] transition hover:bg-slate-200">
+                        <Facebook className="h-4 w-4" />
+                      </a>
+                    )}
+                    {seller.instagram_url && (
+                      <a href={seller.instagram_url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[#E4405F] transition hover:bg-slate-200">
+                        <Instagram className="h-4 w-4" />
+                      </a>
+                    )}
+                    {seller.tiktok_url && (
+                      <a href={seller.tiktok_url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-800 transition hover:bg-slate-200">
+                        <span className="font-bold text-[10px]">TK</span>
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -238,6 +269,11 @@ export default async function StorePage({
                 {trust.verifiedReviews} avis vérifiés
               </span>
             )}
+
+            {/* Partage et signalement */}
+            <div className="mt-4 flex justify-end">
+              <ReportButton targetId={seller.id} type="seller" className="pt-0" />
+            </div>
           </div>
         </div>
       </section>
