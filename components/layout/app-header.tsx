@@ -432,6 +432,24 @@ export function AppHeader() {
               Favoris
             </Link>
 
+            <Link
+              href="/notifications"
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                "relative rounded-2xl px-4 py-3 text-sm font-bold transition",
+                pathname === "/notifications"
+                  ? "bg-[#E0F2F1] text-[#009688]"
+                  : "bg-slate-50 text-slate-700 hover:bg-slate-100",
+              )}
+            >
+              Notifications
+              {unreadCount > 0 && (
+                <span className="absolute right-3 top-1/2 grid h-5 min-w-[20px] -translate-y-1/2 place-items-center rounded-full bg-[#FF6B35] px-1 text-[10px] font-black text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+
             {user ? (
               <button
                 onClick={() => { signOut(); setMenuOpen(false); }}

@@ -32,8 +32,14 @@ import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
 const ORDER_STATUS: Partial<Record<OrderStatus, { label: string; bg: string; text: string }>> = {
   pending_whatsapp:              { label: "En attente",     bg: "bg-amber-50",  text: "text-amber-700" },
   confirmed_by_customer_service: { label: "Confirmée",      bg: "bg-blue-50",   text: "text-blue-700" },
-  assigned_to_delivery:          { label: "En préparation", bg: "bg-indigo-50", text: "text-indigo-700" },
+  payment_received_cash:         { label: "Paiement reçu",  bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
+  assigned_to_delivery:          { label: "Livreur assigné", bg: "bg-indigo-50", text: "text-indigo-700" },
+  accepted_by_agent:             { label: "Pris en charge",  bg: "bg-indigo-50", text: "text-indigo-700" },
+  picked_up:                     { label: "Récupérée",       bg: "bg-violet-50", text: "text-violet-700" },
   en_route:                      { label: "En route",       bg: "bg-cyan-50",   text: "text-cyan-700" },
+  arrived:                       { label: "Livreur arrivé",  bg: "bg-amber-50",  text: "text-amber-800" },
+  code_generated:                { label: "Code envoyé",     bg: "bg-amber-50",  text: "text-amber-800" },
+  awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50", text: "text-amber-800" },
   delivered_by_rider:            { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   completed:                     { label: "Terminée ✓",     bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   cancelled:                     { label: "Annulée",         bg: "bg-red-50",    text: "text-red-600" },
@@ -81,6 +87,7 @@ export function SellerDashboard() {
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [loading, setLoading]             = useState(true);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [message, setMessage]             = useState<{ text: string; type: "ok" | "err" } | null>(null);
@@ -88,9 +95,10 @@ export function SellerDashboard() {
   /* ── Chargement ─────────────────────────────────────────────────── */
   const load = useCallback(async () => {
     if (!user) return;
-    const [prodResp, orderResp] = await Promise.all([
+    const [prodResp, orderResp, walletResp] = await Promise.all([
       supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
       supabase.from("orders").select("*, order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false }).limit(50),
+      supabase.from("wallets").select("balance").eq("user_id", user.id).maybeSingle(),
     ]);
     setProducts((prodResp.data ?? []) as Product[]);
     setOrders(
@@ -98,6 +106,11 @@ export function SellerDashboard() {
         (row) => ({ ...row, items: row.order_items }) as AppOrder,
       ),
     );
+    if (walletResp?.data && walletResp.data.balance != null) {
+      setWalletBalance(Number(walletResp.data.balance));
+    } else {
+      setWalletBalance(0);
+    }
     setLoading(false);
   }, [user]);
 
@@ -129,7 +142,7 @@ export function SellerDashboard() {
     () => orders.filter((o) => ["completed", "delivered", "delivered_by_rider"].includes(o.status)),
     [orders],
   );
-  const earnings         = useMemo(() => delivered.reduce((s, o) => s + Number(o.total_seller_amount || 0), 0), [delivered]);
+  const earnings         = walletBalance;
   const pendingCount     = products.filter((p) => p.status === "pending").length;
   const activeCount      = products.filter((p) => p.status === "active").length;
   const boostedCount     = products.filter((p) => p.status === "boosted").length;

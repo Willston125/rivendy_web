@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { EditProductView } from "@/features/seller/edit-product-view";
+
+export const metadata: Metadata = {
+  title: "Modifier le produit — Rivendy",
+  robots: { index: false },
+};
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

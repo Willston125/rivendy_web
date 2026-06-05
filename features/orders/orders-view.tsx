@@ -23,9 +23,14 @@ type StatusConfig = { label: string; bg: string; text: string; icon: React.React
 const DELIVERY_STATUS: Record<OrderStatus, StatusConfig> = {
   pending_whatsapp:              { label: "En attente",      bg: "bg-amber-50",    text: "text-amber-700",   icon: <Clock className="h-3 w-3" /> },
   confirmed_by_customer_service: { label: "Confirmée",       bg: "bg-blue-50",     text: "text-blue-700",    icon: <CheckCircle2 className="h-3 w-3" /> },
-  assigned_to_delivery:          { label: "En préparation",  bg: "bg-indigo-50",   text: "text-indigo-700",  icon: <Package className="h-3 w-3" /> },
+  payment_received_cash:         { label: "Paiement reçu",   bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
+  assigned_to_delivery:          { label: "Livreur assigné", bg: "bg-indigo-50",   text: "text-indigo-700",  icon: <Package className="h-3 w-3" /> },
+  accepted_by_agent:             { label: "Pris en charge",  bg: "bg-indigo-50",   text: "text-indigo-700",  icon: <Package className="h-3 w-3" /> },
   picked_up:                     { label: "Récupérée",       bg: "bg-violet-50",   text: "text-violet-700",  icon: <Package className="h-3 w-3" /> },
   en_route:                      { label: "En route 🛵",     bg: "bg-cyan-50",     text: "text-cyan-700",    icon: <Truck className="h-3 w-3" /> },
+  arrived:                       { label: "Livreur arrivé",  bg: "bg-amber-50",    text: "text-amber-800",   icon: <Clock className="h-3 w-3" /> },
+  code_generated:                { label: "Code envoyé 🔑",  bg: "bg-amber-50",    text: "text-amber-800",   icon: <Clock className="h-3 w-3" /> },
+  awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50",   text: "text-amber-800",   icon: <Truck className="h-3 w-3" /> },
   delivered_by_rider:            { label: "Livrée ✓",        bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
   completed:                     { label: "Terminée ✓",      bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
   cancelled:                     { label: "Annulée",          bg: "bg-red-50",      text: "text-red-600",     icon: <XCircle className="h-3 w-3" /> },
@@ -38,9 +43,19 @@ const DELIVERY_STATUS: Record<OrderStatus, StatusConfig> = {
 const STEPS: { statuses: OrderStatus[]; label: string }[] = [
   { statuses: ["pending_whatsapp", "pending"],                   label: "Reçue" },
   { statuses: ["confirmed_by_customer_service"],                  label: "Confirmée" },
-  { statuses: ["assigned_to_delivery", "picked_up"],             label: "Préparation" },
-  { statuses: ["en_route", "shipped"],                           label: "En route" },
-  { statuses: ["delivered_by_rider", "delivered", "completed"],  label: "Livrée" },
+  { statuses: ["payment_received_cash"],                         label: "Payée" },
+  { statuses: ["assigned_to_delivery", "accepted_by_agent"],      label: "Préparation" },
+  { statuses: [
+      "picked_up",
+      "en_route",
+      "arrived",
+      "code_generated",
+      "awaiting_customer_confirmation",
+      "delivered_by_rider",
+      "completed",
+      "shipped",
+      "delivered"
+    ],                                                           label: "Livraison" },
 ];
 
 function stepIndex(status: OrderStatus): number {

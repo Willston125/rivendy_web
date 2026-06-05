@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { BadgeCheck, Package, Wallet } from "lucide-react";
 import { SignupForm } from "@/features/auth/signup-form";
+
+export const metadata: Metadata = {
+  title: "Créer un compte — Rivendy",
+  description: "Inscrivez-vous sur Rivendy pour acheter des articles ou commencer à vendre sur notre marketplace.",
+};
 
 export default function SignupPage() {
   return (

@@ -13,6 +13,10 @@ import {
   Zap,
 } from "lucide-react";
 import { ProductGrid } from "@/features/products/product-grid";
+import { StoreRatings } from "@/features/store/store-ratings";
+import { FollowButton } from "@/features/store/follow-button";
+import { PrintCatalog } from "@/features/store/print-catalog";
+import { createAnonServerClient } from "@/lib/supabase/server";
 import {
   getCountry,
   getSellerProfile,
@@ -53,11 +57,17 @@ export default async function StorePage({
 }) {
   const { sellerId } = await params;
 
-  const [seller, products, trust] = await Promise.all([
+  const [seller, products, trust, followCountRes] = await Promise.all([
     getSellerProfile(sellerId),
     getSellerPublicProducts(sellerId, true),
     getStoreTrustSummary(sellerId),
+    createAnonServerClient()
+      .from("store_follows")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", sellerId),
   ]);
+
+  const followersCount = followCountRes.count ?? 0;
 
   if (!seller) notFound();
 
@@ -143,6 +153,7 @@ export default async function StorePage({
                       Certifié
                     </span>
                   )}
+                  <FollowButton sellerId={seller.id} />
                 </div>
 
                 {/* Description */}
@@ -169,7 +180,7 @@ export default async function StorePage({
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-4 gap-2 text-center">
               {/* Trust score */}
               <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
                 <p className="text-lg font-black text-slate-900">
@@ -195,6 +206,12 @@ export default async function StorePage({
               <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
                 <p className="text-lg font-black text-slate-900">{trust.totalReviews}</p>
                 <p className="mt-1 text-[10px] font-bold text-slate-400">Avis</p>
+              </div>
+
+              {/* Abonnés */}
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
+                <p className="text-lg font-black text-slate-900">{followersCount}</p>
+                <p className="mt-1 text-[10px] font-bold text-slate-400">Abonnés</p>
               </div>
 
               {/* Ventes */}
@@ -243,6 +260,7 @@ export default async function StorePage({
               Aucun numéro de téléphone ni WhatsApp privé n&apos;est affiché.
             </p>
           </div>
+          <PrintCatalog seller={seller} products={products} country={country} />
         </div>
 
         {activeProducts.length > 0 ? (
@@ -307,6 +325,14 @@ export default async function StorePage({
           </div>
         </section>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          AVIS ET ÉVALUATIONS DE LA BOUTIQUE
+      ══════════════════════════════════════════════════════════════ */}
+      <section className="mt-12 border-t border-slate-100 pt-8">
+        <h2 className="text-xl font-black text-slate-900 mb-6">Avis de la boutique</h2>
+        <StoreRatings sellerId={seller.id} />
+      </section>
     </div>
   );
 }

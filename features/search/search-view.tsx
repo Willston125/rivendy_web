@@ -30,28 +30,6 @@ export function SearchView() {
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Auto-focus à l'ouverture */
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  /* Recherche déclenchée avec debounce 400 ms */
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    if (!query.trim() && !category) {
-      setProducts([]);
-      setSearched(false);
-      return;
-    }
-
-    timerRef.current = setTimeout(() => void doSearch(query, category), 400);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, country?.id]);
-
   async function doSearch(q: string, cat: CategoryId | null) {
     setLoading(true);
 
@@ -74,6 +52,28 @@ export function SearchView() {
     setSearched(true);
     setLoading(false);
   }
+
+  /* Auto-focus à l'ouverture */
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  /* Recherche déclenchée avec debounce 400 ms */
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (!query.trim() && !category) {
+      setProducts([]);
+      setSearched(false);
+      return;
+    }
+
+    timerRef.current = setTimeout(() => void doSearch(query, category), 400);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, category, country?.id]);
 
   function clearAll() {
     setQuery("");

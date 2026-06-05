@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { MessageCircle, ShieldCheck, Store } from "lucide-react";
 import { LoginForm } from "@/features/auth/login-form";
+
+export const metadata: Metadata = {
+  title: "Connexion — Rivendy",
+  description: "Connectez-vous à votre espace Rivendy pour gérer votre panier, vos commandes et vos ventes.",
+};
 
 export default function LoginPage() {
   return (
@@ -48,7 +54,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Vendeurs certifiés</p>
-                <p className="text-xs text-slate-400">Les boutiques sont vérifiées et validées par l'équipe Rivendy.</p>
+                <p className="text-xs text-slate-400">Les boutiques sont vérifiées et validées par l&apos;équipe Rivendy.</p>
               </div>
             </div>
           </div>

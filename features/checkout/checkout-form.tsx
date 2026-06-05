@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   CheckCircle2,
   MapPin,
@@ -201,71 +202,48 @@ export function CheckoutForm() {
       const paymentName = selectedMethod!.name;
       const paymentStatus = selectedMethod!.type === "cash" ? "pending_cash" : "paid";
 
+      type SecureOrderResult = {
+        success: boolean;
+        order_id: string;
+        total_price: number;
+        total_commission: number;
+        total_seller_amount: number;
+        error?: string;
+      };
+
       for (const group of checkoutGroups) {
         const id = orderId();
-        const groupTotal = group.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-        const groupCommission = group.items.reduce(
-          (sum, item) => sum + Number(item.product.commission_amount || 0) * item.quantity,
-          0,
-        );
-        const sellerAmount = groupTotal - groupCommission;
 
-        // Insérer la commande
-        const { error: orderError } = await supabase.from("orders").insert({
-          id,
-          order_type: sellerCount > 1 ? "multi" : "single",
-          seller_id: group.sellerId,
-          seller_name: group.sellerName,
-          buyer_id: user?.id ?? null,
-          buyer_name: buyerName.trim(),
-          buyer_phone: buyerPhone.trim(),
-          buyer_zone: effectiveZoneLabel,
-          payment_method: paymentName,
-          payment_status: paymentStatus,
-          status: "pending_whatsapp",
-          transaction_ref: transactionRef.trim() || null,
-          country_id: country.id,
-          total_price: groupTotal,
-          total_commission: groupCommission,
-          total_seller_amount: sellerAmount,
-          created_at: new Date().toISOString(),
+        // Appeler le RPC sécurisé pour créer la commande et les articles
+        const { data: rpcResult, error: rpcError } = await supabase.rpc("secure_create_order", {
+          p_order_id: id,
+          p_order_type: sellerCount > 1 ? "multi" : "single",
+          p_seller_id: group.sellerId,
+          p_seller_name: group.sellerName,
+          p_buyer_name: buyerName.trim(),
+          p_buyer_phone: buyerPhone.trim(),
+          p_buyer_zone: effectiveZoneLabel,
+          p_payment_method: paymentName,
+          p_payment_status: paymentStatus,
+          p_country_id: country.id,
+          p_transaction_ref: transactionRef.trim() || null,
+          p_items: group.items.map((item) => ({
+            product_id: item.product.id,
+            quantity: item.quantity,
+          })),
         });
-        if (orderError) throw orderError;
 
-        // Insérer les articles
-        const itemRows = group.items.map((item) => ({
-          order_id: id,
-          product_id: item.product.id,
-          product_title: item.product.title,
-          product_image_url: firstPhoto(item.product),
-          product_price: item.product.price,
-          product_size: item.product.size || null,
-          quantity: item.quantity,
-          subtotal: item.product.price * item.quantity,
-          commission_rate:
-            item.product.price > 0
-              ? Number(item.product.commission_amount || 0) / item.product.price
-              : 0,
-          commission_amount: Number(item.product.commission_amount || 0) * item.quantity,
-          seller_amount:
-            (item.product.price - Number(item.product.commission_amount || 0)) * item.quantity,
-        }));
+        if (rpcError) throw rpcError;
 
-        const { error: itemsError } = await supabase.from("order_items").insert(itemRows);
-        if (itemsError?.message?.includes("product_image_url")) {
-          const retryRows = itemRows.map((row) => {
-            const r = { ...row } as Record<string, unknown>;
-            delete r.product_image_url;
-            return r;
-          });
-          const { error: retryError } = await supabase.from("order_items").insert(retryRows);
-          if (retryError) throw retryError;
-        } else if (itemsError) {
-          throw itemsError;
+        const resultObj = rpcResult as SecureOrderResult | null;
+        if (!resultObj || resultObj.success === false) {
+          throw new Error(resultObj?.error || "Une erreur est survenue lors de la création de la commande.");
         }
 
+        const actualTotal = resultObj.total_price;
+
         // Log WhatsApp
-        const msg = buildWhatsAppMessage(group.sellerName, group.items, groupTotal, id, paymentName);
+        const msg = buildWhatsAppMessage(group.sellerName, group.items, actualTotal, id, paymentName);
         supabase.from("whatsapp_logs").insert({
           country_id: country.id,
           phone_number: country.whatsapp_number,
@@ -321,12 +299,12 @@ export function CheckoutForm() {
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="text-3xl font-black text-slate-950">Panier vide</h1>
         <p className="mt-3 text-sm text-slate-500">Ajoute des produits depuis le feed pour commander.</p>
-        <a
+        <Link
           href="/"
           className="mt-6 inline-flex h-12 items-center rounded-full bg-[#009688] px-6 text-sm font-black text-white hover:bg-[#00796B]"
         >
           Voir le feed
-        </a>
+        </Link>
       </div>
     );
   }
@@ -581,7 +559,7 @@ export function CheckoutForm() {
 
         <div className="flex items-start gap-2 rounded-xl bg-[#E0F2F1] p-3 text-xs font-semibold text-[#009688]">
           <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>WhatsApp s'ouvre sur le numéro officiel Rivendy — jamais celui du vendeur.</span>
+          <span>WhatsApp s&apos;ouvre sur le numéro officiel Rivendy — jamais celui du vendeur.</span>
         </div>
 
         <button

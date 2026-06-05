@@ -24,26 +24,23 @@ function formatDate(iso: string) {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-type PayStatus = "pending_cash" | "paid" | "delivered";
-
-function OrderStatusChip({ status }: { status: string }) {
-  const map: Record<PayStatus, { label: string; cls: string }> = {
-    delivered:    { label: "Livré",      cls: "bg-green-50 text-green-700" },
-    paid:         { label: "Payé",       cls: "bg-[#E0F2F1] text-[#009688]" },
-    pending_cash: { label: "En attente", cls: "bg-orange-50 text-orange-600" },
-  };
-  const cfg = map[status as PayStatus] ?? { label: status, cls: "bg-slate-100 text-slate-500" };
-  return (
-    <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-black ${cfg.cls}`}>
-      {cfg.label}
-    </span>
-  );
+interface WalletTransaction {
+  id: string;
+  wallet_id: string;
+  order_id: string | null;
+  type: string;
+  amount: number;
+  balance_after: number;
+  description: string | null;
+  created_at: string;
 }
 
 export function WalletView() {
   const { user, profile } = useAuth();
   const { country } = useCountry();
   const [orders, setOrders] = useState<AppOrder[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,34 +48,58 @@ export function WalletView() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("orders")
-      .select("*, order_items(*)")
-      .eq("seller_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    setOrders(
-      ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
-        ...row,
-        items: row.order_items,
-      }) as AppOrder),
-    );
-    setLoading(false);
+    try {
+      // 1. Charger les commandes vendeur (pour stats et gains en attente)
+      const { data: ordersData } = await supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      setOrders(
+        ((ordersData ?? []) as Array<Record<string, unknown>>).map((row) => ({
+          ...row,
+          items: row.order_items,
+        }) as AppOrder),
+      );
+
+      // 2. Charger le solde réel du portefeuille vendeur
+      const { data: walletData } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (walletData && walletData.balance != null) {
+        setWalletBalance(Number(walletData.balance));
+      } else {
+        setWalletBalance(0);
+      }
+
+      // 3. Charger l'historique des transactions financières
+      const { data: txData } = await supabase
+        .from("wallet_transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      setTransactions(txData ?? []);
+    } catch (err) {
+      console.error("Error loading wallet details:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
   // ── Calculs ────────────────────────────────────────────────
-  const confirmedOrders = orders.filter(
-    (o) => o.payment_status === "paid" || o.payment_status === "delivered",
-  );
   const pendingOrders = orders.filter((o) => o.payment_status === "pending_cash");
   const deliveredOrders = orders.filter((o) => o.payment_status === "delivered");
 
-  const confirmedEarnings = confirmedOrders.reduce(
-    (sum, o) => sum + Number(o.total_seller_amount || 0),
-    0,
-  );
+  const confirmedEarnings = walletBalance;
   const pendingEarnings = pendingOrders.reduce(
     (sum, o) => sum + Number(o.total_seller_amount || 0),
     0,
@@ -255,21 +276,21 @@ export function WalletView() {
         </p>
       </div>
 
-      {/* Historique des ventes */}
+      {/* Historique des transactions */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-[#1A1A1A]">Historique des ventes</h2>
+          <h2 className="text-lg font-black text-[#1A1A1A]">Historique des transactions</h2>
           <span className="text-sm text-slate-400">
-            {orders.length} vente{orders.length > 1 ? "s" : ""}
+            {transactions.length} transaction{transactions.length > 1 ? "s" : ""}
           </span>
         </div>
 
-        {orders.length === 0 ? (
+        {transactions.length === 0 ? (
           <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#E0F2F1]">
               <Wallet className="h-7 w-7 text-[#009688]" />
             </div>
-            <p className="mt-4 font-bold text-[#1A1A1A]">Aucune vente pour le moment</p>
+            <p className="mt-4 font-bold text-[#1A1A1A]">Aucune transaction pour le moment</p>
             <p className="mt-1 text-sm text-slate-400">
               Publiez un article et commencez à générer des gains dès aujourd&apos;hui.
             </p>
@@ -283,39 +304,35 @@ export function WalletView() {
           </div>
         ) : (
           <div className="space-y-3">
-            {orders.map((order) => {
-              const title =
-                (order.items ?? []).length > 0
-                  ? order.items!.map((i) => i.product_title).join(", ")
-                  : order.id;
-              const isPending = order.payment_status === "pending_cash";
+            {transactions.map((tx) => {
+              const isCredit = tx.type === "credit" || tx.type === "order_credit" || tx.amount > 0;
               return (
-                <div key={order.id} className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+                <div key={tx.id} className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
                   {/* Icon status */}
                   <div
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                      order.payment_status === "delivered"
-                        ? "bg-green-50"
-                        : order.payment_status === "paid"
-                          ? "bg-[#E0F2F1]"
-                          : "bg-orange-50"
+                      isCredit
+                        ? "bg-[#E0F2F1]"
+                        : "bg-red-50"
                     }`}
                   >
-                    {order.payment_status === "delivered" ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : order.payment_status === "paid" ? (
-                      <Receipt className="h-5 w-5 text-[#009688]" />
+                    {isCredit ? (
+                      <CheckCircle className="h-5 w-5 text-[#009688]" />
                     ) : (
-                      <Clock className="h-5 w-5 text-orange-500" />
+                      <Clock className="h-5 w-5 text-red-500" />
                     )}
                   </div>
 
                   {/* Infos */}
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-bold text-[#1A1A1A]">{title}</p>
+                    <p className="line-clamp-1 text-sm font-bold text-[#1A1A1A]">
+                      {tx.description || (isCredit ? "Crédit portefeuille" : "Débit portefeuille")}
+                    </p>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <span className="text-xs text-slate-400">{formatDate(order.created_at)}</span>
-                      <OrderStatusChip status={order.payment_status} />
+                      <span className="text-xs text-slate-400">{formatDate(tx.created_at)}</span>
+                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+                        {tx.type}
+                      </span>
                     </div>
                   </div>
 
@@ -323,16 +340,11 @@ export function WalletView() {
                   <div className="text-right">
                     <p
                       className={`text-sm font-black ${
-                        isPending ? "text-orange-500" : "text-green-600"
+                        isCredit ? "text-green-600" : "text-red-500"
                       }`}
                     >
-                      + {formatMoney(order.total_seller_amount, country)}
+                      {isCredit ? "+" : "-"} {formatMoney(Math.abs(tx.amount), country)}
                     </p>
-                    {order.total_commission > 0 && (
-                      <p className="text-[10px] text-slate-400">
-                        - {formatMoney(order.total_commission, country)} comm.
-                      </p>
-                    )}
                   </div>
                 </div>
               );

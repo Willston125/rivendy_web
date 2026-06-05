@@ -28,11 +28,16 @@ import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
 const STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
   pending_whatsapp:              { label: "En attente",       color: "bg-amber-100 text-amber-700" },
   confirmed_by_customer_service: { label: "Confirmée",        color: "bg-blue-100 text-blue-700" },
-  assigned_to_delivery:          { label: "En préparation",   color: "bg-indigo-100 text-indigo-700" },
+  payment_received_cash:         { label: "Paiement reçu",    color: "bg-[#E0F2F1] text-[#009688]" },
+  assigned_to_delivery:          { label: "Livreur assigné",  color: "bg-indigo-100 text-indigo-700" },
+  accepted_by_agent:             { label: "Pris en charge",   color: "bg-indigo-100 text-indigo-700" },
   picked_up:                     { label: "Récupérée",        color: "bg-violet-100 text-violet-700" },
   en_route:                      { label: "En route",         color: "bg-cyan-100 text-cyan-700" },
-  delivered_by_rider:            { label: "Livrée",           color: "bg-[#E0F2F1] text-[#009688]" },
-  completed:                     { label: "Terminée ✓",       color: "bg-[#E0F2F1] text-[#009688]" },
+  arrived:                       { label: "Livreur arrivé",   color: "bg-amber-100 text-amber-800" },
+  code_generated:                { label: "Code envoyé",      color: "bg-amber-100 text-amber-800" },
+  awaiting_customer_confirmation:{ label: "Livreur chez vous", color: "bg-amber-100 text-amber-800" },
+  delivered_by_rider:            { label: "Livrée",           color: "bg-green-100 text-green-700" },
+  completed:                     { label: "Terminée ✓",       color: "bg-green-100 text-green-700" },
   cancelled:                     { label: "Annulée",          color: "bg-red-100 text-red-600" },
   pending:                       { label: "En attente",       color: "bg-amber-100 text-amber-700" },
   shipped:                       { label: "Expédiée",         color: "bg-sky-100 text-sky-700" },
@@ -61,6 +66,13 @@ function Metric({ icon: Icon, label, value, href }: { icon: LucideIcon; label: s
 }
 
 /* ── Composant principal ─────────────────────────────────────────── */
+interface FollowedStore {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  isCertified: boolean;
+}
+
 export function ProfileDashboard() {
   const { user, profile, signOut } = useAuth();
   const { country } = useCountry();
@@ -69,6 +81,7 @@ export function ProfileDashboard() {
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [products,  setProducts]  = useState<Product[]>([]);
   const [ratings,   setRatings]   = useState<Array<{ has_photo: boolean | null; delivery_validated: boolean | null }>>([]);
+  const [followedStores, setFollowedStores] = useState<FollowedStore[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -116,6 +129,44 @@ export function ProfileDashboard() {
         .select("has_photo, delivery_validated")
         .eq("user_id", user.id);
       setRatings((ratingRows ?? []) as Array<{ has_photo: boolean | null; delivery_validated: boolean | null }>);
+
+      /* Boutiques suivies */
+      const { data: followRows } = await supabase
+        .from("store_follows")
+        .select(`
+          seller_id,
+          profiles:seller_id (
+            id,
+            store_name,
+            full_name,
+            avatar_url,
+            is_certified
+          )
+        `)
+        .eq("follower_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (followRows) {
+        const formatted = (followRows as unknown as Array<{
+          seller_id: string;
+          profiles: {
+            id: string;
+            store_name: string | null;
+            full_name: string | null;
+            avatar_url: string | null;
+            is_certified: boolean | null;
+          } | null;
+        }>).map((r) => {
+          const prof = r.profiles;
+          return {
+            id: r.seller_id,
+            name: prof?.store_name || prof?.full_name || "Boutique Rivendy",
+            avatarUrl: prof?.avatar_url || "",
+            isCertified: !!prof?.is_certified,
+          };
+        });
+        setFollowedStores(formatted);
+      }
     }
     load();
   }, [profile, user]);
@@ -319,6 +370,58 @@ export function ProfileDashboard() {
                       <p className="text-[11px] font-semibold text-[#009688]">
                         {formatMoney(product.price, country)}
                       </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Boutiques suivies */}
+          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <p className="text-sm font-black text-slate-900">Boutiques suivies</p>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-500">
+                {followedStores.length}
+              </span>
+            </div>
+
+            {followedStores.length === 0 ? (
+              <p className="px-4 py-5 text-xs font-semibold text-slate-400">
+                Tu ne suis aucune boutique pour le moment.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {followedStores.slice(0, 4).map((store) => (
+                  <Link
+                    key={store.id}
+                    href={`/store/${store.id}`}
+                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50"
+                  >
+                    {/* Avatar */}
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#E0F2F1]">
+                      {store.avatarUrl ? (
+                        <Image
+                          src={store.avatarUrl}
+                          alt={store.name}
+                          fill
+                          sizes="40px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm font-black text-[#009688]">
+                          {store.name.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="truncate text-[12px] font-bold text-slate-900">{store.name}</p>
+                        {store.isCertified && (
+                          <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-amber-400 text-white" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400">Voir la boutique</p>
                     </div>
                   </Link>
                 ))}

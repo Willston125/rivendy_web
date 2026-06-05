@@ -8,6 +8,9 @@ import { BuyNowButton } from "@/features/checkout/buy-now-button";
 import { FavoriteButton } from "@/features/products/favorite-button";
 import { ProductGallery } from "@/features/products/product-gallery";
 import { ProductGrid } from "@/features/products/product-grid";
+import { ProductComments } from "@/features/products/product-comments";
+import { ProductRatingInput } from "@/features/products/product-rating-input";
+import { ReportButton } from "@/features/products/report-button";
 import { categoryLabel, formatMoney, isBoosted, isProductVisible } from "@/lib/utils/format";
 import { getCountry, getProductById, getSimilarProducts } from "@/services/public-data";
 
@@ -164,6 +167,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
           )}
 
+          {/* Saisie de note */}
+          <ProductRatingInput productId={product.id} />
+
           {/* Description */}
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <h2 className="text-base font-black text-[#1A1A1A]">Description</h2>
@@ -228,9 +234,20 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
             {/* Commander maintenant */}
             <BuyNowButton product={product} />
+            <ReportButton productId={product.id} />
           </div>
         </section>
       </div>
+
+      {/* Section Commentaires */}
+      <section className="mt-12">
+        <ProductComments
+          productId={product.id}
+          sellerId={product.seller_id}
+          productTitle={product.title}
+          productImage={Array.isArray(product.photos) && product.photos.length > 0 ? product.photos[0] : ""}
+        />
+      </section>
 
       {/* Produits similaires */}
       {similar.length > 0 && (
