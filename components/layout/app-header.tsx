@@ -133,6 +133,21 @@ export function AppHeader() {
         {/* ── Icônes d'action ─────────────────────────────────────── */}
         <div className="flex items-center gap-1">
 
+          {/* Sélecteur de pays — desktop */}
+          <div className="relative hidden items-center md:flex mr-1.5">
+            <Globe className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <select
+              value={country.id}
+              onChange={(e) => changeCountry(e.target.value)}
+              className="h-10 appearance-none rounded-full border border-slate-200 bg-slate-50 pl-9 pr-8 text-xs font-bold text-slate-700 outline-none transition hover:border-[#009688] focus:border-[#009688] focus:bg-white cursor-pointer"
+            >
+              {countries.map((c) => (
+                <option value={c.id} key={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          </div>
+
           {/* Favoris */}
           <Link
             href="/favorites"
