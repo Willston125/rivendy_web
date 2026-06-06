@@ -38,43 +38,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshProfile = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) {
+  // Charge le profil pour un userId donné. N'appelle PAS getUser() (réseau bloquant) :
+  // on passe l'id depuis la session déjà disponible. Best-effort, ne throw jamais.
+  const loadProfileFor = useCallback(async (userId: string | null) => {
+    if (!userId) {
       setProfile(null);
       return;
     }
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", auth.user.id)
-      .maybeSingle();
-
-    setProfile((data as Profile | null) ?? null);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      setProfile((data as Profile | null) ?? null);
+    } catch {
+      // RLS / réseau — on ne bloque pas l'UI
+      setProfile(null);
+    }
   }, []);
+
+  // Exposé : rafraîchit le profil de l'utilisateur courant.
+  const refreshProfile = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    await loadProfileFor(data.session?.user?.id ?? null);
+  }, [loadProfileFor]);
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      await refreshProfile();
-      setLoading(false);
-    });
+    // Filet de sécurité : quoi qu'il arrive, on sort du loading sous 8s
+    // (évite le spinner infini de RequireAuth si une requête réseau traîne).
+    const safety = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 8000);
+
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+        await loadProfileFor(data.session?.user?.id ?? null);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (!mounted) return;
       setSession(nextSession);
-      await refreshProfile();
+      await loadProfileFor(nextSession?.user?.id ?? null);
       setLoading(false);
     });
 
     return () => {
       mounted = false;
+      clearTimeout(safety);
       subscription.subscription.unsubscribe();
     };
-  }, [refreshProfile]);
+  }, [loadProfileFor]);
 
   const signInWithPhone = useCallback(async (phone: string, password: string) => {
     const email = syntheticEmailFromPhone(phone);

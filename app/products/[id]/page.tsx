@@ -3,15 +3,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck, ChevronRight, MessageCircle, Package, ShieldCheck, Star, Zap } from "lucide-react";
-import { AddToCartButton } from "@/features/products/add-to-cart-button";
-import { BuyNowButton } from "@/features/checkout/buy-now-button";
-import { FavoriteButton } from "@/features/products/favorite-button";
+import { ProductActions } from "@/features/products/product-actions";
 import { ProductGallery } from "@/features/products/product-gallery";
 import { ProductGrid } from "@/features/products/product-grid";
 import { ProductComments } from "@/features/products/product-comments";
 import { ProductRatingInput } from "@/features/products/product-rating-input";
-import { ReportButton } from "@/features/products/report-button";
-import { ShareButton } from "@/components/ui/share-button";
 import { ProductViewTracker } from "@/features/products/product-view-tracker";
 import { categoryLabel, formatMoney, isBoosted, isProductVisible } from "@/lib/utils/format";
 import { getCountry, getProductById, getSimilarProducts } from "@/services/public-data";
@@ -228,25 +224,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             Les coordonnées du vendeur ne sont pas affichées. La commande passe par Rivendy — les deux parties sont protégées.
           </div>
 
-          {/* Actions */}
-          <div className="space-y-2">
-            {/* Ligne principale : Ajouter au panier + Favori + Partager */}
-            <div className="flex gap-2">
-              <AddToCartButton product={product} label="Ajouter au panier" size="lg" />
-              <FavoriteButton
-                productId={product.id}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
-              />
-              <ShareButton
-                title={product.title}
-                text={`Regarde ${product.title} sur Rivendy !`}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-              />
-            </div>
-            {/* Commander maintenant */}
-            <BuyNowButton product={product} />
-            <ReportButton targetId={product.id} />
-          </div>
+          {/* Actions — masque commande si c'est le vendeur (parity Flutter) */}
+          <ProductActions product={product} />
         </section>
       </div>
 

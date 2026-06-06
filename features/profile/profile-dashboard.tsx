@@ -182,7 +182,9 @@ export function ProfileDashboard() {
     [ratings],
   );
 
-  const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Utilisateur";
+  // Nom : profil DB > store > metadata signup. JAMAIS l'email (synthétique = numéro).
+  const metaName = (user?.user_metadata?.full_name as string | undefined)?.trim();
+  const displayName = profile?.full_name || profile?.store_name || metaName || "Utilisateur";
   const initials    = displayName.slice(0, 1).toUpperCase();
 
   /* Formatage date courte */
