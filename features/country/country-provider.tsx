@@ -17,12 +17,14 @@ import { DEFAULT_COUNTRY_ID, type Country, type PaymentMethod } from "@/types/ri
 type CountryContextValue = {
   /** Marché actif — null tant que la sélection n'est pas résolue (parity: needsMarketSelection). */
   country: Country | null;
-  /** True si l'init est terminée mais aucun marché n'a été résolu → UI doit afficher le sélecteur. */
+  /** True si l'init est terminée, aucun marché résolu, ET la liste des pays est disponible. */
   needsMarketSelection: boolean;
   countries: Country[];
   paymentMethods: PaymentMethod[];
   loading: boolean;
   setCountryId: (countryId: string) => Promise<void>;
+  /** Relance le chargement des pays (utilisé par le modal si la liste est vide). */
+  reloadCountries: () => Promise<void>;
 };
 
 const CountryContext = createContext<CountryContextValue | null>(null);
@@ -92,11 +94,18 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const needsMarketSelection = !loading && country === null;
+  // Bloque le modal uniquement si l'init EST terminée ET les pays sont bien chargés.
+  // Si countries = [] (Supabase injoignable), on ne bloque pas — le modal propose de réessayer.
+  const needsMarketSelection = !loading && country === null && countries.length > 0;
 
   const loadPaymentMethods = useCallback(async (countryId: string) => {
     const methods = await fetchPaymentMethods(countryId);
     setPaymentMethods(methods);
+  }, []);
+
+  const reloadCountries = useCallback(async () => {
+    const list = await fetchActiveMarkets();
+    if (list.length > 0) setCountries(list);
   }, []);
 
   useEffect(() => {
@@ -104,7 +113,13 @@ export function CountryProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       let resolved: Country | null = null;
 
-      const list = await fetchActiveMarkets();
+      // Retry jusqu'à 3 fois si Supabase est lent à démarrer (cold start Vercel)
+      let list: Country[] = [];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        list = await fetchActiveMarkets();
+        if (list.length > 0) break;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
       setCountries(list);
 
       // Étape 0 — Profil Supabase (source autoritaire, parity with Flutter step 0)
@@ -162,8 +177,8 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<CountryContextValue>(
-    () => ({ country, needsMarketSelection, countries, paymentMethods, loading, setCountryId }),
-    [country, needsMarketSelection, countries, loading, paymentMethods, setCountryId],
+    () => ({ country, needsMarketSelection, countries, paymentMethods, loading, setCountryId, reloadCountries }),
+    [country, needsMarketSelection, countries, loading, paymentMethods, setCountryId, reloadCountries],
   );
 
   return <CountryContext.Provider value={value}>{children}</CountryContext.Provider>;

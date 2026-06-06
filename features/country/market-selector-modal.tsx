@@ -55,11 +55,18 @@ function CountryRow({
  * Parity Flutter : _CountryPickerSheet (bottom-sheet draggable).
  */
 export function MarketSelectorModal() {
-  const { needsMarketSelection, countries, setCountryId } = useCountry();
+  const { needsMarketSelection, countries, setCountryId, reloadCountries } = useCountry();
   const [pending, setPending] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   if (!needsMarketSelection) return null;
+
+  async function handleRetry() {
+    setRetrying(true);
+    await reloadCountries();
+    setRetrying(false);
+  }
 
   async function handleSelect(countryId: string) {
     setPending(countryId);
@@ -93,8 +100,18 @@ export function MarketSelectorModal() {
         {/* Liste des pays */}
         <div className="max-h-[60vh] overflow-y-auto px-3 py-3">
           {countries.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-400">
-              Chargement des marchés…
+            <div className="flex flex-col items-center gap-4 py-12 text-center">
+              <p className="text-sm text-slate-400">
+                Impossible de charger les marchés.
+              </p>
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={retrying}
+                className="rounded-full bg-[#009688] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#00796B] disabled:opacity-60"
+              >
+                {retrying ? "Chargement…" : "Réessayer"}
+              </button>
             </div>
           ) : (
             <div className="space-y-1">
