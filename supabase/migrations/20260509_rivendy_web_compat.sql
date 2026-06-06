@@ -54,7 +54,11 @@ ALTER TABLE public.products
     'beauteParfums',
     'artisanatLocal',
     'materiauxConstruction',
-    'alimentation'
+    'alimentation',
+    'restaurant',
+    'location',
+    'mariage',
+    'personnels'
   ));
 
 -- 3. Orders: align Flutter + admin dashboard lifecycle.
