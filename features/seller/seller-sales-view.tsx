@@ -16,11 +16,13 @@ import {
   Trash2,
   Zap,
   PlaySquare,
+  ArrowUpDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { cn } from "@/lib/utils/cn";
 import type { Product, AppOrder } from "@/types/rivendy";
 
 type Tab = "garde-robe" | "commandes" | "ventes" | "stats";
@@ -119,6 +121,24 @@ export function SellerSalesView() {
     () => orders.filter((o) => !["delivered", "delivered_by_rider", "completed", "cancelled"].includes(o.status)),
     [orders],
   );
+
+  // ── Tri du tableau "Mes Ventes" (desktop) ──────────────────
+  const [soldSort, setSoldSort] = useState<{ key: "title" | "price"; dir: "asc" | "desc" }>({
+    key: "price",
+    dir: "desc",
+  });
+  const sortedSold = useMemo(() => {
+    const priceOf = (p: Product) => (p.seller_price > 0 ? p.seller_price : p.price);
+    const arr = [...soldProducts];
+    arr.sort((a, b) => {
+      const cmp = soldSort.key === "title" ? a.title.localeCompare(b.title) : priceOf(a) - priceOf(b);
+      return soldSort.dir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [soldProducts, soldSort]);
+  function toggleSold(key: "title" | "price") {
+    setSoldSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
 
   // ── Actions ────────────────────────────────────────────────
   async function markAsSold(productId: string) {
@@ -549,46 +569,102 @@ export function SellerSalesView() {
               </p>
             </div>
           ) : (
-            soldProducts.map((product) => (
-              <div key={product.id} className="flex items-center gap-3 overflow-hidden rounded-2xl bg-white p-4 shadow-sm">
-                {/* Image grisée + badge VENDU */}
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                  <Image
-                    src={firstPhoto(product)}
-                    alt={product.title}
-                    fill
-                    sizes="64px"
-                    className="object-cover opacity-50 grayscale"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-black text-white">
-                      VENDU
-                    </span>
-                  </div>
-                </div>
+            <>
+              {/* ── Mobile : cartes ───────────────────────────── */}
+              <div className="space-y-4 md:hidden">
+                {sortedSold.map((product) => (
+                  <div key={product.id} className="flex items-center gap-3 overflow-hidden rounded-2xl bg-white p-4 shadow-sm">
+                    {/* Image grisée + badge VENDU */}
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                      <Image
+                        src={firstPhoto(product)}
+                        alt={product.title}
+                        fill
+                        sizes="64px"
+                        className="object-cover opacity-50 grayscale"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-black text-white">
+                          VENDU
+                        </span>
+                      </div>
+                    </div>
 
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-1 text-sm font-bold text-slate-400 line-through">
-                    {product.title}
-                  </p>
-                  <div className="mt-1 flex items-center gap-1.5 text-sm">
-                    <span className="text-base font-black text-[#009688]">
-                      {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, country)}
-                    </span>
-                    <span className="text-xs text-slate-400">encaissé</span>
-                  </div>
-                  {product.commission_amount > 0 && (
-                    <p className="text-xs text-orange-600">
-                      {formatMoney(product.commission_amount, country)} versés à Rivendy
-                    </p>
-                  )}
-                </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-bold text-slate-400 line-through">
+                        {product.title}
+                      </p>
+                      <div className="mt-1 flex items-center gap-1.5 text-sm">
+                        <span className="text-base font-black text-[#009688]">
+                          {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, country)}
+                        </span>
+                        <span className="text-xs text-slate-400">encaissé</span>
+                      </div>
+                      {product.commission_amount > 0 && (
+                        <p className="text-xs text-orange-600">
+                          {formatMoney(product.commission_amount, country)} versés à Rivendy
+                        </p>
+                      )}
+                    </div>
 
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                </div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
+
+              {/* ── Desktop : tableau triable ─────────────────── */}
+              <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-4 py-3">
+                        <button type="button" onClick={() => toggleSold("title")} className="inline-flex items-center gap-1 transition hover:text-slate-700">
+                          Article
+                          <ArrowUpDown className={cn("h-3 w-3", soldSort.key === "title" ? "text-[#009688]" : "text-slate-300")} />
+                        </button>
+                      </th>
+                      <th className="px-4 py-3 text-right">
+                        <button type="button" onClick={() => toggleSold("price")} className="inline-flex items-center gap-1 transition hover:text-slate-700">
+                          Encaissé
+                          <ArrowUpDown className={cn("h-3 w-3", soldSort.key === "price" ? "text-[#009688]" : "text-slate-300")} />
+                        </button>
+                      </th>
+                      <th className="px-4 py-3 text-right">Commission</th>
+                      <th className="px-4 py-3 text-center">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {sortedSold.map((product) => (
+                      <tr key={product.id} className="transition hover:bg-slate-50/60">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                              <Image src={firstPhoto(product)} alt={product.title} fill sizes="44px" className="object-cover opacity-60 grayscale" />
+                            </div>
+                            <Link href={`/products/${product.id}`} className="line-clamp-1 font-bold text-slate-600 hover:text-[#009688]">
+                              {product.title}
+                            </Link>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-[#009688]">
+                          {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, country)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-xs font-semibold text-orange-600">
+                          {product.commission_amount > 0 ? formatMoney(product.commission_amount, country) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-1 text-[11px] font-black text-green-700">
+                            <CheckCircle className="h-3 w-3" /> Vendu
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
