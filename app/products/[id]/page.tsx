@@ -245,7 +245,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
             {/* Commander maintenant */}
             <BuyNowButton product={product} />
-            <ReportButton productId={product.id} />
+            <ReportButton targetId={product.id} />
           </div>
         </section>
       </div>

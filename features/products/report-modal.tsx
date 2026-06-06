@@ -81,24 +81,24 @@ export function ReportModal({ targetId, type, isOpen, onClose }: ReportModalProp
     setErrorMsg(null);
 
     try {
-      const table = type === "seller" ? "seller_reports" : "product_reports";
-      const payload = type === "seller"
-        ? {
-            seller_id: targetId,
-            reported_by: user.id,
-            reason: selectedReason,
-            details: details.trim(),
-            status: "pending",
-          }
-        : {
-            product_id: targetId,
-            reported_by: user.id,
-            reason: selectedReason,
-            details: details.trim(),
-            status: "pending",
-          };
-
-      const { error } = await supabase.from(table).insert(payload);
+      let error: { message: string } | null = null;
+      if (type === "seller") {
+        ({ error } = await supabase.from("seller_reports").insert({
+          seller_id: targetId,
+          reported_by: user.id,
+          reason: selectedReason,
+          details: details.trim(),
+          status: "pending",
+        }));
+      } else {
+        ({ error } = await supabase.from("product_reports").insert({
+          product_id: targetId,
+          reported_by: user.id,
+          reason: selectedReason,
+          details: details.trim(),
+          status: "pending",
+        }));
+      }
 
       if (error) throw error;
 
