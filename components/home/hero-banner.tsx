@@ -10,7 +10,7 @@ import { ArrowRight, Package, Shield, Truck } from "lucide-react";
  * - Côté gauche : titre, sous-titre, 3 avantages, CTA
  * - Côté droit : image femme souriante (generée)
  */
-export function HeroBanner() {
+export function HeroBanner({ countryName = "votre marché" }: { countryName?: string }) {
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#009688] via-[#00897B] to-[#00796B] shadow-lg shadow-[#009688]/15">
 
@@ -29,7 +29,7 @@ export function HeroBanner() {
             <h1 className="text-2xl font-extrabold leading-tight text-white sm:text-3xl lg:text-[2.1rem] lg:leading-[1.2]">
               Achetez, vendez et{" "}
               <br className="hidden sm:block" />
-              commandez à Djibouti{" "}
+              commandez à {countryName}{" "}
               <br className="hidden sm:block" />
               avec <span className="text-[#B2DFDB]">Rivendy</span>
             </h1>

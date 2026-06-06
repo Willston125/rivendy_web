@@ -8,11 +8,11 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 
 export const metadata: Metadata = {
   title: {
-    default: "Rivendy — Marketplace Djibouti",
+    default: "Rivendy — Marketplace",
     template: "%s | Rivendy",
   },
   description:
-    "Rivendy est la marketplace #1 à Djibouti. Achetez, vendez et commandez des produits locaux en toute sécurité.",
+    "Rivendy est la marketplace multi-marchés africaine. Achetez, vendez et commandez des produits locaux en toute sécurité.",
   metadataBase: new URL("https://rivendy.com"),
 };
 

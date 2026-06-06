@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp, orderId } from "@/lib/utils/format";
 import type { CartItem, PaymentMethod } from "@/types/rivendy";
 
@@ -44,7 +44,8 @@ export function CheckoutForm() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const { groups, totalAmount, totalItems, sellerCount, clearCart } = useCart();
-  const { country, paymentMethods } = useCountry();
+  const { country: countryOrNull, paymentMethods, needsMarketSelection } = useCountry();
+  const country = useCountryOrDefault();
 
   // Infos acheteur
   const [buyerName, setBuyerName] = useState(profile?.full_name || "");
@@ -293,6 +294,17 @@ export function CheckoutForm() {
   }
 
   // ── Vues ──────────────────────────────────────────────────────────────────
+
+  if (needsMarketSelection) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <p className="text-2xl font-black text-slate-950">Sélectionne ton marché</p>
+        <p className="mt-3 text-sm text-slate-500">
+          Choisis ton pays en haut de la page pour accéder au checkout.
+        </p>
+      </div>
+    );
+  }
 
   if (!totalItems && !createdIds.length) {
     return (

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { ProductCard } from "@/features/products/product-card";
 import { supabase } from "@/lib/supabase/client";
 import { CATEGORIES, SUBCATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
@@ -21,7 +21,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 };
 
 export function SearchView() {
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryId | null>(null);
   const [subcategory, setSubcategory] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export function SearchView() {
       .limit(60);
 
     if (country?.id && country.id !== "all")
-      dbQuery = dbQuery.eq("seller_country_id", country.id);
+      dbQuery = dbQuery.eq("country_id", country.id);
     if (cat) dbQuery = dbQuery.eq("category", cat);
     if (sub?.trim()) dbQuery = dbQuery.eq("subcategory", sub.trim());
     if (q.trim()) dbQuery = dbQuery.ilike("title", `%${q.trim()}%`);

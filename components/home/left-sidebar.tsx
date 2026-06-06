@@ -17,14 +17,15 @@ import {
   Sparkles,
   Store,
   UtensilsCrossed,
-  Facebook,
-  Instagram,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/features/auth/auth-provider";
-import { firstPhoto } from "@/lib/utils/format";
+import { useCountryOrDefault } from "@/features/country/country-provider";
+import { formatMoney } from "@/lib/utils/format";
+import { FacebookIcon, InstagramIcon } from "@/components/ui/social-icons";
+import { StoriesRail } from "@/features/products/stories-rail";
 import type { Product } from "@/types/rivendy";
 import type { CategoryId } from "@/types/rivendy";
 
@@ -39,16 +40,6 @@ const QUICK_CATEGORIES: { id: CategoryId | string; label: string; icon: LucideIc
   { id: "alimentation",  label: "Alimentation",    icon: UtensilsCrossed },
 ];
 
-/* ── Stories groupées par vendeur ─────────────────────────────────── */
-function groupBySeller(products: Product[]): Product[] {
-  const seen = new Set<string>();
-  return products.filter((p) => {
-    if (seen.has(p.seller_id)) return false;
-    seen.add(p.seller_id);
-    return true;
-  });
-}
-
 export function LeftSidebar({
   stories,
   countryId,
@@ -57,11 +48,8 @@ export function LeftSidebar({
   countryId: string;
 }) {
   const { profile, user } = useAuth();
+  const country = useCountryOrDefault();
   const [balanceVisible, setBalanceVisible] = useState(true);
-  // Exclure le vendeur connecté de ses propres histoires
-  const grouped = groupBySeller(stories)
-    .filter((p) => p.seller_id !== user?.id)
-    .slice(0, 5);
 
   const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Invité";
   const isCertified = profile?.is_certified ?? false;
@@ -116,7 +104,7 @@ export function LeftSidebar({
                   </button>
                 </div>
                 <p className="mt-0.5 text-lg font-extrabold text-slate-900">
-                  {balanceVisible ? "12 450 FDJ" : "••••••"}
+                  {balanceVisible ? formatMoney(12450, country) : "••••••"}
                 </p>
               </div>
 
@@ -155,39 +143,17 @@ export function LeftSidebar({
       {/* ══════════════════════════════════════════════════════════════
           HISTOIRES DE BOUTIQUES
       ══════════════════════════════════════════════════════════════ */}
-      {grouped.length > 0 && (
+      {stories.length > 0 && (
         <div>
           <div className="mb-3 flex items-center justify-between px-1">
             <h3 className="text-[13px] font-bold text-slate-900">Histoires de boutiques</h3>
-            <Link href="/" className="text-xs font-semibold text-[#009688] transition hover:underline">
-              Voir tout
-            </Link>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
-            {grouped.map((product) => (
-              <Link
-                key={product.seller_id}
-                href={`/store/${product.seller_id}`}
-                className="flex w-[62px] shrink-0 flex-col items-center gap-1.5"
-              >
-                {/* Anneau dégradé */}
-                <span className="relative flex h-[58px] w-[58px] items-center justify-center rounded-full bg-gradient-to-br from-[#00BFA5] via-[#009688] to-[#6A5ACD] p-[2.5px]">
-                  <span className="relative block h-full w-full overflow-hidden rounded-full bg-white p-[2px]">
-                    <Image
-                      src={product.seller_avatar_url ?? firstPhoto(product)}
-                      alt={product.seller_name ?? "Boutique"}
-                      fill
-                      sizes="52px"
-                      className="rounded-full object-cover"
-                    />
-                  </span>
-                </span>
-                <span className="w-full truncate text-center text-[10px] font-semibold leading-tight text-slate-500">
-                  {product.seller_name ?? "Boutique"}
-                </span>
-              </Link>
-            ))}
-          </div>
+          <StoriesRail
+            products={stories}
+            excludeSellerId={user?.id}
+            limit={8}
+            variant="sidebar"
+          />
         </div>
       )}
 
@@ -227,10 +193,10 @@ export function LeftSidebar({
         <p className="mt-1 text-[10px] text-slate-400">© 2024 Rivendy. Tous droits réservés.</p>
         <div className="mt-2.5 flex items-center gap-2.5">
           <a href="https://facebook.com/rivendy" target="_blank" rel="noreferrer" className="text-slate-300 transition hover:text-[#1877F2]" aria-label="Facebook">
-            <Facebook className="h-3.5 w-3.5" />
+            <FacebookIcon className="h-3.5 w-3.5" />
           </a>
           <a href="https://instagram.com/rivendy" target="_blank" rel="noreferrer" className="text-slate-300 transition hover:text-[#E4405F]" aria-label="Instagram">
-            <Instagram className="h-3.5 w-3.5" />
+            <InstagramIcon className="h-3.5 w-3.5" />
           </a>
           <a href="https://tiktok.com/@rivendy" target="_blank" rel="noreferrer" className="text-slate-300 transition hover:text-slate-900" aria-label="TikTok">
             <span className="font-bold text-[10px]">TK</span>

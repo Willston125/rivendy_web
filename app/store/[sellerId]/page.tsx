@@ -11,12 +11,12 @@ import {
   ShoppingBag,
   Star,
   Zap,
-  Facebook,
-  Instagram,
   Link2
 } from "lucide-react";
+import { FacebookIcon, InstagramIcon } from "@/components/ui/social-icons";
 import { ProductGrid } from "@/features/products/product-grid";
 import { StoreRatings } from "@/features/store/store-ratings";
+import { VoiceNotePlayer } from "@/features/store/voice-note-player";
 import { FollowButton } from "@/features/store/follow-button";
 import { PrintCatalog } from "@/features/store/print-catalog";
 import { ShareButton } from "@/components/ui/share-button";
@@ -27,7 +27,9 @@ import {
   getSellerProfile,
   getSellerPublicProducts,
   getStoreTrustSummary,
+  getVendorPillars,
 } from "@/services/public-data";
+import { VendorTrustPillars } from "@/features/store/vendor-trust-pillars";
 
 /* ── generateMetadata ────────────────────────────────────────────── */
 export async function generateMetadata({
@@ -40,11 +42,12 @@ export async function generateMetadata({
   if (!seller) return { title: "Boutique introuvable — Rivendy" };
 
   const name = seller.store_name || seller.full_name || "Boutique Rivendy";
+  const country = await getCountry(seller.country_id || "DJ");
   return {
     title: `${name} — Rivendy`,
     description:
       seller.store_description ||
-      `Découvrez les produits de ${name} sur Rivendy, la marketplace #1 à Djibouti.`,
+      `Découvrez les produits de ${name} sur Rivendy, la marketplace #1 à ${country.name}.`,
     openGraph: {
       title: name,
       description: seller.store_description ?? "",
@@ -62,10 +65,11 @@ export default async function StorePage({
 }) {
   const { sellerId } = await params;
 
-  const [seller, products, trust, followCountRes] = await Promise.all([
+  const [seller, products, trust, pillars, followCountRes] = await Promise.all([
     getSellerProfile(sellerId),
     getSellerPublicProducts(sellerId, true),
     getStoreTrustSummary(sellerId),
+    getVendorPillars(sellerId),
     createAnonServerClient()
       .from("store_follows")
       .select("id", { count: "exact", head: true })
@@ -192,12 +196,12 @@ export default async function StorePage({
                   <div className="mt-3 flex items-center gap-2">
                     {seller.facebook_url && (
                       <a href={seller.facebook_url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[#1877F2] transition hover:bg-slate-200">
-                        <Facebook className="h-4 w-4" />
+                        <FacebookIcon className="h-4 w-4" />
                       </a>
                     )}
                     {seller.instagram_url && (
                       <a href={seller.instagram_url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[#E4405F] transition hover:bg-slate-200">
-                        <Instagram className="h-4 w-4" />
+                        <InstagramIcon className="h-4 w-4" />
                       </a>
                     )}
                     {seller.tiktok_url && (
@@ -209,6 +213,12 @@ export default async function StorePage({
                 )}
               </div>
             </div>
+
+            {/* Note vocale du vendeur */}
+            {seller.voice_note_url && <VoiceNotePlayer audioUrl={seller.voice_note_url} />}
+
+            {/* Piliers de performance vendeur */}
+            <VendorTrustPillars pillars={pillars} />
 
             {/* Stats */}
             <div className="grid grid-cols-4 gap-2 text-center">

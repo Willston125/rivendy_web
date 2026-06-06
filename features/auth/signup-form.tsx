@@ -17,7 +17,7 @@ export function SignupForm() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [realEmail, setRealEmail] = useState("");
-  const [countryId, setCountryId] = useState(country.id);
+  const [countryId, setCountryId] = useState(country?.id ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

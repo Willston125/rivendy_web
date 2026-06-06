@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Zap, CheckCircle2, Copy, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import type { BoostPurchaseInput, Product } from "@/types/rivendy";
@@ -16,11 +16,17 @@ interface BoostTier {
   name: string;
   emoji: string;
   priceFDJ: number;
+  priceKMF: number;
   durationDays: number;
   color: string;
   bgColor: string;
   isPopular?: boolean;
   benefits: string[];
+}
+
+// Parity Flutter boost_screen.dart — priceForMarket(marketId)
+function priceForMarket(tier: BoostTier, countryId: string): number {
+  return countryId === "KM" ? tier.priceKMF : tier.priceFDJ;
 }
 
 const TIERS: BoostTier[] = [
@@ -29,6 +35,7 @@ const TIERS: BoostTier[] = [
     name: "Bronze",
     emoji: "🥉",
     priceFDJ: 500,
+    priceKMF: 1250,
     durationDays: 3,
     color: "#CD7F32",
     bgColor: "#FFF8F0",
@@ -43,6 +50,7 @@ const TIERS: BoostTier[] = [
     name: "Argent",
     emoji: "🥈",
     priceFDJ: 1500,
+    priceKMF: 3750,
     durationDays: 7,
     color: "#9E9E9E",
     bgColor: "#F8F8F8",
@@ -59,6 +67,7 @@ const TIERS: BoostTier[] = [
     name: "Or",
     emoji: "🥇",
     priceFDJ: 3000,
+    priceKMF: 7500,
     durationDays: 15,
     color: "#FFB800",
     bgColor: "#FFFBEB",
@@ -82,7 +91,7 @@ const PAYMENT_METHODS = [
 
 export function BoostView({ product }: { product: Product }) {
   const { user } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [selectedTier, setSelectedTier] = useState<BoostTier | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -106,7 +115,7 @@ export function BoostView({ product }: { product: Product }) {
         product_id: product.id,
         seller_id: user.id,
         plan: tier.id,
-        price_paid: tier.priceFDJ,
+        price_paid: priceForMarket(tier, country.id),
         duration_days: tier.durationDays,
         status: "pending",
         payment_method: PAYMENT_METHODS[selectedMethod].name,
@@ -161,7 +170,7 @@ export function BoostView({ product }: { product: Product }) {
       </div>
 
       {/* Info banner */}
-      <div className="mb-6 flex gap-3 rounded-2xl border border-[#009688]/20 bg-[#009688]/8 bg-[#E8F5E9] p-4">
+      <div className="mb-6 flex gap-3 rounded-2xl border border-[#009688]/20 bg-[#E8F5E9] p-4">
         <Zap className="h-6 w-6 shrink-0 text-[#009688]" />
         <p className="text-sm leading-relaxed text-[#004D40]">
           Un boost augmente la visibilité de votre annonce et attire plus
@@ -206,12 +215,12 @@ export function BoostView({ product }: { product: Product }) {
                 </div>
                 <div className="text-right">
                   <p className="text-xl font-black" style={{ color: tier.color }}>
-                    {formatMoney(tier.priceFDJ, country)}
+                    {formatMoney(priceForMarket(tier, country.id), country)}
                   </p>
                   <p className="text-xs text-slate-400">
                     soit{" "}
-                    {Math.round(tier.priceFDJ / tier.durationDays).toLocaleString("fr-FR")}{" "}
-                    FDJ/jour
+                    {Math.round(priceForMarket(tier, country.id) / tier.durationDays).toLocaleString("fr-FR")}{" "}
+                    {country.currency_symbol}/jour
                   </p>
                 </div>
               </div>
@@ -276,7 +285,7 @@ export function BoostView({ product }: { product: Product }) {
                 </p>
                 <p className="text-sm text-slate-500">
                   {selectedTier.durationDays} jours ·{" "}
-                  {formatMoney(selectedTier.priceFDJ, country)}
+                  {formatMoney(priceForMarket(selectedTier, country.id), country)}
                 </p>
               </div>
             </div>
@@ -321,7 +330,7 @@ export function BoostView({ product }: { product: Product }) {
                 </div>
                 <p className="text-sm text-slate-600">
                   Envoyez{" "}
-                  <strong>{formatMoney(selectedTier.priceFDJ, country)}</strong>{" "}
+                  <strong>{formatMoney(priceForMarket(selectedTier, country.id), country)}</strong>{" "}
                   au numéro :{" "}
                   <strong
                     style={{ color: selectedTier.color }}

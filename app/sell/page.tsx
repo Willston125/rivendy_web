@@ -6,7 +6,7 @@ import { ProductForm } from "@/features/products/product-form";
 export const metadata: Metadata = {
   title: "Publier un produit — Rivendy",
   description:
-    "Mettez votre produit en vente sur Rivendy en quelques minutes. Touchez des milliers d'acheteurs à Djibouti.",
+    "Mettez votre produit en vente sur Rivendy en quelques minutes. Touchez des milliers d'acheteurs sur votre marché.",
 };
 
 const STEPS = [

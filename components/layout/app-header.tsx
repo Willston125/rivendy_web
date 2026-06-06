@@ -37,7 +37,8 @@ export function AppHeader() {
   const params = useSearchParams();
   const { profile, user, signOut } = useAuth();
   const { totalItems } = useCart();
-  const { country, countries, setCountryId } = useCountry();
+  const { country: countryOrNull, countries, setCountryId, needsMarketSelection } = useCountry();
+  const countryId = countryOrNull?.id ?? "";
   const [query, setQuery] = useState(params.get("q") ?? "");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -59,7 +60,7 @@ export function AppHeader() {
     const next = new URLSearchParams(params.toString());
     if (query.trim()) next.set("q", query.trim());
     else next.delete("q");
-    next.set("country", country.id);
+    if (countryId) next.set("country", countryId);
     router.push(`/?${next.toString()}`);
   }
 
@@ -137,10 +138,13 @@ export function AppHeader() {
           <div className="relative hidden items-center md:flex mr-1.5">
             <Globe className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <select
-              value={country.id}
+              value={countryId}
               onChange={(e) => changeCountry(e.target.value)}
               className="h-10 appearance-none rounded-full border border-slate-200 bg-slate-50 pl-9 pr-8 text-xs font-bold text-slate-700 outline-none transition hover:border-[#009688] focus:border-[#009688] focus:bg-white cursor-pointer"
             >
+              {needsMarketSelection && (
+                <option value="" disabled>Choisir un marché…</option>
+              )}
               {countries.map((c) => (
                 <option value={c.id} key={c.id}>{c.name}</option>
               ))}
@@ -403,10 +407,13 @@ export function AppHeader() {
           <div className="relative mb-3">
             <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <select
-              value={country.id}
+              value={countryId}
               onChange={(e) => changeCountry(e.target.value)}
               className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-9 pr-4 text-sm font-bold text-slate-700 outline-none"
             >
+              {needsMarketSelection && (
+                <option value="" disabled>Choisir un marché…</option>
+              )}
               {countries.map((c) => (
                 <option value={c.id} key={c.id}>{c.name}</option>
               ))}

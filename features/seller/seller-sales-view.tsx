@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import type { Product, AppOrder } from "@/types/rivendy";
 
@@ -80,7 +80,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 
 export function SellerSalesView() {
   const { user, profile } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);

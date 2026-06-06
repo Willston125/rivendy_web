@@ -12,6 +12,7 @@ import { ProductComments } from "@/features/products/product-comments";
 import { ProductRatingInput } from "@/features/products/product-rating-input";
 import { ReportButton } from "@/features/products/report-button";
 import { ShareButton } from "@/components/ui/share-button";
+import { ProductViewTracker } from "@/features/products/product-view-tracker";
 import { categoryLabel, formatMoney, isBoosted, isProductVisible } from "@/lib/utils/format";
 import { getCountry, getProductById, getSimilarProducts } from "@/services/public-data";
 
@@ -26,12 +27,13 @@ export async function generateMetadata(
     ? (product.photos[0] as string)
     : "/brand/hero-woman.png";
 
+  const country = await getCountry(product.seller_country_id || "DJ");
   return {
     title: `${product.title} — Rivendy`,
     description:
       product.description
         ? product.description.slice(0, 155)
-        : `Achetez "${product.title}" sur Rivendy, la marketplace #1 à Djibouti.`,
+        : `Achetez "${product.title}" sur Rivendy, la marketplace #1 à ${country.name}.`,
     openGraph: {
       title: product.title,
       description: product.description?.slice(0, 155) ?? "",
@@ -64,6 +66,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+
+      {/* Incrémente views_count — parity Flutter product_detail_screen */}
+      <ProductViewTracker productId={product.id} />
 
       {/* Breadcrumb */}
       <nav className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">

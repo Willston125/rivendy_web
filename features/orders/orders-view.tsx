@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
-import type { AppOrder, OrderStatus } from "@/types/rivendy";
+import type { AppOrder, Country, OrderStatus } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
 
 /* ── Mapping statut → label + style ────────────────────────────── */
@@ -195,7 +195,7 @@ function DeliveryCodeBanner({ orderId, userId }: { orderId: string, userId: stri
 }
 
 /* ── Carte commande ─────────────────────────────────────────────── */
-function OrderCard({ order, country, userId }: { order: AppOrder; country: ReturnType<typeof useCountry>["country"], userId: string }) {
+function OrderCard({ order, country, userId }: { order: AppOrder; country: Country, userId: string }) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
   const shortRef = order.id.split("-")[0].toUpperCase();
   const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(order.created_at));
@@ -297,7 +297,7 @@ function OrderCard({ order, country, userId }: { order: AppOrder; country: Retur
 /* ── Vue principale ─────────────────────────────────────────────── */
 export function OrdersView() {
   const { user } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [orders, setOrders]   = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");

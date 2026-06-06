@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MessageCircle, Minus, Plus, ShoppingBag, Store, Trash2, MessageSquare } from "lucide-react";
 import { useCart } from "@/features/cart/cart-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 
 export function CartView() {
@@ -18,7 +18,7 @@ export function CartView() {
     removeItem,
     clearCart,
   } = useCart();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   // ── Panier vide ────────────────────────────────────────────────────────────
   if (!totalItems) {

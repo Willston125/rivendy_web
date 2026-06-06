@@ -4,6 +4,7 @@ import { Zap } from "lucide-react";
 import { CATEGORIES, SUBCATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
 import { AdBanner } from "@/features/ads/ad-banner";
 import { ProductGrid } from "@/features/products/product-grid";
+import { StoriesRail } from "@/features/products/stories-rail";
 import { LeftSidebar } from "@/components/home/left-sidebar";
 import { HeroBanner } from "@/components/home/hero-banner";
 import { PromoCards } from "@/components/home/promo-cards";
@@ -16,27 +17,35 @@ import {
 } from "@/services/public-data";
 import { cn } from "@/lib/utils/cn";
 
-export const metadata: Metadata = {
-  title: "Rivendy — Achetez et vendez à Djibouti",
-  description:
-    "Rivendy est la marketplace #1 à Djibouti. Achetez, vendez et commandez des produits locaux en toute sécurité.",
-  openGraph: {
-    title: "Rivendy — Marketplace Djibouti",
-    description:
-      "Découvrez des milliers de produits locaux sur Rivendy. Mode, électronique, beauté, alimentation et bien plus.",
-    url: "https://rivendy.com",
-    siteName: "Rivendy",
-    images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
-    locale: "fr_DJ",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Rivendy — Marketplace Djibouti",
-    description: "Achetez et vendez à Djibouti avec Rivendy.",
-    images: ["/brand/hero-woman.png"],
-  },
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: HomeSearchParams;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const countryId = params.country || DEFAULT_COUNTRY_ID;
+  const country = await getCountry(countryId);
+  return {
+    title: `Rivendy — Achetez et vendez à ${country.name}`,
+    description: `Rivendy est la marketplace #1 à ${country.name}. Achetez, vendez et commandez des produits locaux en toute sécurité.`,
+    openGraph: {
+      title: `Rivendy — Marketplace ${country.name}`,
+      description:
+        "Découvrez des milliers de produits locaux sur Rivendy. Mode, électronique, beauté, alimentation et bien plus.",
+      url: "https://rivendy.com",
+      siteName: "Rivendy",
+      images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
+      locale: "fr_DJ",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `Rivendy — Marketplace ${country.name}`,
+      description: `Achetez et vendez à ${country.name} avec Rivendy.`,
+      images: ["/brand/hero-woman.png"],
+    },
+  };
+}
 
 type HomeSearchParams = Promise<{
   country?: string;
@@ -107,10 +116,18 @@ export default async function HomePage({
           )}
 
           {/* ── Hero Banner ─────────────────────────────────────── */}
-          {!q && !category && <HeroBanner />}
+          {!q && !category && <HeroBanner countryName={country.name} />}
 
           {/* ── Bannière pub Supabase (Home Banner) ─────────────── */}
           {ads.length > 0 && <AdBanner ads={ads} />}
+
+          {/* ── Stories (mobile/tablette — sidebar masquée < xl) ── */}
+          {!q && !category && stories.length > 0 && (
+            <div className="xl:hidden">
+              <h2 className="mb-2 px-1 text-[15px] font-black text-slate-900">Stories</h2>
+              <StoriesRail products={stories} limit={12} variant="strip" />
+            </div>
+          )}
 
           {/* ── Onglets catégories ──────────────────────────────── */}
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">

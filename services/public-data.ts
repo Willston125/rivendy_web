@@ -191,7 +191,8 @@ export async function getProducts({
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (countryId && countryId !== "all") query = query.eq("seller_country_id", countryId);
+  // Parity Flutter : filtrer sur country_id du produit (pas seller_country_id du profil)
+  if (countryId && countryId !== "all") query = query.eq("country_id", countryId);
   if (category && category !== "all") query = query.eq("category", category);
   if (subcategory?.trim()) query = query.eq("subcategory", subcategory.trim());
   if (search?.trim()) query = query.ilike("title", `%${search.trim()}%`);
@@ -222,7 +223,7 @@ export async function getSimilarProducts(product: Product, limit = 8) {
     .select("*")
     .eq("category", product.category)
     .neq("id", product.id)
-    .eq("seller_country_id", product.seller_country_id ?? DEFAULT_COUNTRY_ID)
+    .eq("country_id", product.seller_country_id ?? DEFAULT_COUNTRY_ID)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -248,6 +249,7 @@ export async function getSellerPublicProducts(sellerId: string, includeSold = fa
     .from("products")
     .select("*, profiles!seller_id(full_name, store_name, avatar_url, is_certified, country_id)")
     .eq("seller_id", sellerId)
+    .eq("is_deleted", false)
     .order("created_at", { ascending: false });
 
   query = includeSold
@@ -294,16 +296,56 @@ export async function getStoreTrustSummary(sellerId: string) {
   };
 }
 
+export interface VendorPillars {
+  totalOrders: number;
+  deliveredOrders: number;
+  avgPreparationHours: number | null;
+  conformityRate: number | null;
+  responseRate: number | null;
+}
+
+/**
+ * Piliers de performance vendeur (préparation / conformité / réponse).
+ * Agrégés via la RPC `get_vendor_pillars` (SECURITY DEFINER) car le rôle
+ * anon ne peut pas lire `orders` directement. Renvoie null si pas de donnée
+ * ou si la RPC n'est pas encore déployée.
+ */
+export async function getVendorPillars(sellerId: string): Promise<VendorPillars | null> {
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase.rpc("get_vendor_pillars", { p_seller_id: sellerId });
+  if (error || !data) return null;
+  const row = data as {
+    total_orders?: number;
+    delivered_orders?: number;
+    avg_preparation_hours?: number | null;
+    conformity_rate?: number | null;
+    response_rate?: number | null;
+  };
+  if (!row.total_orders || row.total_orders <= 0) return null;
+  return {
+    totalOrders: Number(row.total_orders ?? 0),
+    deliveredOrders: Number(row.delivered_orders ?? 0),
+    avgPreparationHours: row.avg_preparation_hours != null ? Number(row.avg_preparation_hours) : null,
+    conformityRate: row.conformity_rate != null ? Number(row.conformity_rate) : null,
+    responseRate: row.response_rate != null ? Number(row.response_rate) : null,
+  };
+}
+
 export async function getStoryProducts(countryId = DEFAULT_COUNTRY_ID) {
   const supabase = createAnonServerClient();
+  const nowIso = new Date().toISOString();
+
+  // Parity Flutter : is_deleted=false + story_expires_at > now + country_id sur le produit (pas le profil)
   const { data, error } = await supabase
     .from("products")
     .select("*, profiles!seller_id(full_name, store_name, avatar_url, is_certified, country_id)")
     .eq("is_story", true)
+    .eq("is_deleted", false)
     .in("status", ["active", "boosted", "validated", "pending"])
-    .eq("profiles.country_id", countryId)
+    .gt("story_expires_at", nowIso)
+    .eq("country_id", countryId)
     .order("created_at", { ascending: false })
-    .limit(18);
+    .limit(20);
 
   if (error || !data) return [];
   return data.map((row) => normalizeProduct(row as ProductRow));

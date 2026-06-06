@@ -6,7 +6,7 @@ import { Heart, ShoppingBag } from "lucide-react";
 import { ProductGrid } from "@/features/products/product-grid";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import type { Product } from "@/types/rivendy";
 
 /* ── Squelette de chargement ─────────────────────────────────────── */
@@ -58,7 +58,7 @@ function FavoritesEmpty() {
 /* ── Composant principal ─────────────────────────────────────────── */
 export function FavoritesView() {
   const { user } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 

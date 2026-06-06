@@ -21,7 +21,7 @@ import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
 
 /* ── Libellés & couleurs des statuts commande ────────────────────── */
@@ -75,7 +75,7 @@ interface FollowedStore {
 
 export function ProfileDashboard() {
   const { user, profile, signOut } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   const [orders,    setOrders]    = useState<AppOrder[]>([]);
   const [favorites, setFavorites] = useState<Product[]>([]);

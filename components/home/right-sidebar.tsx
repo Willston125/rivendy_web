@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCart } from "@/features/cart/cart-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 
 /* ── Statistiques Rivendy (statiques pour l'instant) ─────────── */
@@ -24,7 +24,7 @@ const STATS = [
 
 export function RightSidebar() {
   const { items, totalAmount, removeItem } = useCart();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   const previewItems = items.slice(0, 3);
 
@@ -170,7 +170,7 @@ export function RightSidebar() {
           <div className="flex-1">
             <h3 className="text-sm font-black text-slate-900">Vendre sur Rivendy</h3>
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-              Développez votre boutique et touchez des milliers d&apos;acheteurs à Djibouti et partout.
+              Développez votre boutique et touchez des milliers d&apos;acheteurs à {country.name} et partout.
             </p>
             <Link
               href="/seller/create"

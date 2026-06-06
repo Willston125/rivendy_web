@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Mail, MessageCircle } from "lucide-react";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { normalizePhoneForWhatsApp } from "@/lib/utils/format";
 
 const FAQS = [
@@ -46,7 +46,7 @@ const FAQS = [
 
 export function HelpView() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
   const waMsg = encodeURIComponent("Bonjour, j'ai besoin d'aide avec Rivendy.");

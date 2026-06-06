@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import type { AppOrder } from "@/types/rivendy";
 
@@ -37,7 +37,7 @@ interface WalletTransaction {
 
 export function WalletView() {
   const { user, profile } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -105,7 +105,8 @@ export function WalletView() {
     0,
   );
 
-  const canWithdraw = confirmedEarnings >= 2000;
+  const MIN_WITHDRAW = country.id === "KM" ? 5000 : 2000;
+  const canWithdraw = confirmedEarnings >= MIN_WITHDRAW;
 
   // ── Demande de retrait via WhatsApp ────────────────────────
   async function requestWithdrawal() {
@@ -197,7 +198,7 @@ export function WalletView() {
           canWithdraw ? "bg-white/15 text-white/80" : "bg-orange-500/30 text-white/80"
         }`}>
           {canWithdraw ? "🔓" : "🔒"}
-          {canWithdraw ? "Retrait disponible" : "Retrait à partir de 2 000 FDJ"}
+          {canWithdraw ? "Retrait disponible" : `Retrait à partir de ${formatMoney(MIN_WITHDRAW, country)}`}
         </div>
 
         {/* Actions */}

@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
+import { formatMoney } from "@/lib/utils/format";
 import { uploadProductPhotos } from "@/services/image-upload";
 import { CATEGORIES, type CategoryId } from "@/types/rivendy";
 
@@ -65,7 +66,7 @@ type Step = 0 | 1 | 2 | 3;
 // ── Composant principal ─────────────────────────────────────
 export function CreateStoreForm() {
   const { user } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(0);
@@ -149,6 +150,7 @@ export function CreateStoreForm() {
           commission_amount: commissionAmount,
           category: p.category,
           condition: ["restaurant", "alimentation"].includes(p.category) ? "Neuf" : p.condition,
+          country_id: country.id,
           photos: urls,
           status: "active",
           stock_quantity: 1,
@@ -342,7 +344,7 @@ export function CreateStoreForm() {
           />
         </FormField>
 
-        <FormField label="Votre prix (FDJ) *" required>
+        <FormField label={`Votre prix (${country.currency_symbol}) *`} required>
           <input
             type="number"
             value={current.price}
@@ -354,15 +356,15 @@ export function CreateStoreForm() {
             <div className="mt-2 rounded-xl border border-[#00C4B4]/30 bg-[#00C4B4]/5 p-3 text-xs">
               <div className="flex justify-between text-slate-500">
                 <span>Votre prix vendeur</span>
-                <span className="font-bold">{commission.sellerPrice.toFixed(0)} FDJ</span>
+                <span className="font-bold">{formatMoney(commission.sellerPrice, country)}</span>
               </div>
               <div className="flex justify-between text-orange-600">
                 <span>+ Commission Rivendy ({commission.rateLabel})</span>
-                <span className="font-bold">{commission.commissionAmount.toFixed(0)} FDJ</span>
+                <span className="font-bold">{formatMoney(commission.commissionAmount, country)}</span>
               </div>
               <div className="mt-2 flex justify-between border-t border-[#00C4B4]/30 pt-2 font-black text-[#00C4B4]">
                 <span>💰 Prix affiché aux clients</span>
-                <span>{commission.displayPrice.toFixed(0)} FDJ</span>
+                <span>{formatMoney(commission.displayPrice, country)}</span>
               </div>
             </div>
           )}
@@ -442,10 +444,10 @@ export function CreateStoreForm() {
                   {commission && parseFloat(p.price) > 0 && (
                     <>
                       <p className="text-xs font-black text-[#00C4B4]">
-                        {commission.displayPrice.toFixed(0)} FDJ clients
+                        {formatMoney(commission.displayPrice, country)} clients
                       </p>
                       <p className="text-xs text-slate-400">
-                        Vous recevrez : {commission.sellerPrice.toFixed(0)} FDJ
+                        Vous recevrez : {formatMoney(commission.sellerPrice, country)}
                       </p>
                     </>
                   )}

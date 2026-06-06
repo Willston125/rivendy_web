@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Tag } from "lucide-react";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { ProductCard } from "@/features/products/product-card";
 import { supabase } from "@/lib/supabase/client";
 import type { Product } from "@/types/rivendy";
 
 export function PromoView() {
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BadgeCheck, Copy, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import type { SellerSubscriptionInput } from "@/types/rivendy";
@@ -15,6 +15,7 @@ interface Plan {
   label: string;
   emoji: string;
   priceFDJ: number;
+  priceKMF: number;
   durationDays: number;
   durationLabel: string;
   buttonLabel: string;
@@ -25,12 +26,18 @@ interface Plan {
   features: string[];
 }
 
+// Parity Flutter subscription_screen.dart — priceForMarket(marketId)
+function priceForMarket(plan: Plan, countryId: string): number {
+  return countryId === "KM" ? plan.priceKMF : plan.priceFDJ;
+}
+
 const PLANS: Plan[] = [
   {
     id: "weekly",
     label: "Hebdomadaire",
     emoji: "🗓",
     priceFDJ: 1000,
+    priceKMF: 2500,
     durationDays: 7,
     durationLabel: "7 jours",
     buttonLabel: "S'abonner 7 jours",
@@ -46,6 +53,7 @@ const PLANS: Plan[] = [
     label: "Mensuel",
     emoji: "📅",
     priceFDJ: 3000,
+    priceKMF: 7500,
     durationDays: 30,
     durationLabel: "30 jours",
     buttonLabel: "S'abonner 30 jours",
@@ -66,10 +74,11 @@ const PLANS: Plan[] = [
     label: "Annuel",
     emoji: "🏆",
     priceFDJ: 25000,
+    priceKMF: 62500,
     durationDays: 365,
     durationLabel: "1 an",
     buttonLabel: "S'abonner 1 an",
-    savingsLabel: "Économisez 52% — soit ~2 083 FDJ/mois",
+    savingsLabel: "Économisez 52%",
     badge: "MEILLEUR PRIX",
     badgeColor: "#FFB800",
     features: [
@@ -94,7 +103,7 @@ const PAYMENT_METHODS = [
 
 export function SubscriptionView() {
   const { user, profile } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -119,7 +128,7 @@ export function SubscriptionView() {
       const payload: SellerSubscriptionInput = {
         seller_id: user.id,
         plan: plan.id,
-        price_paid: plan.priceFDJ,
+        price_paid: priceForMarket(plan, country.id),
         duration_days: plan.durationDays,
         status: "pending",
         payment_method: "manual",
@@ -131,7 +140,7 @@ export function SubscriptionView() {
       // non-blocking
     }
 
-    const formattedPrice = formatMoney(plan.priceFDJ, country);
+    const formattedPrice = formatMoney(priceForMarket(plan, country.id), country);
     const msg = encodeURIComponent(
       `Bonjour Rivendy, j'ai effectué le paiement pour mon abonnement Vendeur Certifié.\n\n` +
         `• Plan : ${plan.label} (${plan.durationLabel})\n` +
@@ -181,7 +190,7 @@ export function SubscriptionView() {
               </div>
             </div>
             <div className="p-2">
-              <p className="text-sm font-black text-[#009688]">5 000 FDJ</p>
+              <p className="text-sm font-black text-[#009688]">{formatMoney(priceForMarket(PLANS[1], country.id), country)}</p>
               <p className="truncate text-xs text-slate-500">Produit exemple</p>
             </div>
           </div>
@@ -211,80 +220,88 @@ export function SubscriptionView() {
       <p className="mb-4 text-sm text-slate-400">Résiliable à tout moment</p>
 
       <div className="space-y-4">
-        {PLANS.map((plan) => (
-          <div
-            key={plan.id}
-            className={`relative overflow-hidden rounded-2xl bg-white shadow-sm transition ${
-              plan.isPopular
-                ? "border-2 border-[#009688] shadow-[#009688]/10 shadow-lg"
-                : "border border-slate-200"
-            }`}
-          >
-            {plan.badge && (
-              <div
-                className="absolute right-0 top-0 rounded-bl-xl px-3 py-1.5 text-[10px] font-black text-white"
-                style={{ backgroundColor: plan.badgeColor }}
-              >
-                {plan.badge}
-              </div>
-            )}
+        {PLANS.map((plan) => {
+          const displaySavings = plan.savingsLabel
+            ? plan.id === "yearly"
+              ? `${plan.savingsLabel} — soit ~${Math.round(priceForMarket(plan, country.id) / 12).toLocaleString("fr-FR")} ${country.currency_symbol}/mois`
+              : plan.savingsLabel
+            : null;
 
-            <div className={`p-5 ${plan.badge ? "pt-9" : ""}`}>
-              {/* Header row */}
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">{plan.emoji}</span>
-                <div className="flex-1">
-                  <p className="font-black text-[#1A1A1A]">{plan.label}</p>
-                  <p className="text-sm text-slate-400">{plan.durationLabel}</p>
-                </div>
-                <div className="text-right">
-                  <p
-                    className={`text-xl font-black ${
-                      plan.isPopular ? "text-[#009688]" : "text-[#1A1A1A]"
-                    }`}
-                  >
-                    {formatMoney(plan.priceFDJ, country)}
-                  </p>
-                  <p className="text-xs text-slate-400">/ {plan.durationLabel}</p>
-                </div>
-              </div>
-
-              {/* Savings */}
-              {plan.savingsLabel && (
-                <div className="mt-3 rounded-lg bg-green-50 px-3 py-2">
-                  <p className="text-xs font-semibold text-green-700">
-                    💰 {plan.savingsLabel}
-                  </p>
+          return (
+            <div
+              key={plan.id}
+              className={`relative overflow-hidden rounded-2xl bg-white shadow-sm transition ${
+                plan.isPopular
+                  ? "border-2 border-[#009688] shadow-[#009688]/10 shadow-lg"
+                  : "border border-slate-200"
+              }`}
+            >
+              {plan.badge && (
+                <div
+                  className="absolute right-0 top-0 rounded-bl-xl px-3 py-1.5 text-[10px] font-black text-white"
+                  style={{ backgroundColor: plan.badgeColor }}
+                >
+                  {plan.badge}
                 </div>
               )}
 
-              <hr className="my-3 border-slate-100" />
+              <div className={`p-5 ${plan.badge ? "pt-9" : ""}`}>
+                {/* Header row */}
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">{plan.emoji}</span>
+                  <div className="flex-1">
+                    <p className="font-black text-[#1A1A1A]">{plan.label}</p>
+                    <p className="text-sm text-slate-400">{plan.durationLabel}</p>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={`text-xl font-black ${
+                        plan.isPopular ? "text-[#009688]" : "text-[#1A1A1A]"
+                      }`}
+                    >
+                      {formatMoney(priceForMarket(plan, country.id), country)}
+                    </p>
+                    <p className="text-xs text-slate-400">/ {plan.durationLabel}</p>
+                  </div>
+                </div>
 
-              {/* Features */}
-              <ul className="space-y-1.5">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[#009688]" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
+                {/* Savings */}
+                {displaySavings && (
+                  <div className="mt-3 rounded-lg bg-green-50 px-3 py-2">
+                    <p className="text-xs font-semibold text-green-700">
+                      💰 {displaySavings}
+                    </p>
+                  </div>
+                )}
 
-              {/* Button */}
-              <button
-                type="button"
-                onClick={() => setSelectedPlan(plan)}
-                className={`mt-4 w-full rounded-xl py-3 text-sm font-black text-white transition ${
-                  plan.isPopular
-                    ? "bg-[#009688] hover:bg-[#00796B]"
-                    : "bg-[#1A1A1A] hover:bg-[#333]"
-                }`}
-              >
-                {plan.buttonLabel}
-              </button>
+                <hr className="my-3 border-slate-100" />
+
+                {/* Features */}
+                <ul className="space-y-1.5">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[#009688]" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Button */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan(plan)}
+                  className={`mt-4 w-full rounded-xl py-3 text-sm font-black text-white transition ${
+                    plan.isPopular
+                      ? "bg-[#009688] hover:bg-[#00796B]"
+                      : "bg-[#1A1A1A] hover:bg-[#333]"
+                  }`}
+                >
+                  {plan.buttonLabel}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Footer */}
@@ -316,7 +333,7 @@ export function SubscriptionView() {
                 </p>
                 <p className="text-sm text-slate-500">
                   {selectedPlan.durationLabel} ·{" "}
-                  {formatMoney(selectedPlan.priceFDJ, country)}
+                  {formatMoney(priceForMarket(selectedPlan, country.id), country)}
                 </p>
               </div>
             </div>
@@ -333,7 +350,7 @@ export function SubscriptionView() {
               <div className="text-sm text-slate-600">
                 <p>
                   Envoie{" "}
-                  <strong>{formatMoney(selectedPlan.priceFDJ, country)}</strong>{" "}
+                  <strong>{formatMoney(priceForMarket(selectedPlan, country.id), country)}</strong>{" "}
                   sur l&apos;un de ces numéros :
                 </p>
                 <ul className="mt-2 space-y-1">

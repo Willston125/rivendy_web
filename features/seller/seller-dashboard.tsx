@@ -24,7 +24,7 @@ import { ProductStatusBadge } from "@/features/products/product-status-badge";
 import { supabase } from "@/lib/supabase/client";
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { cn } from "@/lib/utils/cn";
 import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
 
@@ -83,7 +83,7 @@ function Metric({ icon: Icon, label, value, accent = false }: {
 /* ── Vue principale ─────────────────────────────────────────────── */
 export function SellerDashboard() {
   const { user, profile, refreshProfile } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);
@@ -158,9 +158,11 @@ export function SellerDashboard() {
 
   async function requestBoost(product: Product) {
     if (!user) return;
+    // Parity Flutter boost_screen.dart — Bronze: 500 FDJ / 1250 KMF / 3 jours
+    const bronzePrice = country.id === "KM" ? 1250 : 500;
     const { error } = await supabase.from("boost_purchases").insert({
       product_id: product.id, seller_id: user.id,
-      plan: "bronze", price_paid: 1000, duration_days: 7,
+      plan: "bronze", price_paid: bronzePrice, duration_days: 3,
       status: "pending", payment_method: "cash", country_id: country.id,
       notes: "Demande boost depuis Rivendy Web",
     });
@@ -169,8 +171,10 @@ export function SellerDashboard() {
 
   async function requestCertification() {
     if (!user) return;
+    // Parity Flutter subscription_screen.dart — Monthly: 3000 FDJ / 7500 KMF / 30 jours
+    const monthlyPrice = country.id === "KM" ? 7500 : 3000;
     const { error } = await supabase.from("seller_subscriptions").insert({
-      seller_id: user.id, plan: "monthly", price_paid: 5000,
+      seller_id: user.id, plan: "monthly", price_paid: monthlyPrice,
       duration_days: 30, status: "pending", payment_method: "cash",
       country_id: country.id, notes: "Demande certification depuis Rivendy Web",
     });
@@ -443,7 +447,7 @@ export function SellerDashboard() {
                 onClick={requestCertification}
                 className="mt-3 flex h-9 w-full items-center justify-center rounded-xl bg-amber-500 text-xs font-black text-white transition hover:bg-amber-600"
               >
-                Demander la certification (5 000 FDJ)
+                Demander la certification ({formatMoney(country.id === "KM" ? 7500 : 3000, country)})
               </button>
             </div>
           )}
@@ -462,7 +466,7 @@ export function SellerDashboard() {
                 className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#009688] text-xs font-black text-white transition hover:bg-[#00796B]"
               >
                 <Zap className="h-3.5 w-3.5 fill-white" />
-                Boost Bronze — 1 000 FDJ / 7 jours
+                Boost Bronze — {formatMoney(country.id === "KM" ? 1250 : 500, country)} / 3 jours
               </button>
             </div>
           )}

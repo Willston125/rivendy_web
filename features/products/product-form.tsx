@@ -14,7 +14,7 @@ import { uploadProductPhotos } from "@/services/image-upload";
 import { CATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
 import { categoryLabel, formatMoney } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 
 type EditableProduct = Partial<Product> & { id?: string };
 
@@ -33,7 +33,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export function ProductForm({ product }: { product?: EditableProduct }) {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   const [title, setTitle]               = useState(product?.title ?? "");
   const [description, setDescription]   = useState(product?.description ?? "");

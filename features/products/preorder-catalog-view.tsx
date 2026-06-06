@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Search, X, Info, Package, Clock } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import type { Product } from "@/types/rivendy";
@@ -109,7 +109,7 @@ export function PreorderCatalogView() {
 }
 
 function PreorderCard({ product }: { product: Product }) {
-  const { country } = useCountry();
+  const country = useCountryOrDefault();
 
   return (
     <Link
