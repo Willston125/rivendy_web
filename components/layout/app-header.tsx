@@ -15,6 +15,7 @@ import {
   UserRound,
   X,
   Globe,
+  Plus,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
@@ -27,7 +28,6 @@ import type { AppNotification } from "@/features/notifications/use-notifications
 const navItems = [
   { href: "/", label: "Explorer" },
   { href: "/preorders", label: "Sur commande" },
-  { href: "/sell", label: "Vendre" },
   { href: "/seller", label: "Ma boutique" },
 ];
 
@@ -133,6 +133,15 @@ export function AppHeader() {
 
         {/* ── Icônes d'action ─────────────────────────────────────── */}
         <div className="flex items-center gap-1">
+
+          {/* Bouton Vendre — CTA proéminent (desktop) */}
+          <Link
+            href="/sell"
+            className="mr-1.5 hidden h-10 items-center gap-1.5 rounded-full bg-[#009688] px-4 text-sm font-bold text-white shadow-sm shadow-[#009688]/20 transition hover:bg-[#00796B] md:flex"
+          >
+            <Plus className="h-4 w-4" />
+            Vendre
+          </Link>
 
           {/* Sélecteur de pays — desktop */}
           <div className="relative hidden items-center md:flex mr-1.5">
@@ -364,7 +373,7 @@ export function AppHeader() {
           ) : (
             <Link
               href="/auth/login"
-              className="hidden h-10 items-center gap-2 rounded-full bg-[#009688] px-5 text-sm font-bold text-white shadow-sm shadow-[#009688]/20 transition hover:bg-[#00796B] md:flex"
+              className="hidden h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-[#009688] hover:text-[#009688] md:flex"
             >
               <UserRound className="h-4 w-4" />
               Connexion

@@ -30,6 +30,7 @@ import {
   getVendorPillars,
 } from "@/services/public-data";
 import { VendorTrustPillars } from "@/features/store/vendor-trust-pillars";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 /* ── generateMetadata ────────────────────────────────────────────── */
 export async function generateMetadata({
@@ -103,6 +104,9 @@ export default async function StorePage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+
+      {/* Fil d'Ariane */}
+      <Breadcrumbs items={[{ label: "Accueil", href: "/" }, { label: "Boutique" }, { label: sellerName }]} />
 
       {/* ══════════════════════════════════════════════════════════════
           HEADER BOUTIQUE
