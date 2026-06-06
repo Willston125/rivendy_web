@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "@/app/providers";
 import { AppHeader } from "@/components/layout/app-header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 export const metadata: Metadata = {
   title: {
@@ -24,7 +25,8 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           <Suspense fallback={null}>
             <AppHeader />
           </Suspense>
-          <main className="min-h-screen pb-24 md:pb-0">{children}</main>
+          <main className="min-h-screen">{children}</main>
+          <SiteFooter />
           <MobileNav />
         </Providers>
       </body>
