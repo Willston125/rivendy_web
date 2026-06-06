@@ -171,37 +171,54 @@ export async function getAdvertisements({
     });
 }
 
+// Tri du catalogue — parity Flutter search_screen.dart (_sortOrder)
+export type ProductSort = "recent" | "price_asc" | "price_desc";
+
 export async function getProducts({
   countryId = DEFAULT_COUNTRY_ID,
   category,
   subcategory,
   search,
+  priceMin,
+  priceMax,
+  sort = "recent",
   limit = 60,
 }: {
   countryId?: string;
   category?: CategoryId | string;
   subcategory?: string;
   search?: string;
+  priceMin?: number;
+  priceMax?: number;
+  sort?: ProductSort;
   limit?: number;
 }) {
   const supabase = createAnonServerClient();
-  let query = supabase
-    .from("visible_products")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  let query = supabase.from("visible_products").select("*").limit(limit);
 
   // Parity Flutter : filtrer sur country_id du produit (pas seller_country_id du profil)
   if (countryId && countryId !== "all") query = query.eq("country_id", countryId);
   if (category && category !== "all") query = query.eq("category", category);
   if (subcategory?.trim()) query = query.eq("subcategory", subcategory.trim());
   if (search?.trim()) query = query.ilike("title", `%${search.trim()}%`);
+  // Fourchette de prix — parity Flutter (filtre _priceMin / _priceMax)
+  if (typeof priceMin === "number" && !Number.isNaN(priceMin)) query = query.gte("price", priceMin);
+  if (typeof priceMax === "number" && !Number.isNaN(priceMax)) query = query.lte("price", priceMax);
+
+  // Tri — parity Flutter : recent | price_asc | price_desc
+  if (sort === "price_asc") query = query.order("price", { ascending: true });
+  else if (sort === "price_desc") query = query.order("price", { ascending: false });
+  else query = query.order("created_at", { ascending: false });
 
   const { data, error } = await query;
   if (error || !data) return [];
 
   const products = data.map((row) => normalizeProduct(row as ProductRow));
-  return products.sort((a, b) => Number(b.status === "boosted") - Number(a.status === "boosted"));
+  // Tri récents : on remonte les boostés ; tri prix : on respecte le prix.
+  if (sort === "recent") {
+    return products.sort((a, b) => Number(b.status === "boosted") - Number(a.status === "boosted"));
+  }
+  return products;
 }
 
 export async function getProductById(id: string) {

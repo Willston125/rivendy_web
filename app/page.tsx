@@ -14,7 +14,9 @@ import {
   getCountry,
   getProducts,
   getStoryProducts,
+  type ProductSort,
 } from "@/services/public-data";
+import { CatalogToolbar } from "@/features/products/catalog-toolbar";
 import { cn } from "@/lib/utils/cn";
 
 export async function generateMetadata({
@@ -52,6 +54,9 @@ type HomeSearchParams = Promise<{
   category?: string;
   subcategory?: string;
   q?: string;
+  priceMin?: string;
+  priceMax?: string;
+  sort?: string;
 }>;
 
 export default async function HomePage({
@@ -64,10 +69,15 @@ export default async function HomePage({
   const category = params.category as CategoryId | undefined;
   const subcategory = params.subcategory;
   const q = params.q;
+  const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
+  const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
+  const sort = (["recent", "price_asc", "price_desc"].includes(params.sort ?? "")
+    ? params.sort
+    : "recent") as ProductSort;
 
   const [country, products, ads, inlineAds, stories] = await Promise.all([
     getCountry(countryId),
-    getProducts({ countryId, category, subcategory, search: q }),
+    getProducts({ countryId, category, subcategory, search: q, priceMin, priceMax, sort }),
     getAdvertisements({ countryId, positions: ["web_home_banner", "home_banner"] }),
     getAdvertisements({ countryId, positions: ["web_feed_inline", "feed_inline"] }),
     getStoryProducts(countryId),
@@ -199,6 +209,14 @@ export default async function HomePage({
                 </Link>
               ))}
             </div>
+          )}
+
+          {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
+          {(category || q) && (
+            <CatalogToolbar
+              resultCount={products.length}
+              currencySymbol={country.currency_symbol}
+            />
           )}
 
           {/* ── Cartes promo (Offres · Sur commande) ────────────── */}
