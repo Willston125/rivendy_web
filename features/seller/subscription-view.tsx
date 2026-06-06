@@ -155,7 +155,7 @@ export function SubscriptionView() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
+    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
       {/* Header gradient */}
       <div className="mb-6 rounded-3xl bg-gradient-to-br from-[#00897B] to-[#004D40] p-8 text-center text-white shadow-xl shadow-[#007168]/20">
         <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg shadow-black/20">
@@ -219,7 +219,7 @@ export function SubscriptionView() {
       </h2>
       <p className="mb-4 text-sm text-slate-400">Résiliable à tout moment</p>
 
-      <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
         {PLANS.map((plan) => {
           const displaySavings = plan.savingsLabel
             ? plan.id === "yearly"
@@ -230,11 +230,11 @@ export function SubscriptionView() {
           return (
             <div
               key={plan.id}
-              className={`relative overflow-hidden rounded-2xl bg-white shadow-sm transition ${
+              className={`relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md ${
                 plan.isPopular
-                  ? "border-2 border-[#009688] shadow-[#009688]/10 shadow-lg"
+                  ? "border-2 border-[#009688] shadow-lg shadow-[#009688]/10"
                   : "border border-slate-200"
-              }`}
+              } ${plan.badge ? "pt-9" : ""}`}
             >
               {plan.badge && (
                 <div
@@ -245,60 +245,53 @@ export function SubscriptionView() {
                 </div>
               )}
 
-              <div className={`p-5 ${plan.badge ? "pt-9" : ""}`}>
-                {/* Header row */}
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">{plan.emoji}</span>
-                  <div className="flex-1">
-                    <p className="font-black text-[#1A1A1A]">{plan.label}</p>
-                    <p className="text-sm text-slate-400">{plan.durationLabel}</p>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`text-xl font-black ${
-                        plan.isPopular ? "text-[#009688]" : "text-[#1A1A1A]"
-                      }`}
-                    >
-                      {formatMoney(priceForMarket(plan, country.id), country)}
-                    </p>
-                    <p className="text-xs text-slate-400">/ {plan.durationLabel}</p>
-                  </div>
-                </div>
-
-                {/* Savings */}
-                {displaySavings && (
-                  <div className="mt-3 rounded-lg bg-green-50 px-3 py-2">
-                    <p className="text-xs font-semibold text-green-700">
-                      💰 {displaySavings}
-                    </p>
-                  </div>
-                )}
-
-                <hr className="my-3 border-slate-100" />
-
-                {/* Features */}
-                <ul className="space-y-1.5">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[#009688]" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Button */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlan(plan)}
-                  className={`mt-4 w-full rounded-xl py-3 text-sm font-black text-white transition ${
-                    plan.isPopular
-                      ? "bg-[#009688] hover:bg-[#00796B]"
-                      : "bg-[#1A1A1A] hover:bg-[#333]"
+              {/* Header centré (pricing card) */}
+              <div className="text-center">
+                <span className="text-3xl">{plan.emoji}</span>
+                <p className="mt-2 font-black text-[#1A1A1A]">{plan.label}</p>
+                <p
+                  className={`mt-2 text-2xl font-black ${
+                    plan.isPopular ? "text-[#009688]" : "text-[#1A1A1A]"
                   }`}
                 >
-                  {plan.buttonLabel}
-                </button>
+                  {formatMoney(priceForMarket(plan, country.id), country)}
+                </p>
+                <p className="text-xs text-slate-400">/ {plan.durationLabel}</p>
               </div>
+
+              {/* Savings */}
+              {displaySavings && (
+                <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-center">
+                  <p className="text-xs font-semibold text-green-700">
+                    💰 {displaySavings}
+                  </p>
+                </div>
+              )}
+
+              <hr className="my-4 border-slate-100" />
+
+              {/* Features */}
+              <ul className="mb-5 space-y-2">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#009688]" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Button — collé en bas pour aligner les cartes */}
+              <button
+                type="button"
+                onClick={() => setSelectedPlan(plan)}
+                className={`mt-auto w-full rounded-xl py-3 text-sm font-black text-white transition ${
+                  plan.isPopular
+                    ? "bg-[#009688] hover:bg-[#00796B]"
+                    : "bg-[#1A1A1A] hover:bg-[#333]"
+                }`}
+              >
+                {plan.buttonLabel}
+              </button>
             </div>
           );
         })}

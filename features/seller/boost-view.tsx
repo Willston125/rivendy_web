@@ -141,7 +141,7 @@ export function BoostView({ product }: { product: Product }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
+    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Rivendy</p>
@@ -183,13 +183,13 @@ export function BoostView({ product }: { product: Product }) {
         Choisissez votre boost
       </h2>
 
-      <div className="space-y-3">
+      <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
         {TIERS.map((tier) => (
           <div
             key={tier.id}
-            className="relative overflow-hidden rounded-2xl bg-white shadow-sm transition"
+            className="relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md"
             style={{
-              border: `1.5px solid ${tier.color}33`,
+              border: tier.isPopular ? `2px solid ${tier.color}` : `1.5px solid ${tier.color}33`,
             }}
           >
             {tier.isPopular && (
@@ -201,55 +201,47 @@ export function BoostView({ product }: { product: Product }) {
               </div>
             )}
 
-            <div className="p-5">
-              {/* Header */}
-              <div className="flex items-start gap-3">
-                <span className="text-3xl">{tier.emoji}</span>
-                <div className="flex-1">
-                  <p className="font-black" style={{ color: tier.color }}>
-                    Boost {tier.name}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {tier.durationDays} jours
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-black" style={{ color: tier.color }}>
-                    {formatMoney(priceForMarket(tier, country.id), country)}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    soit{" "}
-                    {Math.round(priceForMarket(tier, country.id) / tier.durationDays).toLocaleString("fr-FR")}{" "}
-                    {country.currency_symbol}/jour
-                  </p>
-                </div>
-              </div>
-
-              <hr className="my-3 border-slate-100" />
-
-              {/* Benefits */}
-              <ul className="mb-4 space-y-1.5">
-                {tier.benefits.map((b) => (
-                  <li key={b} className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckCircle2
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: tier.color }}
-                    />
-                    {b}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Button */}
-              <button
-                type="button"
-                onClick={() => setSelectedTier(tier)}
-                className="w-full rounded-xl py-3 text-sm font-black text-white transition hover:opacity-90"
-                style={{ backgroundColor: tier.color }}
-              >
-                Choisir {tier.name}
-              </button>
+            {/* Header centré (pricing card) */}
+            <div className="text-center">
+              <span className="text-4xl">{tier.emoji}</span>
+              <p className="mt-2 font-black" style={{ color: tier.color }}>
+                Boost {tier.name}
+              </p>
+              <p className="text-sm text-slate-500">{tier.durationDays} jours</p>
+              <p className="mt-3 text-2xl font-black" style={{ color: tier.color }}>
+                {formatMoney(priceForMarket(tier, country.id), country)}
+              </p>
+              <p className="text-xs text-slate-400">
+                soit{" "}
+                {Math.round(priceForMarket(tier, country.id) / tier.durationDays).toLocaleString("fr-FR")}{" "}
+                {country.currency_symbol}/jour
+              </p>
             </div>
+
+            <hr className="my-4 border-slate-100" />
+
+            {/* Benefits */}
+            <ul className="mb-5 space-y-2">
+              {tier.benefits.map((b) => (
+                <li key={b} className="flex items-start gap-2 text-sm text-slate-600">
+                  <CheckCircle2
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                    style={{ color: tier.color }}
+                  />
+                  {b}
+                </li>
+              ))}
+            </ul>
+
+            {/* Button — collé en bas pour aligner les cartes */}
+            <button
+              type="button"
+              onClick={() => setSelectedTier(tier)}
+              className="mt-auto w-full rounded-xl py-3 text-sm font-black text-white transition hover:opacity-90"
+              style={{ backgroundColor: tier.color }}
+            >
+              Choisir {tier.name}
+            </button>
           </div>
         ))}
       </div>
