@@ -263,15 +263,15 @@ export function BoostView({ product }: { product: Product }) {
       {/* Payment modal */}
       {selectedTier && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={() => setSelectedTier(null)}
         >
           <div
-            className="w-full max-w-lg rounded-t-3xl bg-white p-6"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Handle */}
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200" />
+            {/* Handle — mobile uniquement */}
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
 
             {/* Title */}
             <div className="mb-5 flex items-start gap-3">
