@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RequireAuth } from "@/features/auth/require-auth";
+import { AccountShell } from "@/features/account/account-shell";
 import { SettingsView } from "@/features/profile/settings-view";
 
 export const metadata: Metadata = {
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 export default function SettingsPage() {
   return (
     <RequireAuth>
-      <SettingsView />
+      <AccountShell>
+        <SettingsView />
+      </AccountShell>
     </RequireAuth>
   );
 }

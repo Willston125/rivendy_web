@@ -67,7 +67,7 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-8">
+    <div className="w-full max-w-xl">
       <div className="mb-6">
         <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Sécurité</p>
         <h1 className="mt-1 text-2xl font-black text-[#1A1A1A]">Changer le mot de passe</h1>

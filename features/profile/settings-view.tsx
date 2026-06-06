@@ -188,7 +188,7 @@ export function SettingsView() {
   ];
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8 md:px-6">
+    <div className="w-full">
       <div className="mb-6">
         <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Compte</p>
         <h1 className="mt-1 text-3xl font-black text-[#1A1A1A]">Paramètres</h1>

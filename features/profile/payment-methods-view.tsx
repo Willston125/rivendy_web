@@ -100,7 +100,7 @@ export function PaymentMethodsView() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Rivendy</p>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RequireAuth } from "@/features/auth/require-auth";
+import { AccountShell } from "@/features/account/account-shell";
 import { ProfileInfoForm } from "@/features/profile/profile-info-form";
 
 export const metadata: Metadata = {
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 export default function ProfileInfoPage() {
   return (
     <RequireAuth>
-      <ProfileInfoForm />
+      <AccountShell>
+        <ProfileInfoForm />
+      </AccountShell>
     </RequireAuth>
   );
 }

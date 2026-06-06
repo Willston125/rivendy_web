@@ -158,7 +158,7 @@ export function WalletView() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
+    <div className="w-full">
 
       {/* En-tête */}
       <div className="mb-6 flex items-end justify-between">
