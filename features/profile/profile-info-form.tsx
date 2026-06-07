@@ -56,12 +56,13 @@ export function ProfileInfoForm() {
     setUploading(true);
     try {
       const compressed = await compressImage(file, 800, 0.85);
-      const path = `avatars/${user.id}/${Date.now()}.jpg`;
+      // Même bucket/chemin que l'app (image_upload_service.dart) → RLS Storage OK
+      const path = `${user.id}/${user.id}_${Date.now()}.jpg`;
       const { error: uploadErr } = await supabase.storage
-        .from("products-images")
+        .from("avatars")
         .upload(path, compressed, { contentType: "image/jpeg", upsert: true });
       if (uploadErr) throw uploadErr;
-      const { data } = supabase.storage.from("products-images").getPublicUrl(path);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       setAvatarUrl(data.publicUrl);
     } catch {
       setError("Erreur lors de l'upload de la photo.");

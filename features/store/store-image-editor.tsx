@@ -15,24 +15,28 @@ import { ImageCropperModal } from "@/features/store/image-cropper-modal";
  * Storage de l'app (`products-images`).
  */
 
-// Upload direct du blob recadré (déjà en JPEG bien dimensionné — pas de
-// recompression qui pourrait bloquer). Résout toujours (jamais de hang).
+// Upload direct du blob recadré. IMPORTANT : on utilise EXACTEMENT les mêmes
+// buckets et format de chemin que l'app (image_upload_service.dart) pour que
+// les policies RLS Storage existantes s'appliquent :
+//   avatar  → bucket "avatars",  chemin "{userId}/{userId}_{ts}.jpg"
+//   couverture → bucket "banners", chemin "{userId}/{userId}_{ts}.jpg"
 async function uploadCropped(
   userId: string,
   blob: Blob,
-  column: "store_banner_url" | "avatar_url",
+  kind: "avatar" | "banner",
 ): Promise<boolean> {
   try {
-    const folder = column === "avatar_url" ? "avatars" : "banners";
-    const path = `${folder}/${userId}/${Date.now()}.jpg`;
+    const bucket = kind === "avatar" ? "avatars" : "banners";
+    const column = kind === "avatar" ? "avatar_url" : "store_banner_url";
+    const path = `${userId}/${userId}_${Date.now()}.jpg`;
     const { error: upErr } = await supabase.storage
-      .from("products-images")
+      .from(bucket)
       .upload(path, blob, { contentType: "image/jpeg", upsert: true });
     if (upErr) {
-      console.error("[store-image] upload échoué:", upErr.message);
+      console.error(`[store-image] upload échoué (bucket=${bucket}):`, upErr.message);
       return false;
     }
-    const { data } = supabase.storage.from("products-images").getPublicUrl(path);
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     const { error: dbErr } = await supabase
       .from("profiles")
       .update({ [column]: data.publicUrl, updated_at: new Date().toISOString() })
@@ -84,7 +88,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
           title="Recadrer la couverture"
           onCancel={() => setPending(null)}
           onConfirm={async (blob) => {
-            const ok = await uploadCropped(user.id, blob, "store_banner_url");
+            const ok = await uploadCropped(user.id, blob, "banner");
             setPending(null);
             if (ok) router.refresh();
             else alert("Erreur lors de la mise à jour de la couverture.");
@@ -135,7 +139,7 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
           title="Recadrer la photo de profil"
           onCancel={() => setPending(null)}
           onConfirm={async (blob) => {
-            const ok = await uploadCropped(user.id, blob, "avatar_url");
+            const ok = await uploadCropped(user.id, blob, "avatar");
             setPending(null);
             if (ok) router.refresh();
             else alert("Erreur lors de la mise à jour de la photo de profil.");
