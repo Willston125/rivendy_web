@@ -218,14 +218,8 @@ export default async function StorePage({
               </div>
             </div>
 
-            {/* Note vocale du vendeur */}
-            {seller.voice_note_url && <VoiceNotePlayer audioUrl={seller.voice_note_url} />}
-
-            {/* Piliers de performance vendeur */}
-            <VendorTrustPillars pillars={pillars} />
-
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
               {/* Trust score */}
               <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
                 <p className="text-lg font-black text-slate-900">
@@ -267,8 +261,20 @@ export default async function StorePage({
             </div>
           </div>
 
+          {/* Note vocale + performance vendeur (bande dédiée, sous l'identité) */}
+          {(seller.voice_note_url || pillars) && (
+            <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-stretch">
+              {seller.voice_note_url && (
+                <div className="lg:flex-1">
+                  <VoiceNotePlayer audioUrl={seller.voice_note_url} />
+                </div>
+              )}
+              <VendorTrustPillars pillars={pillars} />
+            </div>
+          )}
+
           {/* Badges trust label + protection */}
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 rounded-full bg-[#E0F2F1] px-3 py-1 text-xs font-bold text-[#009688]">
               <Star className="h-3 w-3 fill-[#009688]" />
               {trust.label}
@@ -283,9 +289,8 @@ export default async function StorePage({
                 {trust.verifiedReviews} avis vérifiés
               </span>
             )}
-
-            {/* Partage et signalement */}
-            <div className="mt-4 flex justify-end">
+            {/* Signaler — poussé à droite */}
+            <div className="ml-auto">
               <ReportButton targetId={seller.id} type="seller" className="pt-0" />
             </div>
           </div>
