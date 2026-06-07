@@ -303,19 +303,24 @@ export function OrdersView() {
   const [filter, setFilter]   = useState<Filter>("all");
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from("orders")
-      .select("*, order_items(*)")
-      .eq("buyer_id", user.id)
-      .order("created_at", { ascending: false });
-    setOrders(
-      ((data ?? []) as Array<Record<string, unknown>>).map(
-        (row) => ({ ...row, items: row.order_items }) as AppOrder,
-      ),
-    );
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("buyer_id", user.id)
+        .order("created_at", { ascending: false });
+      setOrders(
+        ((data ?? []) as Array<Record<string, unknown>>).map(
+          (row) => ({ ...row, items: row.order_items }) as AppOrder,
+        ),
+      );
+    } catch {
+      // ne pas bloquer l'UI
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   /* Chargement initial */

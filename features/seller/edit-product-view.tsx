@@ -13,15 +13,21 @@ export function EditProductView({ productId }: { productId: string }) {
 
   useEffect(() => {
     async function load() {
-      if (!user) return;
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", productId)
-        .eq("seller_id", user.id)
-        .maybeSingle();
-      setProduct((data as Product | null) ?? null);
-      setLoading(false);
+      if (!user) { setLoading(false); return; }
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("products")
+          .select("*")
+          .eq("id", productId)
+          .eq("seller_id", user.id)
+          .maybeSingle();
+        setProduct((data as Product | null) ?? null);
+      } catch {
+        setProduct(null);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [productId, user]);

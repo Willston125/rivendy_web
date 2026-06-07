@@ -94,27 +94,39 @@ export function SellerDashboard() {
 
   /* ── Chargement ─────────────────────────────────────────────────── */
   const load = useCallback(async () => {
-    if (!user) return;
-    const [prodResp, orderResp, walletResp] = await Promise.all([
-      supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("orders").select("*, order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false }).limit(50),
-      supabase.from("wallets").select("balance").eq("user_id", user.id).maybeSingle(),
-    ]);
-    setProducts((prodResp.data ?? []) as Product[]);
-    setOrders(
-      ((orderResp.data ?? []) as Array<Record<string, unknown>>).map(
-        (row) => ({ ...row, items: row.order_items }) as AppOrder,
-      ),
-    );
-    if (walletResp?.data && walletResp.data.balance != null) {
-      setWalletBalance(Number(walletResp.data.balance));
-    } else {
-      setWalletBalance(0);
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const [prodResp, orderResp, walletResp] = await Promise.all([
+        supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("orders").select("*, order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false }).limit(50),
+        supabase.from("wallets").select("balance").eq("user_id", user.id).maybeSingle(),
+      ]);
+      setProducts((prodResp.data ?? []) as Product[]);
+      setOrders(
+        ((orderResp.data ?? []) as Array<Record<string, unknown>>).map(
+          (row) => ({ ...row, items: row.order_items }) as AppOrder,
+        ),
+      );
+      if (walletResp?.data && walletResp.data.balance != null) {
+        setWalletBalance(Number(walletResp.data.balance));
+      } else {
+        setWalletBalance(0);
+      }
+    } catch {
+      // ne pas bloquer l'UI si une requête échoue
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  /* Filet de sécurité : ne jamais rester bloqué sur le skeleton */
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 10000);
+    return () => clearTimeout(t);
+  }, []);
 
   /* ── Realtime nouvelles commandes vendeur ───────────────────────── */
   useEffect(() => {

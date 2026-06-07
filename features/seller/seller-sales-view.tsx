@@ -92,17 +92,20 @@ export function SellerSalesView() {
   const [togglingStory, setTogglingStory] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setLoading(true);
-    
-    const [prodRes, orderRes] = await Promise.all([
-      supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("orders").select("*, items:order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false })
-    ]);
-    
-    setProducts((prodRes.data ?? []) as Product[]);
-    setOrders((orderRes.data ?? []) as AppOrder[]);
-    setLoading(false);
+    try {
+      const [prodRes, orderRes] = await Promise.all([
+        supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("orders").select("*, items:order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false })
+      ]);
+      setProducts((prodRes.data ?? []) as Product[]);
+      setOrders((orderRes.data ?? []) as AppOrder[]);
+    } catch {
+      // ne pas bloquer l'UI
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
