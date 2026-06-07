@@ -31,6 +31,7 @@ import {
 } from "@/services/public-data";
 import { VendorTrustPillars } from "@/features/store/vendor-trust-pillars";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { StoreCoverEditButton, StoreAvatarEditButton } from "@/features/store/store-image-editor";
 
 /* ── generateMetadata ────────────────────────────────────────────── */
 export async function generateMetadata({
@@ -129,6 +130,8 @@ export default async function StorePage({
           )}
           {/* Dégradé bas */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+          {/* Édition couverture — propriétaire uniquement */}
+          <StoreCoverEditButton sellerId={seller.id} />
         </div>
 
         {/* Infos sous la bannière */}
@@ -137,21 +140,24 @@ export default async function StorePage({
 
             {/* Avatar + nom */}
             <div className="flex items-end gap-4">
-              {/* Avatar */}
-              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#E0F2F1] shadow-md">
-                {seller.avatar_url ? (
-                  <Image
-                    src={seller.avatar_url}
-                    alt={sellerName}
-                    fill
-                    sizes="96px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="grid h-full w-full place-items-center text-3xl font-black text-[#009688]">
-                    {sellerName.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
+              {/* Avatar (+ badge édition propriétaire) */}
+              <div className="relative shrink-0">
+                <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-[#E0F2F1] shadow-md">
+                  {seller.avatar_url ? (
+                    <Image
+                      src={seller.avatar_url}
+                      alt={sellerName}
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center text-3xl font-black text-[#009688]">
+                      {sellerName.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <StoreAvatarEditButton sellerId={seller.id} />
               </div>
 
               {/* Nom + badges */}
