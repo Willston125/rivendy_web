@@ -6,20 +6,23 @@ import { Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { compressImage } from "@/services/image-upload";
+import { ImageCropperModal } from "@/features/store/image-cropper-modal";
 
 /**
  * Édition des images de boutique DEPUIS la page boutique (pattern Facebook/
- * marketplace). Visible uniquement par le propriétaire. Réutilise les champs
- * existants `store_banner_url` / `avatar_url` (aucune donnée ajoutée) et le
- * même bucket Storage que l'app (`products-images`).
+ * marketplace). Visible uniquement par le propriétaire. Recadrage avant upload
+ * (option A) → l'image enregistrée est déjà cadrée, aucun champ de position.
+ * Réutilise les champs existants `store_banner_url` / `avatar_url` + le bucket
+ * Storage de l'app (`products-images`).
  */
 
-async function uploadStoreImage(
+async function uploadCropped(
   userId: string,
-  file: File,
+  blob: Blob,
   column: "store_banner_url" | "avatar_url",
   maxDim: number,
 ): Promise<boolean> {
+  const file = new File([blob], "crop.jpg", { type: "image/jpeg" });
   const compressed = await compressImage(file, maxDim, 0.85);
   const folder = column === "avatar_url" ? "avatars" : "banners";
   const path = `${folder}/${userId}/${Date.now()}.jpg`;
@@ -40,18 +43,9 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
   const { user } = useAuth();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const [pending, setPending] = useState<File | null>(null);
 
   if (!user || user.id !== sellerId) return null;
-
-  async function pick(file: File | null) {
-    if (!file || !user) return;
-    setUploading(true);
-    const ok = await uploadStoreImage(user.id, file, "store_banner_url", 1600);
-    setUploading(false);
-    if (ok) router.refresh();
-    else alert("Erreur lors de la mise à jour de la couverture.");
-  }
 
   return (
     <>
@@ -60,17 +54,36 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => pick(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          if (f) setPending(f);
+          e.target.value = "";
+        }}
       />
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-black/70 disabled:opacity-60"
+        className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-black/70"
       >
-        {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-        {uploading ? "Envoi…" : "Modifier la couverture"}
+        <Camera className="h-3.5 w-3.5" />
+        Modifier la couverture
       </button>
+
+      {pending && (
+        <ImageCropperModal
+          file={pending}
+          aspect={3}
+          targetWidth={1500}
+          title="Recadrer la couverture"
+          onCancel={() => setPending(null)}
+          onConfirm={async (blob) => {
+            const ok = await uploadCropped(user.id, blob, "store_banner_url", 1600);
+            setPending(null);
+            if (ok) router.refresh();
+            else alert("Erreur lors de la mise à jour de la couverture.");
+          }}
+        />
+      )}
     </>
   );
 }
@@ -80,18 +93,9 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
   const { user } = useAuth();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const [pending, setPending] = useState<File | null>(null);
 
   if (!user || user.id !== sellerId) return null;
-
-  async function pick(file: File | null) {
-    if (!file || !user) return;
-    setUploading(true);
-    const ok = await uploadStoreImage(user.id, file, "avatar_url", 800);
-    setUploading(false);
-    if (ok) router.refresh();
-    else alert("Erreur lors de la mise à jour de la photo de profil.");
-  }
 
   return (
     <>
@@ -100,17 +104,37 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => pick(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          if (f) setPending(f);
+          e.target.value = "";
+        }}
       />
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        disabled={uploading}
         aria-label="Modifier la photo de profil"
-        className="absolute -bottom-1 -right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#009688] text-white shadow-md transition hover:bg-[#00796B] disabled:opacity-60"
+        className="absolute -bottom-1 -right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#009688] text-white shadow-md transition hover:bg-[#00796B]"
       >
-        {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+        <Camera className="h-3.5 w-3.5" />
       </button>
+
+      {pending && (
+        <ImageCropperModal
+          file={pending}
+          aspect={1}
+          targetWidth={600}
+          round
+          title="Recadrer la photo de profil"
+          onCancel={() => setPending(null)}
+          onConfirm={async (blob) => {
+            const ok = await uploadCropped(user.id, blob, "avatar_url", 800);
+            setPending(null);
+            if (ok) router.refresh();
+            else alert("Erreur lors de la mise à jour de la photo de profil.");
+          }}
+        />
+      )}
     </>
   );
 }
