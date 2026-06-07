@@ -16,6 +16,7 @@ import {
   X,
   Globe,
   Plus,
+  Menu,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
@@ -389,7 +390,7 @@ export function AppHeader() {
           >
             {menuOpen
               ? <X className="h-5 w-5" />
-              : <UserRound className="h-5 w-5" />
+              : <Menu className="h-5 w-5" />
             }
           </button>
         </div>
@@ -411,6 +412,16 @@ export function AppHeader() {
       {/* ── Menu mobile déroulant ──────────────────────────────────── */}
       {menuOpen && (
         <div className="border-t border-slate-100 bg-white px-4 pb-4 pt-3 md:hidden">
+
+          {/* Bouton Vendre — CTA proéminent */}
+          <Link
+            href="/sell"
+            onClick={() => setMenuOpen(false)}
+            className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#009688] text-sm font-black text-white transition hover:bg-[#00796B]"
+          >
+            <Plus className="h-4 w-4" />
+            Vendre un article
+          </Link>
 
           {/* Sélecteur pays */}
           <div className="relative mb-3">
@@ -449,6 +460,21 @@ export function AppHeader() {
                 </Link>
               );
             })}
+
+            {user && (
+              <Link
+                href="/profile"
+                onClick={() => setMenuOpen(false)}
+                className={cn(
+                  "rounded-2xl px-4 py-3 text-sm font-bold transition",
+                  pathname === "/profile"
+                    ? "bg-[#E0F2F1] text-[#009688]"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100",
+                )}
+              >
+                Mon profil
+              </Link>
+            )}
 
             <Link
               href="/favorites"

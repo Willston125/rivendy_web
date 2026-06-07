@@ -4,8 +4,8 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Providers } from "@/app/providers";
 import { AppHeader } from "@/components/layout/app-header";
-import { MobileNav } from "@/components/layout/mobile-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { AppDownloadBanner } from "@/features/app-banner/app-download-banner";
 
 export const metadata: Metadata = {
   title: {
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           </Suspense>
           <main className="min-h-screen">{children}</main>
           <SiteFooter />
-          <MobileNav />
+          <AppDownloadBanner />
         </Providers>
       </body>
     </html>
