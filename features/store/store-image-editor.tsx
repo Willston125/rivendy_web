@@ -15,11 +15,11 @@ import { ImageCropperModal } from "@/features/store/image-cropper-modal";
  * Storage de l'app (`products-images`).
  */
 
-// Upload direct du blob recadré. IMPORTANT : on utilise EXACTEMENT les mêmes
-// buckets et format de chemin que l'app (image_upload_service.dart) pour que
-// les policies RLS Storage existantes s'appliquent :
-//   avatar  → bucket "avatars",  chemin "{userId}/{userId}_{ts}.jpg"
-//   couverture → bucket "banners", chemin "{userId}/{userId}_{ts}.jpg"
+// Upload direct du blob recadré. Buckets/chemins identiques à l'app
+// (image_upload_service.dart) pour que les policies RLS Storage s'appliquent.
+//   avatar     → bucket "avatars",  colonne avatar_url (partagé app+web)
+//   couverture → bucket "banners",  colonne store_banner_url_WEB (web-only :
+//                la couverture de l'app store_banner_url n'est jamais modifiée)
 async function uploadCropped(
   userId: string,
   blob: Blob,
@@ -27,7 +27,7 @@ async function uploadCropped(
 ): Promise<boolean> {
   try {
     const bucket = kind === "avatar" ? "avatars" : "banners";
-    const column = kind === "avatar" ? "avatar_url" : "store_banner_url";
+    const column = kind === "avatar" ? "avatar_url" : "store_banner_url_web";
     const path = `${userId}/${userId}_${Date.now()}.jpg`;
     const { error: upErr } = await supabase.storage
       .from(bucket)

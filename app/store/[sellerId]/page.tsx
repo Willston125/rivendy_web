@@ -114,11 +114,11 @@ export default async function StorePage({
       ══════════════════════════════════════════════════════════════ */}
       <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
 
-        {/* Bannière */}
+        {/* Bannière — couverture web prioritaire, fallback sur celle de l'app */}
         <div className="relative h-36 bg-slate-900 md:h-52">
-          {seller.store_banner_url ? (
+          {(seller.store_banner_url_web || seller.store_banner_url) ? (
             <Image
-              src={seller.store_banner_url}
+              src={(seller.store_banner_url_web || seller.store_banner_url) as string}
               alt=""
               fill
               sizes="100vw"

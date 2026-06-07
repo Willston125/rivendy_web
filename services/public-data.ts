@@ -250,11 +250,23 @@ export async function getSimilarProducts(product: Product, limit = 8) {
 
 export async function getSellerProfile(sellerId: string) {
   const supabase = createAnonServerClient();
-  const { data, error } = await supabase
+  const baseCols =
+    "id, full_name, store_name, store_description, avatar_url, store_banner_url, voice_note_url, is_certified, total_sales, country_id, created_at";
+
+  // Tente avec la colonne web ; fallback si la migration n'est pas encore appliquée
+  let { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, store_name, store_description, avatar_url, store_banner_url, voice_note_url, is_certified, total_sales, country_id, created_at")
+    .select(`${baseCols}, store_banner_url_web`)
     .eq("id", sellerId)
     .maybeSingle();
+
+  if (error) {
+    ({ data, error } = await supabase
+      .from("profiles")
+      .select(baseCols)
+      .eq("id", sellerId)
+      .maybeSingle());
+  }
 
   if (error || !data) return null;
   return data as Profile;
