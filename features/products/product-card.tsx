@@ -1,8 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BadgeCheck, Zap } from "lucide-react";
-import { AddToCartButton } from "@/features/products/add-to-cart-button";
-import { FavoriteButton } from "@/features/products/favorite-button";
+import { ProductCardAction, ProductCardFavorite } from "@/features/products/product-card-action";
 import { categoryLabel, firstPhoto, formatMoney, isBoosted } from "@/lib/utils/format";
 import type { Country, Product } from "@/types/rivendy";
 
@@ -70,13 +69,10 @@ export function ProductCard({
         )}
       </Link>
 
-      {/* Favori — overlay sur l'image (pattern marketplace web) */}
+      {/* Favori — overlay sur l'image (masqué sur ses propres annonces) */}
       {!isEpuise && (
         <div className="absolute right-2 top-2 z-10">
-          <FavoriteButton
-            productId={product.id}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-red-500"
-          />
+          <ProductCardFavorite productId={product.id} sellerId={product.seller_id} />
         </div>
       )}
 
@@ -123,12 +119,7 @@ export function ProductCard({
         {/* ── Action ──────────────────────────────────────────── */}
         {!isEpuise && (
           <div className="border-t border-slate-100 pt-2.5">
-            <AddToCartButton
-              product={product}
-              label="Ajouter au panier"
-              size="sm"
-              className="h-9 w-full rounded-xl bg-[#009688] text-[11px] font-bold whitespace-nowrap hover:bg-[#00796B]"
-            />
+            <ProductCardAction product={product} />
           </div>
         )}
       </div>
