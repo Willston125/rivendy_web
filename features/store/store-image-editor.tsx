@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { ImageCropperModal } from "@/features/store/image-cropper-modal";
@@ -55,6 +55,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<File | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
 
   if (!user || user.id !== sellerId) return null;
 
@@ -67,7 +68,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null;
-          if (f) setPending(f);
+          if (f) { setPending(f); setErrMsg(null); }
           e.target.value = "";
         }}
       />
@@ -80,6 +81,13 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
         Modifier la couverture
       </button>
 
+      {/* Message d'erreur inline (pas d'alert()) */}
+      {errMsg && (
+        <div className="absolute bottom-14 right-3 z-10 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow">
+          {errMsg}
+        </div>
+      )}
+
       {pending && (
         <ImageCropperModal
           file={pending}
@@ -91,7 +99,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
             const ok = await uploadCropped(user.id, blob, "banner");
             setPending(null);
             if (ok) router.refresh();
-            else alert("Erreur lors de la mise à jour de la couverture.");
+            else setErrMsg("Erreur lors de la mise à jour. Réessayez.");
           }}
         />
       )}
@@ -105,6 +113,7 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<File | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
 
   if (!user || user.id !== sellerId) return null;
 
@@ -117,7 +126,7 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null;
-          if (f) setPending(f);
+          if (f) { setPending(f); setErrMsg(null); }
           e.target.value = "";
         }}
       />
@@ -129,6 +138,13 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
       >
         <Camera className="h-3.5 w-3.5" />
       </button>
+
+      {/* Tooltip d'erreur inline — pas de alert() */}
+      {errMsg && (
+        <div className="absolute -bottom-10 right-0 z-20 w-48 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow">
+          {errMsg}
+        </div>
+      )}
 
       {pending && (
         <ImageCropperModal
@@ -142,7 +158,7 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
             const ok = await uploadCropped(user.id, blob, "avatar");
             setPending(null);
             if (ok) router.refresh();
-            else alert("Erreur lors de la mise à jour de la photo de profil.");
+            else setErrMsg("Erreur lors de la mise à jour. Réessayez.");
           }}
         />
       )}

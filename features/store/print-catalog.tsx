@@ -63,41 +63,19 @@ export function PrintCatalog({ seller, products, country }: PrintCatalogProps) {
         ) : (
           <Printer className="h-4 w-4" />
         )}
-        <span>Télécharger le Catalogue PDF</span>
+        <span>Imprimer le catalogue</span>
       </button>
 
-      {/* Style d'impression injecté uniquement à l'impression */}
-      <style jsx global>{`
+      {/* Style d'impression — dangerouslySetInnerHTML évite styled-jsx */}
+      <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          /* Masquer tout le contenu de l'application sauf notre conteneur de catalogue */
-          body * {
-            visibility: hidden;
-          }
-          #print-catalog-container, #print-catalog-container * {
-            visibility: visible;
-          }
-          #print-catalog-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white !important;
-            color: black !important;
-          }
-          
-          /* Marges de page A4 */
-          @page {
-            size: A4 portrait;
-            margin: 15mm 15mm 20mm 15mm;
-          }
-          
-          /* Éviter de couper les cartes au milieu */
-          .print-card-avoid {
-            break-inside: avoid;
-            page-break-inside: avoid;
-          }
+          body * { visibility: hidden; }
+          #print-catalog-container, #print-catalog-container * { visibility: visible; }
+          #print-catalog-container { position: absolute; left: 0; top: 0; width: 100%; background: white !important; color: black !important; }
+          @page { size: A4 portrait; margin: 15mm 15mm 20mm 15mm; }
+          .print-card-avoid { break-inside: avoid; page-break-inside: avoid; }
         }
-      `}</style>
+      ` }} />
 
       {/* Conteneur masqué à l'écran, visible et structuré pour l'impression */}
       <div id="print-catalog-container" className="hidden print:block w-full text-slate-900 bg-white font-sans">

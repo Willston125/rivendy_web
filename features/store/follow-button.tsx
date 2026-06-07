@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { UserPlus, UserCheck, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { cn } from "@/lib/utils/cn";
@@ -13,6 +14,7 @@ interface FollowButtonProps {
 
 export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
@@ -44,13 +46,12 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
   // Action de suivi/désabonnement
   const handleToggleFollow = async () => {
     if (!user) {
-      alert("Veuillez vous connecter pour vous abonner à cette boutique.");
+      // Rediriger vers la connexion plutôt qu'alert()
+      router.push(`/auth/login?redirect=/store/${sellerId}`);
       return;
     }
-    if (user.id === sellerId) {
-      alert("Vous ne pouvez pas vous abonner à votre propre boutique.");
-      return;
-    }
+    // Le bouton est masqué pour le propriétaire (voir ci-dessous), mais garde-fou
+    if (user.id === sellerId) return;
 
     setToggling(true);
 
@@ -80,7 +81,7 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
         if (onFollowChanged) onFollowChanged(true);
       }
     } catch (_) {
-      alert("Une erreur s'est produite. Veuillez réessayer.");
+      // Échec silencieux — pas d'alert() bloquant
     } finally {
       setToggling(false);
     }

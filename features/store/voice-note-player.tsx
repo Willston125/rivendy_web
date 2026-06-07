@@ -87,7 +87,7 @@ export function VoiceNotePlayer({ audioUrl }: { audioUrl: string }) {
   const progress = duration > 0 ? Math.min(1, position / duration) : 0;
 
   return (
-    <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 

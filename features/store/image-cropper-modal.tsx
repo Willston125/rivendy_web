@@ -38,6 +38,13 @@ export function ImageCropperModal({
   const [ty, setTy] = useState(0);
   const [saving, setSaving] = useState(false);
 
+  // Bloquer le scroll de la page pendant que le modal est ouvert
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   // URL objet de l'image choisie
   useEffect(() => {
     const u = URL.createObjectURL(file);
@@ -45,12 +52,17 @@ export function ImageCropperModal({
     return () => URL.revokeObjectURL(u);
   }, [file]);
 
-  // Mesure du cadre (responsive)
+  // Mesure du cadre avec ResizeObserver (responsive + rotation mobile)
   useEffect(() => {
-    if (!frameRef.current) return;
-    const r = frameRef.current.getBoundingClientRect();
-    setFrame({ w: r.width, h: r.height });
-  }, [url]);
+    const el = frameRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const e = entries[0];
+      if (e) setFrame({ w: e.contentRect.width, h: e.contentRect.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const baseScale = nat && frame ? Math.max(frame.w / nat.w, frame.h / nat.h) : 1;
   const scale = baseScale * zoom;
