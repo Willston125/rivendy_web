@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { compressImage } from "@/services/image-upload";
 import { ImageCropperModal } from "@/features/store/image-cropper-modal";
 
 /**
@@ -16,26 +15,34 @@ import { ImageCropperModal } from "@/features/store/image-cropper-modal";
  * Storage de l'app (`products-images`).
  */
 
+// Upload direct du blob recadré (déjà en JPEG bien dimensionné — pas de
+// recompression qui pourrait bloquer). Résout toujours (jamais de hang).
 async function uploadCropped(
   userId: string,
   blob: Blob,
   column: "store_banner_url" | "avatar_url",
-  maxDim: number,
 ): Promise<boolean> {
-  const file = new File([blob], "crop.jpg", { type: "image/jpeg" });
-  const compressed = await compressImage(file, maxDim, 0.85);
-  const folder = column === "avatar_url" ? "avatars" : "banners";
-  const path = `${folder}/${userId}/${Date.now()}.jpg`;
-  const { error: upErr } = await supabase.storage
-    .from("products-images")
-    .upload(path, compressed, { contentType: "image/jpeg", upsert: true });
-  if (upErr) return false;
-  const { data } = supabase.storage.from("products-images").getPublicUrl(path);
-  const { error: dbErr } = await supabase
-    .from("profiles")
-    .update({ [column]: data.publicUrl, updated_at: new Date().toISOString() })
-    .eq("id", userId);
-  return !dbErr;
+  try {
+    const folder = column === "avatar_url" ? "avatars" : "banners";
+    const path = `${folder}/${userId}/${Date.now()}.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from("products-images")
+      .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+    if (upErr) {
+      console.error("[store-image] upload échoué:", upErr.message);
+      return false;
+    }
+    const { data } = supabase.storage.from("products-images").getPublicUrl(path);
+    const { error: dbErr } = await supabase
+      .from("profiles")
+      .update({ [column]: data.publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (dbErr) console.error("[store-image] update profil échoué:", dbErr.message);
+    return !dbErr;
+  } catch (e) {
+    console.error("[store-image] exception:", e);
+    return false;
+  }
 }
 
 /* ── Bouton "Modifier la couverture" (overlay bannière) ──────────── */
@@ -77,7 +84,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
           title="Recadrer la couverture"
           onCancel={() => setPending(null)}
           onConfirm={async (blob) => {
-            const ok = await uploadCropped(user.id, blob, "store_banner_url", 1600);
+            const ok = await uploadCropped(user.id, blob, "store_banner_url");
             setPending(null);
             if (ok) router.refresh();
             else alert("Erreur lors de la mise à jour de la couverture.");
@@ -128,7 +135,7 @@ export function StoreAvatarEditButton({ sellerId }: { sellerId: string }) {
           title="Recadrer la photo de profil"
           onCancel={() => setPending(null)}
           onConfirm={async (blob) => {
-            const ok = await uploadCropped(user.id, blob, "avatar_url", 800);
+            const ok = await uploadCropped(user.id, blob, "avatar_url");
             setPending(null);
             if (ok) router.refresh();
             else alert("Erreur lors de la mise à jour de la photo de profil.");
