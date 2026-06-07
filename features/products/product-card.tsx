@@ -70,6 +70,16 @@ export function ProductCard({
         )}
       </Link>
 
+      {/* Favori — overlay sur l'image (pattern marketplace web) */}
+      {!isEpuise && (
+        <div className="absolute right-2 top-2 z-10">
+          <FavoriteButton
+            productId={product.id}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-red-500"
+          />
+        </div>
+      )}
+
       {/* ── Infos ───────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col gap-2 p-3">
 
@@ -110,21 +120,15 @@ export function ProductCard({
         {/* Spacer pour pousser le bouton en bas */}
         <div className="flex-1" />
 
-        {/* ── Actions ─────────────────────────────────────────── */}
+        {/* ── Action ──────────────────────────────────────────── */}
         {!isEpuise && (
-          <div className="flex items-center gap-1.5 border-t border-slate-100 pt-2.5">
+          <div className="border-t border-slate-100 pt-2.5">
             <AddToCartButton
               product={product}
               label="Ajouter au panier"
               size="sm"
-              className="h-9 min-w-0 flex-1 rounded-xl bg-[#009688] text-[11px] font-bold whitespace-nowrap hover:bg-[#00796B]"
+              className="h-9 w-full rounded-xl bg-[#009688] text-[11px] font-bold whitespace-nowrap hover:bg-[#00796B]"
             />
-            <div className="shrink-0">
-              <FavoriteButton
-                productId={product.id}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition hover:bg-slate-100 hover:text-red-400"
-              />
-            </div>
           </div>
         )}
       </div>

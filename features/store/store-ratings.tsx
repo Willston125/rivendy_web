@@ -297,8 +297,14 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
               ))}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-10 text-center text-slate-400">
-              <p className="text-xs font-medium">Aucun avis rédigé pour le moment.</p>
+            <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E0F2F1]">
+                <MessageSquare className="h-6 w-6 text-[#009688]" />
+              </span>
+              <p className="mt-3 text-sm font-black text-slate-700">Aucun avis pour le moment</p>
+              <p className="mt-1 max-w-xs text-xs text-slate-400">
+                Soyez le premier à partager votre expérience avec cette boutique après un achat.
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
