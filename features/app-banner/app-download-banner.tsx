@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { X, Smartphone, Download } from "lucide-react";
-import { storeUrlForUA } from "@/lib/config/app-links";
+import { HAS_APP_LINKS, storeUrlForUA } from "@/lib/config/app-links";
 
 /**
  * Bannière "Télécharger l'app Rivendy".
@@ -20,6 +20,10 @@ export function AppDownloadBanner() {
   const [storeUrl, setStoreUrl] = useState("/");
 
   useEffect(() => {
+    // L'app n'est pas encore publiée : on n'affiche pas la bannière tant
+    // qu'aucun lien store n'est configuré (s'activera automatiquement après).
+    if (!HAS_APP_LINKS) return;
+
     // Respecter une fermeture récente
     const dismissedAt = Number(localStorage.getItem(LS_KEY) || 0);
     if (dismissedAt && Date.now() - dismissedAt < SNOOZE_MS) return;
