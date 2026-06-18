@@ -126,11 +126,14 @@ export default async function HomePage({
             </div>
           )}
 
-          {/* ── Hero Banner ─────────────────────────────────────── */}
-          {!q && !category && <HeroBanner countryName={country.name} />}
-
-          {/* ── Bannière pub Supabase (Home Banner) — carrousel dynamique ── */}
-          {ads.length > 0 && <AdCarousel ads={ads} />}
+          {/* ── Bannière du haut (emplacement unique) ─────────────
+              Affiches pub publiées (carrousel) si présentes,
+              sinon la hero « Achetez/vendez » par défaut. ── */}
+          {!q && !category && (
+            ads.length > 0
+              ? <AdCarousel ads={ads} />
+              : <HeroBanner countryName={country.name} />
+          )}
 
           {/* ── Stories (mobile/tablette — sidebar masquée < xl) ── */}
           {!q && !category && stories.length > 0 && (
