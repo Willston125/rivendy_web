@@ -10,7 +10,7 @@ import { ArrowRight, Package, Shield, Truck } from "lucide-react";
  * - Côté gauche : titre, sous-titre, 3 avantages, CTA
  * - Côté droit : image femme souriante (generée)
  */
-export function HeroBanner({ countryName = "votre marché" }: { countryName?: string }) {
+export function HeroBanner({ countryName = "votre marché", countryId }: { countryName?: string; countryId?: string }) {
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#009688] via-[#00897B] to-[#00796B] shadow-lg shadow-[#009688]/15">
 
@@ -53,7 +53,7 @@ export function HeroBanner({ countryName = "votre marché" }: { countryName?: st
 
           {/* CTA Button */}
           <Link
-            href="/?country=DJ"
+            href={countryId ? `/?country=${countryId}` : "/"}
             className="group inline-flex items-center gap-2.5 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-[#009688] shadow-lg shadow-black/10 transition-all duration-200 hover:shadow-xl hover:shadow-black/15 active:scale-[.97]"
           >
             Découvrir les offres

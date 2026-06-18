@@ -132,7 +132,7 @@ export default async function HomePage({
           {!q && !category && (
             ads.length > 0
               ? <AdCarousel ads={ads} />
-              : <HeroBanner countryName={country.name} />
+              : <HeroBanner countryName={country.name} countryId={country.id} />
           )}
 
           {/* ── Stories (mobile/tablette — sidebar masquée < xl) ── */}

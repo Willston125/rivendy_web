@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Globe, CheckCircle2 } from "lucide-react";
 import { useCountry } from "@/features/country/country-provider";
 import type { Country } from "@/types/rivendy";
@@ -56,6 +57,8 @@ function CountryRow({
  */
 export function MarketSelectorModal() {
   const { needsMarketSelection, countries, setCountryId, reloadCountries } = useCountry();
+  const router = useRouter();
+  const pathname = usePathname();
   const [pending, setPending] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -73,7 +76,10 @@ export function MarketSelectorModal() {
     setLoading(true);
     await setCountryId(countryId);
     setLoading(false);
-    // Le provider va mettre country != null → needsMarketSelection = false → modal disparaît
+    // Met à jour l'URL : c'est `?country=` qui pilote le rendu serveur
+    // (produits/pubs). Sans ça, le contenu resterait sur le pays par défaut.
+    router.push(`${pathname === "/" ? "/" : pathname}?country=${countryId}`);
+    // Le provider met country != null → needsMarketSelection = false → modal disparaît
   }
 
   return (

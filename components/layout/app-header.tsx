@@ -65,12 +65,17 @@ export function AppHeader() {
     router.push(`/?${next.toString()}`);
   }
 
-  async function changeCountry(countryId: string) {
-    await setCountryId(countryId);
+  function changeCountry(newCountryId: string) {
+    // Mise à jour de l'état client SANS bloquer la navigation : si setCountryId
+    // traîne (chargement des moyens de paiement) ou échoue, l'URL doit changer
+    // quand même → c'est `?country=` qui pilote le rendu serveur (produits/pubs).
+    void setCountryId(newCountryId);
     const next = new URLSearchParams(params.toString());
-    next.set("country", countryId);
+    next.set("country", newCountryId);
+    // push vers la nouvelle URL suffit à re-rendre le serveur. PAS de
+    // router.refresh() ici : il rechargerait la route COURANTE (ancien pays)
+    // et réécraserait le contenu → bug « le contenu ne change pas ».
     router.push(`${pathname === "/" ? "/" : pathname}?${next.toString()}`);
-    router.refresh();
     setMenuOpen(false);
   }
 
