@@ -81,8 +81,9 @@ export function AdCarousel({ ads }: { ads: Advertisement[] }) {
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${index * 100}%)` }}
         >
-          {slides.map((ad, i) => (
-            <AdSlide key={ad.id} ad={ad} priority={i === 0} onActivate={() => trackAdClick(ad.id)} />
+          {slides.map((ad) => (
+            // priority sur toutes les diapos : préchargées → rotation fluide, sans à-coup
+            <AdSlide key={ad.id} ad={ad} priority onActivate={() => trackAdClick(ad.id)} />
           ))}
         </div>
       </div>

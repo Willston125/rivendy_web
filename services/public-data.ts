@@ -162,11 +162,14 @@ export async function getAdvertisements({
   if (error || !data) return [];
 
   const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
   return data
     .map((row) => normalizeAd(row as Record<string, unknown>))
     .filter((ad) => {
       if (ad.starts_at && new Date(ad.starts_at).getTime() > now) return false;
-      if (ad.ends_at && new Date(ad.ends_at).getTime() < now) return false;
+      // Date de fin INCLUSIVE : le dashboard stocke une date à minuit, donc une
+      // fin = « aujourd'hui » doit rester valable jusqu'à la fin de ce jour (+24h).
+      if (ad.ends_at && new Date(ad.ends_at).getTime() + DAY_MS <= now) return false;
       return true;
     });
 }
