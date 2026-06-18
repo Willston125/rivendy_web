@@ -131,6 +131,7 @@ export function AdCarousel({ ads }: { ads: Advertisement[] }) {
 
 /** Une diapo : image plein cadre + dégradé + titre, cliquable selon le type de lien. */
 function AdSlide({ ad, priority, onActivate }: { ad: Advertisement; priority: boolean; onActivate: () => void }) {
+  // Affiche pleine image, couleurs d'origine — aucun overlay ni texte superposé.
   const content = (
     <div className="relative h-44 w-full overflow-hidden sm:h-56 md:h-72">
       <Image
@@ -141,11 +142,6 @@ function AdSlide({ ad, priority, onActivate }: { ad: Advertisement; priority: bo
         className="object-cover"
         priority={priority}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/65 via-slate-950/20 to-transparent" />
-      <div className="absolute inset-y-0 left-0 flex max-w-lg flex-col justify-end p-5 text-white md:p-8">
-        <p className="text-xs font-bold uppercase tracking-wide text-teal-100">Rivendy</p>
-        <h2 className="mt-1 text-2xl font-black leading-tight md:text-4xl">{ad.title}</h2>
-      </div>
     </div>
   );
 

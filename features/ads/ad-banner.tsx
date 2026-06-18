@@ -19,6 +19,7 @@ export function AdBanner({ ads }: { ads: Advertisement[] }) {
   if (!ad?.image_url) return null;
   const onClick = () => trackAdClick(ad.id);
 
+  // Affiche pleine image, couleurs d'origine — aucun overlay ni texte superposé.
   const content = (
     <div className="relative h-36 overflow-hidden rounded-2xl bg-slate-900 md:h-52">
       <Image
@@ -28,11 +29,6 @@ export function AdBanner({ ads }: { ads: Advertisement[] }) {
         sizes="(max-width: 768px) 100vw, 1200px"
         className="object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/65 via-slate-950/20 to-transparent" />
-      <div className="absolute inset-y-0 left-0 flex max-w-md flex-col justify-end p-5 text-white md:p-7">
-        <p className="text-xs font-bold uppercase tracking-wide text-teal-100">Rivendy</p>
-        <h2 className="mt-1 text-2xl font-black leading-tight md:text-3xl">{ad.title}</h2>
-      </div>
     </div>
   );
 
