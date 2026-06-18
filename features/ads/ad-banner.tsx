@@ -1,31 +1,23 @@
+"use client";
+
+import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Advertisement } from "@/types/rivendy";
 
-import { CATEGORIES } from "@/types/rivendy";
-
-function getCategoryId(value: string): string {
-  const normalizedValue = value.toLowerCase().replace(/ & /g, "").replace(/ /g, "");
-  const match = CATEGORIES.find(
-    (c) =>
-      c.id.toLowerCase() === normalizedValue ||
-      c.label.toLowerCase().replace(/ & /g, "").replace(/ /g, "") === normalizedValue
-  );
-  return match ? match.id : value;
-}
-
-function hrefForAd(ad: Advertisement) {
-  if (ad.link_type === "product" && ad.link_value) return `/products/${ad.link_value}`;
-  if (ad.link_type === "store" && ad.link_value) return `/store/${ad.link_value}`;
-  if (ad.link_type === "category" && ad.link_value) return `/?category=${getCategoryId(ad.link_value)}`;
-  if (ad.link_type === "whatsapp" && ad.link_value) return `https://wa.me/${ad.link_value.replace(/\+/g, "")}`;
-  if (ad.link_type === "external" && ad.link_value) return ad.link_value;
-  return "/";
-}
+import { hrefForAd, isExternalAd } from "./ad-link";
+import { trackAdView, trackAdClick } from "./track";
 
 export function AdBanner({ ads }: { ads: Advertisement[] }) {
   const ad = ads[0];
+
+  // Compte une vue au montage (bannière toujours visible, pas de rotation).
+  useEffect(() => {
+    if (ad?.image_url) trackAdView(ad.id);
+  }, [ad?.id, ad?.image_url]);
+
   if (!ad?.image_url) return null;
+  const onClick = () => trackAdClick(ad.id);
 
   const content = (
     <div className="relative h-36 overflow-hidden rounded-2xl bg-slate-900 md:h-52">
@@ -44,16 +36,16 @@ export function AdBanner({ ads }: { ads: Advertisement[] }) {
     </div>
   );
 
-  if (ad.link_type === "external") {
+  if (isExternalAd(ad)) {
     return (
-      <a href={hrefForAd(ad)} target="_blank" rel="noreferrer" className="block w-full transition hover:opacity-95">
+      <a href={hrefForAd(ad)} target="_blank" rel="noreferrer" onClick={onClick} className="block w-full transition hover:opacity-95">
         {content}
       </a>
     );
   }
 
   return (
-    <Link href={hrefForAd(ad)} className="block w-full transition hover:opacity-95">
+    <Link href={hrefForAd(ad)} onClick={onClick} className="block w-full transition hover:opacity-95">
       {content}
     </Link>
   );

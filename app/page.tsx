@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Zap } from "lucide-react";
 import { CATEGORIES, SUBCATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
 import { AdBanner } from "@/features/ads/ad-banner";
+import { AdCarousel } from "@/features/ads/ad-carousel";
 import { ProductGrid } from "@/features/products/product-grid";
 import { StoriesRail } from "@/features/products/stories-rail";
 import { LeftSidebar } from "@/components/home/left-sidebar";
@@ -128,8 +129,8 @@ export default async function HomePage({
           {/* ── Hero Banner ─────────────────────────────────────── */}
           {!q && !category && <HeroBanner countryName={country.name} />}
 
-          {/* ── Bannière pub Supabase (Home Banner) ─────────────── */}
-          {ads.length > 0 && <AdBanner ads={ads} />}
+          {/* ── Bannière pub Supabase (Home Banner) — carrousel dynamique ── */}
+          {ads.length > 0 && <AdCarousel ads={ads} />}
 
           {/* ── Stories (mobile/tablette — sidebar masquée < xl) ── */}
           {!q && !category && stories.length > 0 && (
