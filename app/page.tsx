@@ -75,13 +75,18 @@ export default async function HomePage({
     ? params.sort
     : "recent") as ProductSort;
 
-  const [country, products, ads, inlineAds, stories] = await Promise.all([
+  const [country, products, ads, inlineAds, promoAds, stories] = await Promise.all([
     getCountry(countryId),
     getProducts({ countryId, category, subcategory, search: q, priceMin, priceMax, sort }),
     getAdvertisements({ countryId, positions: ["web_home_banner", "home_banner"] }),
     getAdvertisements({ countryId, positions: ["web_feed_inline"] }),
+    getAdvertisements({ countryId, positions: ["web_promo_offers", "web_promo_preorder"] }),
     getStoryProducts(countryId),
   ]);
+
+  // Slots promo accueil — 1 affiche max par emplacement (1ère active par display_order)
+  const offersAd = promoAds.find((a) => a.position === "web_promo_offers") ?? null;
+  const preorderAd = promoAds.find((a) => a.position === "web_promo_preorder") ?? null;
 
   const isAlimentation = category === "alimentation";
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
@@ -222,8 +227,8 @@ export default async function HomePage({
             />
           )}
 
-          {/* ── Cartes promo (Offres · Sur commande) ────────────── */}
-          {!q && !category && <PromoCards />}
+          {/* ── Cartes promo (Offres · Sur commande) — pilotables dashboard ── */}
+          {!q && !category && <PromoCards offersAd={offersAd} preorderAd={preorderAd} />}
 
           {/* ── Produits boostés ────────────────────────────────── */}
           {boosted.length > 0 && (

@@ -1,15 +1,30 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Package, Percent } from "lucide-react";
+import type { Advertisement } from "@/types/rivendy";
+import { PromoSlotCard } from "@/features/ads/promo-slot-card";
 
 /**
- * 3 cartes promotionnelles — fidèles à l'image de référence
+ * 2 cartes promotionnelles de l'accueil — « Offres exclusives » et
+ * « Sur commande ». Chaque carte est pilotable depuis le Dashboard via un
+ * « slot promo » (positions web_promo_offers / web_promo_preorder) : si une
+ * affiche est active pour le marché courant, elle remplace la carte en dur ;
+ * sinon on garde la carte éditoriale par défaut (repli, zéro régression).
  */
-export function PromoCards() {
+export function PromoCards({
+  offersAd,
+  preorderAd,
+}: {
+  offersAd?: Advertisement | null;
+  preorderAd?: Advertisement | null;
+}) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
 
-      {/* ── Carte 2 : Offres exclusives ──────────────────────────── */}
+      {/* ── Carte 1 : Offres exclusives ──────────────────────────── */}
+      {offersAd ? (
+        <PromoSlotCard ad={offersAd} fallbackHref="/seller/promo" />
+      ) : (
       <Link
         href="/seller/promo"
         className="group relative flex h-[120px] overflow-hidden rounded-2xl border border-orange-100 bg-orange-50 shadow-sm transition hover:shadow-md"
@@ -42,8 +57,12 @@ export function PromoCards() {
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50 via-orange-50/60 to-transparent" />
         </div>
       </Link>
+      )}
 
-      {/* ── Carte 3 : Sur commande ────────────────────────────────── */}
+      {/* ── Carte 2 : Sur commande ────────────────────────────────── */}
+      {preorderAd ? (
+        <PromoSlotCard ad={preorderAd} fallbackHref="/preorders" />
+      ) : (
       <Link
         href="/preorders"
         className="group relative flex h-[120px] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:shadow-md sm:col-span-1"
@@ -76,6 +95,7 @@ export function PromoCards() {
           <div className="absolute inset-0 bg-gradient-to-r from-white via-white/60 to-transparent" />
         </div>
       </Link>
+      )}
     </div>
   );
 }
