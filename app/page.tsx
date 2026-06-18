@@ -80,7 +80,7 @@ export default async function HomePage({
     getCountry(countryId),
     getProducts({ countryId, category, subcategory, search: q, priceMin, priceMax, sort }),
     getAdvertisements({ countryId, positions: ["web_home_banner", "home_banner"] }),
-    getAdvertisements({ countryId, positions: ["web_feed_inline", "feed_inline"] }),
+    getAdvertisements({ countryId, positions: ["web_feed_inline"] }),
     getStoryProducts(countryId),
   ]);
 
