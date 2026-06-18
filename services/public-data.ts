@@ -166,7 +166,12 @@ export async function getAdvertisements({
   return data
     .map((row) => normalizeAd(row as Record<string, unknown>))
     .filter((ad) => {
-      if (ad.starts_at && new Date(ad.starts_at).getTime() > now) return false;
+      // Date de début INCLUSIVE : le dashboard stocke une date à minuit UTC. Une
+      // pub « commence aujourd'hui » doit être visible dès le début de ce jour en
+      // heure locale du marché (UTC+0..+4) — sinon elle reste cachée jusqu'à
+      // minuit UTC (= jusqu'à 3-4h du matin local). On accorde donc 24h de marge
+      // (symétrique du +24h sur la fin) pour couvrir les fuseaux est-africains.
+      if (ad.starts_at && new Date(ad.starts_at).getTime() - DAY_MS > now) return false;
       // Date de fin INCLUSIVE : le dashboard stocke une date à minuit, donc une
       // fin = « aujourd'hui » doit rester valable jusqu'à la fin de ce jour (+24h).
       if (ad.ends_at && new Date(ad.ends_at).getTime() + DAY_MS <= now) return false;
