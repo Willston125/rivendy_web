@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { CATEGORIES, SUBCATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
-import { AdBanner } from "@/features/ads/ad-banner";
 import { AdCarousel } from "@/features/ads/ad-carousel";
 import { ProductGrid } from "@/features/products/product-grid";
 import { StoriesRail } from "@/features/products/stories-rail";
@@ -250,13 +249,6 @@ export default async function HomePage({
             </section>
           )}
 
-          {/* ── Pub inline ────────────────────────────────────────── */}
-          {inlineAds.length > 0 && (
-            <div>
-              <AdBanner ads={inlineAds} />
-            </div>
-          )}
-
           {/* ── Section Supermarché (layout spécial) ───────────────── */}
           {isAlimentation && recent.length > 0 && (
             <section>
@@ -330,6 +322,7 @@ export default async function HomePage({
               products={recent}
               country={country}
               cols={3}
+              inlineAds={inlineAds}
               emptyLabel={
                 q
                   ? `Aucun résultat pour "${q}" — essaie un autre mot.`
