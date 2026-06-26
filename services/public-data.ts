@@ -17,6 +17,16 @@ function toNumber(value: unknown, fallback = 0) {
   return typeof value === "number" ? value : Number(value ?? fallback);
 }
 
+function normalizeAttrs(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value == null) continue;
+    out[key] = String(value).trim();
+  }
+  return out;
+}
+
 function normalizeProduct(row: ProductRow): Product {
   const profile = row.profiles;
   const photos = Array.isArray(row.photos) ? row.photos.map(String) : [];
@@ -66,6 +76,8 @@ function normalizeProduct(row: ProductRow): Product {
       (row.seller_country_id as string | null) ||
       profile?.country_id ||
       null,
+    business_type: String(row.business_type ?? "boutique"),
+    extra_attributes: normalizeAttrs(row.extra_attributes),
   };
 }
 

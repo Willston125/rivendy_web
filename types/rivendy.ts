@@ -140,6 +140,8 @@ export interface Product {
   seller_avatar_url?: string | null;
   seller_is_certified?: boolean | null;
   seller_country_id?: string | null;
+  business_type: string;
+  extra_attributes: Record<string, string>;
 }
 
 export type AdvertisementPosition =
