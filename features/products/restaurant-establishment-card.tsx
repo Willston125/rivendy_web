@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight, Utensils, Bike, BadgeCheck } from "lucide-react";
 import type { RestaurantGroup } from "@/features/products/restaurant-grouping";
 
@@ -15,10 +16,12 @@ export function RestaurantEstablishmentCard({ group }: { group: RestaurantGroup 
       {/* Logo */}
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#E0F2F1]">
         {group.logoUrl ? (
-          <img
+          <Image
             src={group.logoUrl}
             alt={group.sellerName}
-            className="h-full w-full object-cover transition group-hover:scale-105"
+            fill
+            sizes="64px"
+            className="object-cover transition group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#009688]">
