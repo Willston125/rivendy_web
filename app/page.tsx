@@ -17,6 +17,8 @@ import {
   type ProductSort,
 } from "@/services/public-data";
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
+import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/features/products/restaurant-grouping";
+import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
 import { cn } from "@/lib/utils/cn";
 
 export async function generateMetadata({
@@ -57,6 +59,7 @@ type HomeSearchParams = Promise<{
   priceMin?: string;
   priceMax?: string;
   sort?: string;
+  resType?: string;
 }>;
 
 export default async function HomePage({
@@ -68,6 +71,7 @@ export default async function HomePage({
   const countryId = params.country || DEFAULT_COUNTRY_ID;
   const category = params.category as CategoryId | undefined;
   const subcategory = params.subcategory;
+  const resType = params.resType;
   const q = params.q;
   const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
   const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
@@ -89,6 +93,10 @@ export default async function HomePage({
   const preorderAd = promoAds.find((a) => a.position === "web_promo_preorder") ?? null;
 
   const isAlimentation = category === "alimentation";
+  const isRestaurant = category === "restaurant";
+  const restaurantGroups = isRestaurant
+    ? groupRestaurants(products, resType ?? RESTAURANT_FILTER_ALL)
+    : [];
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
   const recent  = products.filter((p) => p.status !== "boosted");
 
@@ -219,8 +227,36 @@ export default async function HomePage({
             </div>
           )}
 
+          {/* ── Filtres Restaurant (type d'établissement) ─────────── */}
+          {isRestaurant && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {RESTAURANT_FILTERS.map((value) => {
+                const active =
+                  (!resType && value === RESTAURANT_FILTER_ALL) || resType === value;
+                const href =
+                  value === RESTAURANT_FILTER_ALL
+                    ? `/?country=${countryId}&category=restaurant`
+                    : `/?country=${countryId}&category=restaurant&resType=${encodeURIComponent(value)}`;
+                return (
+                  <Link
+                    key={value}
+                    href={href}
+                    className={cn(
+                      "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                      active
+                        ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-[#009688]/30 hover:text-[#009688]",
+                    )}
+                  >
+                    {value}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
-          {(category || q) && (
+          {(category || q) && !isRestaurant && (
             <CatalogToolbar
               resultCount={products.length}
               currencySymbol={country.currency_symbol}
@@ -231,7 +267,7 @@ export default async function HomePage({
           {!q && !category && <PromoCards offersAd={offersAd} preorderAd={preorderAd} />}
 
           {/* ── Produits boostés ────────────────────────────────── */}
-          {boosted.length > 0 && (
+          {boosted.length > 0 && !isRestaurant && (
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -303,8 +339,32 @@ export default async function HomePage({
             </section>
           )}
 
+          {/* ── Section Restaurants (établissement d'abord) ───────── */}
+          {isRestaurant && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-xl">🍽️</span>
+                <h2 className="text-[15px] font-black text-slate-900">Restaurants</h2>
+                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
+                  {restaurantGroups.length} établissement{restaurantGroups.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              {restaurantGroups.length > 0 ? (
+                <div className="space-y-3">
+                  {restaurantGroups.map((group) => (
+                    <RestaurantEstablishmentCard key={group.sellerId || group.sellerName} group={group} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+                  Aucun restaurant disponible pour ce filtre.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
-          {!isAlimentation && (
+          {!isAlimentation && !isRestaurant && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">
