@@ -342,9 +342,21 @@ export default async function HomePage({
           {/* ── Section Restaurants (établissement d'abord) ───────── */}
           {isRestaurant && (
             <section>
+              {/* Bannière hero */}
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#009688] to-[#007168] p-5">
+                <div>
+                  <p className="text-lg font-black text-white">Faim maintenant ?</p>
+                  <p className="mt-0.5 text-[12.5px] font-medium text-white/85">
+                    Découvrez les meilleurs restaurants sur Rivendy
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#FF6B35] px-3.5 py-1.5 text-[12.5px] font-bold text-white">
+                    Commandez vos plats préférés
+                  </span>
+                </div>
+                <span className="hidden text-4xl sm:block">🍽️</span>
+              </div>
               <div className="mb-3 flex items-center gap-2">
-                <span className="text-xl">🍽️</span>
-                <h2 className="text-[15px] font-black text-slate-900">Restaurants</h2>
+                <h2 className="text-[15px] font-black text-slate-900">Restaurants populaires</h2>
                 <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
                   {restaurantGroups.length} établissement{restaurantGroups.length > 1 ? "s" : ""}
                 </span>
