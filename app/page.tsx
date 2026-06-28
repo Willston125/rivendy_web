@@ -19,7 +19,7 @@ import {
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
 import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/features/products/restaurant-grouping";
 import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
-import { RestaurantBannerCarousel } from "@/features/ads/restaurant-banner-ad";
+import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
 
 export async function generateMetadata({
@@ -346,7 +346,7 @@ export default async function HomePage({
             <section>
               {/* Bannière hero : carrousel pub dashboard si dispo, sinon défaut */}
               {restaurantBannerAds.length > 0 ? (
-                <RestaurantBannerCarousel ads={restaurantBannerAds} />
+                <BannerAdCarousel ads={restaurantBannerAds} storeOpensRestaurant fallbackHref="/?category=restaurant" />
               ) : (
                 <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#009688] to-[#007168] p-5">
                   <div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Search, X, Info, Package, Clock } from "lucide-react";
@@ -7,12 +7,16 @@ import Link from "next/link";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
-import type { Product } from "@/types/rivendy";
+import type { Product, Advertisement } from "@/types/rivendy";
+import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 
 export function PreorderCatalogView() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [bannerAds, setBannerAds] = useState<Advertisement[]>([]);
+
+  const countryId = useCountryOrDefault()?.id;
 
   useEffect(() => {
     async function load() {
@@ -28,6 +32,29 @@ export function PreorderCatalogView() {
     load();
   }, []);
 
+  // Bannières pub de l'onglet « Sur commande » (position web_preorder_banner).
+  useEffect(() => {
+    if (!countryId) return;
+    async function loadAds() {
+      const { data } = await supabase
+        .from("advertisements")
+        .select("*")
+        .eq("country_id", countryId)
+        .eq("is_active", true)
+        .eq("position", "web_preorder_banner")
+        .order("display_order", { ascending: true });
+      const now = Date.now();
+      const DAY = 86_400_000;
+      const active = ((data as Advertisement[]) ?? []).filter((ad) => {
+        if (ad.starts_at && new Date(ad.starts_at).getTime() - DAY > now) return false;
+        if (ad.ends_at && new Date(ad.ends_at).getTime() + DAY <= now) return false;
+        return true;
+      });
+      setBannerAds(active);
+    }
+    loadAds();
+  }, [countryId]);
+
   const filtered = search.trim()
     ? products.filter(
         (p) =>
@@ -35,6 +62,8 @@ export function PreorderCatalogView() {
           p.description.toLowerCase().includes(search.toLowerCase())
       )
     : products;
+
+  
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -67,6 +96,9 @@ export function PreorderCatalogView() {
       </div>
 
       <div className="px-4 py-4 md:px-6">
+        {/* Bannière pub (carrousel, dashboard) */}
+        {bannerAds.length > 0 && <BannerAdCarousel ads={bannerAds} />}
+
         {/* Info banner */}
         <div className="mb-4 flex items-start gap-2 rounded-2xl border border-[#009688]/20 bg-[#009688]/8 bg-[#E8F5E9] px-4 py-3">
           <Info className="h-4 w-4 shrink-0 text-[#009688]" />

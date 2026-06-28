@@ -12,22 +12,27 @@ import { trackAdView, trackAdClick } from "./track";
 const AUTOPLAY_MS = 4000;
 
 /**
- * Carrousel de la bannière hero de l'onglet Restaurant
- * (position web_restaurant_banner). Remplace la bannière « Faim maintenant ? ».
+ * Carrousel de bannière publicitaire réutilisable (format ~2.7:1).
+ * Utilisé par l'onglet Restaurant (web_restaurant_banner) et l'onglet
+ * Sur commande (web_preorder_banner).
  *
  * - 1 affiche  → image simple
  * - N affiches → rotation auto (4 s), pause au survol, swipe tactile,
  *   flèches ‹ › et points cliquables. Vue dédupliquée par affiche.
  *
- * Routing : un vendeur « store » ouvre son menu food-app /restaurant/[id].
+ * `storeOpensRestaurant` : si vrai, un lien « store » ouvre le menu
+ * food-app /restaurant/[id] (onglet Restaurant) ; sinon la boutique
+ * générique via hrefForAd (/store/[id]).
  */
-function hrefForBanner(ad: Advertisement): string {
-  if (ad.link_type === "store" && ad.link_value) return `/restaurant/${ad.link_value}`;
-  if (ad.link_type === "none") return "/?category=restaurant";
-  return hrefForAd(ad);
-}
-
-export function RestaurantBannerCarousel({ ads }: { ads: Advertisement[] }) {
+export function BannerAdCarousel({
+  ads,
+  storeOpensRestaurant = false,
+  fallbackHref = "/",
+}: {
+  ads: Advertisement[];
+  storeOpensRestaurant?: boolean;
+  fallbackHref?: string;
+}) {
   const slides = useMemo(() => ads.filter((a) => a.image_url), [ads]);
   const count = slides.length;
 
@@ -58,6 +63,16 @@ export function RestaurantBannerCarousel({ ads }: { ads: Advertisement[] }) {
     }
   }, [slides, index]);
 
+  const hrefFor = useCallback(
+    (ad: Advertisement): string => {
+      if (storeOpensRestaurant && ad.link_type === "store" && ad.link_value)
+        return `/restaurant/${ad.link_value}`;
+      if (ad.link_type === "none") return fallbackHref;
+      return hrefForAd(ad);
+    },
+    [storeOpensRestaurant, fallbackHref],
+  );
+
   if (count === 0) return null;
 
   function onTouchStart(e: React.TouchEvent) {
@@ -85,7 +100,13 @@ export function RestaurantBannerCarousel({ ads }: { ads: Advertisement[] }) {
           style={{ transform: `translateX(-${index * 100}%)` }}
         >
           {slides.map((ad) => (
-            <BannerSlide key={ad.id} ad={ad} onActivate={() => trackAdClick(ad.id)} />
+            <BannerSlide
+              key={ad.id}
+              ad={ad}
+              href={hrefFor(ad)}
+              external={isExternalAd(ad)}
+              onActivate={() => trackAdClick(ad.id)}
+            />
           ))}
         </div>
       </div>
@@ -131,7 +152,17 @@ export function RestaurantBannerCarousel({ ads }: { ads: Advertisement[] }) {
   );
 }
 
-function BannerSlide({ ad, onActivate }: { ad: Advertisement; onActivate: () => void }) {
+function BannerSlide({
+  ad,
+  href,
+  external,
+  onActivate,
+}: {
+  ad: Advertisement;
+  href: string;
+  external: boolean;
+  onActivate: () => void;
+}) {
   const content = (
     <div className="relative aspect-[1600/600] w-full overflow-hidden">
       <Image
@@ -148,10 +179,10 @@ function BannerSlide({ ad, onActivate }: { ad: Advertisement; onActivate: () => 
     </div>
   );
 
-  if (isExternalAd(ad)) {
+  if (external) {
     return (
       <a
-        href={hrefForBanner(ad)}
+        href={href}
         target="_blank"
         rel="noreferrer"
         onClick={onActivate}
@@ -163,7 +194,7 @@ function BannerSlide({ ad, onActivate }: { ad: Advertisement; onActivate: () => 
   }
 
   return (
-    <Link href={hrefForBanner(ad)} onClick={onActivate} className="block w-full shrink-0 transition hover:opacity-95">
+    <Link href={href} onClick={onActivate} className="block w-full shrink-0 transition hover:opacity-95">
       {content}
     </Link>
   );
