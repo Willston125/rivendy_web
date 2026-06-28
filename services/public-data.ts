@@ -90,6 +90,7 @@ function normalizeAd(row: Record<string, unknown>): Advertisement {
     link_type: (row.link_type as Advertisement["link_type"]) ?? "none",
     link_value: (row.link_value as string | null) ?? null,
     position: String(row.position ?? "home_banner"),
+    target_category: (row.target_category as string | null) ?? null,
     display_order: Number(row.display_order ?? 1),
     is_active: Boolean(row.is_active ?? false),
     starts_at: (row.starts_at as string | null) ?? null,

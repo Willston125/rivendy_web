@@ -85,7 +85,7 @@ export default async function HomePage({
     getProducts({ countryId, category, subcategory, search: q, priceMin, priceMax, sort }),
     getAdvertisements({ countryId, positions: ["web_home_banner", "home_banner"] }),
     getAdvertisements({ countryId, positions: ["web_feed_inline"] }),
-    getAdvertisements({ countryId, positions: ["web_promo_offers", "web_promo_preorder", "web_restaurant_banner"] }),
+    getAdvertisements({ countryId, positions: ["web_promo_offers", "web_promo_preorder", "web_restaurant_banner", "web_category_banner"] }),
     getStoryProducts(countryId),
   ]);
 
@@ -93,6 +93,10 @@ export default async function HomePage({
   const offersAd = promoAds.find((a) => a.position === "web_promo_offers") ?? null;
   const preorderAd = promoAds.find((a) => a.position === "web_promo_preorder") ?? null;
   const restaurantBannerAds = promoAds.filter((a) => a.position === "web_restaurant_banner");
+  // Bannières d'onglet ciblées : uniquement celles dont la cible = onglet courant
+  const categoryBannerAds = category
+    ? promoAds.filter((a) => a.position === "web_category_banner" && a.target_category === category)
+    : [];
 
   const isAlimentation = category === "alimentation";
   const isRestaurant = category === "restaurant";
@@ -255,6 +259,11 @@ export default async function HomePage({
                 );
               })}
             </div>
+          )}
+
+          {/* ── Bannière pub d'onglet (ciblée, dashboard) — jamais sur l'accueil ── */}
+          {categoryBannerAds.length > 0 && (
+            <BannerAdCarousel ads={categoryBannerAds} fallbackHref={`/?category=${category}`} />
           )}
 
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}

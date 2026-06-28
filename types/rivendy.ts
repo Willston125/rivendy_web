@@ -160,6 +160,7 @@ export interface Advertisement {
   link_type: "product" | "category" | "store" | "external" | "none" | "whatsapp";
   link_value: string | null;
   position: AdvertisementPosition | string;
+  target_category?: string | null;
   display_order: number;
   is_active: boolean;
   starts_at: string | null;
