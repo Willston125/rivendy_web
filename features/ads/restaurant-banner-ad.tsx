@@ -1,42 +1,146 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Advertisement } from "@/types/rivendy";
 import { hrefForAd, isExternalAd } from "./ad-link";
 import { trackAdView, trackAdClick } from "./track";
 
+// Aligné sur le carrousel d'accueil de l'app (4 s).
+const AUTOPLAY_MS = 4000;
+
 /**
- * Bannière publicitaire de l'onglet Restaurant (position web_restaurant_banner).
- * Remplace la bannière « Faim maintenant ? » par l'affiche du dashboard, en
- * plein cadre (~2.7:1). Vue + clic trackés. Un vendeur restaurant (link_type
- * « store ») ouvre directement son menu food-app /restaurant/[id].
+ * Carrousel de la bannière hero de l'onglet Restaurant
+ * (position web_restaurant_banner). Remplace la bannière « Faim maintenant ? ».
+ *
+ * - 1 affiche  → image simple
+ * - N affiches → rotation auto (4 s), pause au survol, swipe tactile,
+ *   flèches ‹ › et points cliquables. Vue dédupliquée par affiche.
+ *
+ * Routing : un vendeur « store » ouvre son menu food-app /restaurant/[id].
  */
-export function RestaurantBannerAd({ ad }: { ad: Advertisement }) {
+function hrefForBanner(ad: Advertisement): string {
+  if (ad.link_type === "store" && ad.link_value) return `/restaurant/${ad.link_value}`;
+  if (ad.link_type === "none") return "/?category=restaurant";
+  return hrefForAd(ad);
+}
+
+export function RestaurantBannerCarousel({ ads }: { ads: Advertisement[] }) {
+  const slides = useMemo(() => ads.filter((a) => a.image_url), [ads]);
+  const count = slides.length;
+
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const seen = useRef<Set<string>>(new Set());
+
+  const goTo = useCallback((i: number) => setIndex(((i % count) + count) % count), [count]);
+  const next = useCallback(() => goTo(index + 1), [goTo, index]);
+  const prev = useCallback(() => goTo(index - 1), [goTo, index]);
+
   useEffect(() => {
-    trackAdView(ad.id);
-  }, [ad.id]);
+    if (count <= 1 || paused) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % count), AUTOPLAY_MS);
+    return () => clearInterval(id);
+  }, [count, paused]);
 
-  // Pour une bannière Restaurant, un lien « store » ouvre le menu food-app.
-  const href =
-    ad.link_type === "store" && ad.link_value
-      ? `/restaurant/${ad.link_value}`
-      : ad.link_type === "none"
-        ? "/?category=restaurant"
-        : hrefForAd(ad);
-  const external = isExternalAd(ad);
-  const onClick = () => trackAdClick(ad.id);
+  useEffect(() => {
+    if (index >= count) setIndex(0);
+  }, [count, index]);
 
-  const inner = (
-    <div className="group relative aspect-[1600/600] w-full overflow-hidden rounded-2xl border border-slate-100 bg-slate-100 shadow-sm transition hover:shadow-md">
+  useEffect(() => {
+    const ad = slides[index];
+    if (ad && !seen.current.has(ad.id)) {
+      seen.current.add(ad.id);
+      trackAdView(ad.id);
+    }
+  }, [slides, index]);
+
+  if (count === 0) return null;
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) (dx < 0 ? next : prev)();
+    touchStartX.current = null;
+  }
+
+  return (
+    <section
+      className="relative mb-4"
+      aria-roledescription="carousel"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <div className="overflow-hidden rounded-2xl bg-slate-900">
+        <div
+          className="flex transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(-${index * 100}%)` }}
+        >
+          {slides.map((ad) => (
+            <BannerSlide key={ad.id} ad={ad} onActivate={() => trackAdClick(ad.id)} />
+          ))}
+        </div>
+      </div>
+
+      {count > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Affiche précédente"
+            onClick={prev}
+            className="absolute left-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-slate-900 shadow-md backdrop-blur transition hover:bg-white"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Affiche suivante"
+            onClick={next}
+            className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-slate-900 shadow-md backdrop-blur transition hover:bg-white"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+
+          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
+            {slides.map((ad, i) => (
+              <button
+                key={ad.id}
+                type="button"
+                aria-label={`Aller à l'affiche ${i + 1}`}
+                aria-current={i === index}
+                onClick={() => goTo(i)}
+                className={
+                  i === index
+                    ? "h-2 w-6 rounded-full bg-white transition-all"
+                    : "h-2 w-2 rounded-full bg-white/55 transition-all hover:bg-white/80"
+                }
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function BannerSlide({ ad, onActivate }: { ad: Advertisement; onActivate: () => void }) {
+  const content = (
+    <div className="relative aspect-[1600/600] w-full overflow-hidden">
       <Image
         src={ad.image_url}
         alt={ad.title}
         fill
         sizes="(max-width: 680px) 100vw, 680px"
+        className="object-cover"
         priority
-        className="object-cover transition duration-300 group-hover:scale-[1.03]"
       />
       <span className="absolute left-2.5 top-2.5 rounded-md bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white">
         Sponsorisé
@@ -44,17 +148,23 @@ export function RestaurantBannerAd({ ad }: { ad: Advertisement }) {
     </div>
   );
 
-  if (external) {
+  if (isExternalAd(ad)) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" onClick={onClick} className="mb-4 block">
-        {inner}
+      <a
+        href={hrefForBanner(ad)}
+        target="_blank"
+        rel="noreferrer"
+        onClick={onActivate}
+        className="block w-full shrink-0 transition hover:opacity-95"
+      >
+        {content}
       </a>
     );
   }
 
   return (
-    <Link href={href} onClick={onClick} className="mb-4 block">
-      {inner}
+    <Link href={hrefForBanner(ad)} onClick={onActivate} className="block w-full shrink-0 transition hover:opacity-95">
+      {content}
     </Link>
   );
 }

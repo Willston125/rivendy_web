@@ -19,7 +19,7 @@ import {
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
 import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/features/products/restaurant-grouping";
 import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
-import { RestaurantBannerAd } from "@/features/ads/restaurant-banner-ad";
+import { RestaurantBannerCarousel } from "@/features/ads/restaurant-banner-ad";
 import { cn } from "@/lib/utils/cn";
 
 export async function generateMetadata({
@@ -92,7 +92,7 @@ export default async function HomePage({
   // Slots promo accueil — 1 affiche max par emplacement (1ère active par display_order)
   const offersAd = promoAds.find((a) => a.position === "web_promo_offers") ?? null;
   const preorderAd = promoAds.find((a) => a.position === "web_promo_preorder") ?? null;
-  const restaurantBannerAd = promoAds.find((a) => a.position === "web_restaurant_banner") ?? null;
+  const restaurantBannerAds = promoAds.filter((a) => a.position === "web_restaurant_banner");
 
   const isAlimentation = category === "alimentation";
   const isRestaurant = category === "restaurant";
@@ -344,9 +344,9 @@ export default async function HomePage({
           {/* ── Section Restaurants (établissement d'abord) ───────── */}
           {isRestaurant && (
             <section>
-              {/* Bannière hero : pub dashboard si disponible, sinon défaut */}
-              {restaurantBannerAd ? (
-                <RestaurantBannerAd ad={restaurantBannerAd} />
+              {/* Bannière hero : carrousel pub dashboard si dispo, sinon défaut */}
+              {restaurantBannerAds.length > 0 ? (
+                <RestaurantBannerCarousel ads={restaurantBannerAds} />
               ) : (
                 <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#009688] to-[#007168] p-5">
                   <div>
