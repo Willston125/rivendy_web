@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -17,6 +17,7 @@ import {
   Sparkles,
   Store,
   UtensilsCrossed,
+  BedDouble,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -38,6 +39,7 @@ const QUICK_CATEGORIES: { id: CategoryId | string; label: string; icon: LucideIc
   { id: "maison",        label: "Maison",          icon: Package },
   { id: "beauteParfums", label: "Beauté & Parfum", icon: Sparkles },
   { id: "alimentation",  label: "Alimentation",    icon: UtensilsCrossed },
+  { id: "hotel",         label: "Hôtels",          icon: BedDouble },
 ];
 
 export function LeftSidebar({
@@ -48,11 +50,14 @@ export function LeftSidebar({
   countryId: string;
 }) {
   const { profile, user } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [balanceVisible, setBalanceVisible] = useState(true);
 
   const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Invité";
   const isCertified = profile?.is_certified ?? false;
+
+  if (!country) return null;
 
   return (
     <aside className="hidden space-y-4 xl:block">

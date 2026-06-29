@@ -21,6 +21,8 @@ import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/f
 import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
 import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "@/features/products/location-listings";
 import { LocationOfferCard } from "@/features/products/location-offer-card";
+import { groupHotels, HOTEL_FILTERS, HOTEL_FILTER_ALL } from "@/features/products/hotel-listings";
+import { HotelCard } from "@/features/products/hotel-card";
 import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
 
@@ -64,6 +66,7 @@ type HomeSearchParams = Promise<{
   sort?: string;
   resType?: string;
   locType?: string;
+  hotelType?: string;
 }>;
 
 export default async function HomePage({
@@ -77,6 +80,7 @@ export default async function HomePage({
   const subcategory = params.subcategory;
   const resType = params.resType;
   const locType = params.locType;
+  const hotelType = params.hotelType;
   const q = params.q;
   const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
   const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
@@ -110,6 +114,10 @@ export default async function HomePage({
     : [];
   const locationOffers = isLocation
     ? filterLocationOffers(products, locType ?? LOCATION_FILTER_ALL)
+    : [];
+  const isHotel = category === "hotel";
+  const hotelSummaries = isHotel
+    ? groupHotels(products, hotelType ?? HOTEL_FILTER_ALL)
     : [];
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
   const recent  = products.filter((p) => p.status !== "boosted");
@@ -295,13 +303,39 @@ export default async function HomePage({
             </div>
           )}
 
+          {/* ── Filtres Hôtels (ambiances) ────────────────────────── */}
+          {isHotel && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {HOTEL_FILTERS.map((value) => {
+                const active = (!hotelType && value === HOTEL_FILTER_ALL) || hotelType === value;
+                const href = value === HOTEL_FILTER_ALL
+                  ? `/?country=${countryId}&category=hotel`
+                  : `/?country=${countryId}&category=hotel&hotelType=${encodeURIComponent(value)}`;
+                return (
+                  <Link
+                    key={value}
+                    href={href}
+                    className={cn(
+                      "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                      active
+                        ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-[#009688]/30 hover:text-[#009688]",
+                    )}
+                  >
+                    {value}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Bannière pub d'onglet (ciblée, dashboard) — jamais sur l'accueil ── */}
           {categoryBannerAds.length > 0 && (
             <BannerAdCarousel ads={categoryBannerAds} fallbackHref={`/?category=${category}`} />
           )}
 
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
-          {(category || q) && !isRestaurant && !isLocation && (
+          {(category || q) && !isRestaurant && !isLocation && !isHotel && (
             <CatalogToolbar
               resultCount={products.length}
               currencySymbol={country.currency_symbol}
@@ -334,8 +368,31 @@ export default async function HomePage({
             </section>
           )}
 
+          {/* ── Section Hôtels (hôtel-first) ──────────────────────── */}
+          {isHotel && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-[15px] font-black text-slate-900">Hôtels recommandés</h2>
+                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
+                  {hotelSummaries.length} hôtel{hotelSummaries.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              {hotelSummaries.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {hotelSummaries.map((h) => (
+                    <HotelCard key={h.sellerId || h.sellerName} hotel={h} country={country} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+                  Aucun hôtel disponible pour ce filtre.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* ── Produits boostés ────────────────────────────────── */}
-          {boosted.length > 0 && !isRestaurant && !isLocation && (
+          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && (
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -448,7 +505,7 @@ export default async function HomePage({
           )}
 
           {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
-          {!isAlimentation && !isRestaurant && !isLocation && (
+          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">
