@@ -19,6 +19,8 @@ import {
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
 import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/features/products/restaurant-grouping";
 import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
+import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "@/features/products/location-listings";
+import { LocationOfferCard } from "@/features/products/location-offer-card";
 import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
 
@@ -61,6 +63,7 @@ type HomeSearchParams = Promise<{
   priceMax?: string;
   sort?: string;
   resType?: string;
+  locType?: string;
 }>;
 
 export default async function HomePage({
@@ -73,6 +76,7 @@ export default async function HomePage({
   const category = params.category as CategoryId | undefined;
   const subcategory = params.subcategory;
   const resType = params.resType;
+  const locType = params.locType;
   const q = params.q;
   const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
   const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
@@ -100,8 +104,12 @@ export default async function HomePage({
 
   const isAlimentation = category === "alimentation";
   const isRestaurant = category === "restaurant";
+  const isLocation = category === "location";
   const restaurantGroups = isRestaurant
     ? groupRestaurants(products, resType ?? RESTAURANT_FILTER_ALL)
+    : [];
+  const locationOffers = isLocation
+    ? filterLocationOffers(products, locType ?? LOCATION_FILTER_ALL)
     : [];
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
   const recent  = products.filter((p) => p.status !== "boosted");
@@ -261,13 +269,39 @@ export default async function HomePage({
             </div>
           )}
 
+          {/* ── Filtres Location (catégories) ─────────────────────── */}
+          {isLocation && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {[{ id: "", label: "Tous" }, ...LOCATION_CATEGORIES].map((c) => {
+                const active = (!locType && c.id === "") || locType === c.id;
+                const href = c.id === ""
+                  ? `/?country=${countryId}&category=location`
+                  : `/?country=${countryId}&category=location&locType=${c.id}`;
+                return (
+                  <Link
+                    key={c.id || "all"}
+                    href={href}
+                    className={cn(
+                      "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                      active
+                        ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-[#009688]/30 hover:text-[#009688]",
+                    )}
+                  >
+                    {c.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Bannière pub d'onglet (ciblée, dashboard) — jamais sur l'accueil ── */}
           {categoryBannerAds.length > 0 && (
             <BannerAdCarousel ads={categoryBannerAds} fallbackHref={`/?category=${category}`} />
           )}
 
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
-          {(category || q) && !isRestaurant && (
+          {(category || q) && !isRestaurant && !isLocation && (
             <CatalogToolbar
               resultCount={products.length}
               currencySymbol={country.currency_symbol}
@@ -277,8 +311,31 @@ export default async function HomePage({
           {/* ── Cartes promo (Offres · Sur commande) — pilotables dashboard ── */}
           {!q && !category && <PromoCards offersAd={offersAd} preorderAd={preorderAd} />}
 
+          {/* ── Section Location (offre-first) ────────────────────── */}
+          {isLocation && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-[15px] font-black text-slate-900">Offres recommandées</h2>
+                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
+                  {locationOffers.length} offre{locationOffers.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              {locationOffers.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  {locationOffers.map((p) => (
+                    <LocationOfferCard key={p.id} product={p} country={country} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+                  Aucune offre disponible pour ce filtre.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* ── Produits boostés ────────────────────────────────── */}
-          {boosted.length > 0 && !isRestaurant && (
+          {boosted.length > 0 && !isRestaurant && !isLocation && (
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -391,7 +448,7 @@ export default async function HomePage({
           )}
 
           {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
-          {!isAlimentation && !isRestaurant && (
+          {!isAlimentation && !isRestaurant && !isLocation && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">
