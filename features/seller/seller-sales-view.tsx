@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
-import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import type { Product, AppOrder } from "@/types/rivendy";
 
@@ -469,7 +469,6 @@ export function SellerSalesView() {
               const statusCfg = SELLER_ORDER_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600" };
               const fmtDate = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(order.created_at));
               const items = order.items ?? [];
-              const phone = normalizePhoneForWhatsApp(order.buyer_phone || "");
 
               return (
                 <div key={order.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
@@ -523,18 +522,11 @@ export function SellerSalesView() {
                       </p>
                     </div>
 
-                    {phone && (
-                      <div className="mt-4">
-                        <a
-                          href={`https://wa.me/${phone}?text=${encodeURIComponent(`Bonjour ${order.buyer_name}, je suis le vendeur de votre commande #${order.id.split("-")[0].toUpperCase()} sur Rivendy.`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366]/10 px-4 py-2.5 text-sm font-black text-[#1DA851] transition hover:bg-[#25D366]/20"
-                        >
-                          Contacter l&apos;acheteur sur WhatsApp
-                        </a>
-                      </div>
-                    )}
+                    {/* Contact client centralisé par Rivendy — le vendeur n'a
+                        jamais accès aux coordonnées de l'acheteur. */}
+                    <p className="mt-4 text-xs text-slate-400">
+                      📦 Rivendy coordonne la livraison et le contact client.
+                    </p>
                   </div>
                 </div>
               );
