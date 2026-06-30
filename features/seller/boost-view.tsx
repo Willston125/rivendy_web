@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Zap, CheckCircle2, Copy, CheckCircle } from "lucide-react";
@@ -91,7 +91,8 @@ const PAYMENT_METHODS = [
 
 export function BoostView({ product }: { product: Product }) {
   const { user } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [selectedTier, setSelectedTier] = useState<BoostTier | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -115,11 +116,11 @@ export function BoostView({ product }: { product: Product }) {
         product_id: product.id,
         seller_id: user.id,
         plan: tier.id,
-        price_paid: priceForMarket(tier, country.id),
+        price_paid: priceForMarket(tier, country?.id),
         duration_days: tier.durationDays,
         status: "pending",
         payment_method: PAYMENT_METHODS[selectedMethod].name,
-        country_id: country.id,
+        country_id: country?.id,
         payment_reference: reference,
       };
       await supabase.from("boost_purchases").insert(payload);
@@ -139,6 +140,8 @@ export function BoostView({ product }: { product: Product }) {
     setSelectedTier(null);
     setSubmitting(false);
   }
+
+  if (!country) return null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
@@ -209,12 +212,12 @@ export function BoostView({ product }: { product: Product }) {
               </p>
               <p className="text-sm text-slate-500">{tier.durationDays} jours</p>
               <p className="mt-3 text-2xl font-black" style={{ color: tier.color }}>
-                {formatMoney(priceForMarket(tier, country.id), country)}
+                {formatMoney(priceForMarket(tier, country?.id), country)}
               </p>
               <p className="text-xs text-slate-400">
                 soit{" "}
-                {Math.round(priceForMarket(tier, country.id) / tier.durationDays).toLocaleString("fr-FR")}{" "}
-                {country.currency_symbol}/jour
+                {Math.round(priceForMarket(tier, country?.id) / tier.durationDays).toLocaleString("fr-FR")}{" "}
+                {country?.currency_symbol}/jour
               </p>
             </div>
 
@@ -277,7 +280,7 @@ export function BoostView({ product }: { product: Product }) {
                 </p>
                 <p className="text-sm text-slate-500">
                   {selectedTier.durationDays} jours ·{" "}
-                  {formatMoney(priceForMarket(selectedTier, country.id), country)}
+                  {formatMoney(priceForMarket(selectedTier, country?.id), country)}
                 </p>
               </div>
             </div>
@@ -322,7 +325,7 @@ export function BoostView({ product }: { product: Product }) {
                 </div>
                 <p className="text-sm text-slate-600">
                   Envoyez{" "}
-                  <strong>{formatMoney(priceForMarket(selectedTier, country.id), country)}</strong>{" "}
+                  <strong>{formatMoney(priceForMarket(selectedTier, country?.id), country)}</strong>{" "}
                   au numéro :{" "}
                   <strong
                     style={{ color: selectedTier.color }}

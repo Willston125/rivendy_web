@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -18,7 +18,8 @@ export function CartView() {
     removeItem,
     clearCart,
   } = useCart();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
 
   // ── Panier vide ────────────────────────────────────────────────────────────
   if (!totalItems) {
@@ -40,6 +41,8 @@ export function CartView() {
       </div>
     );
   }
+
+  if (!country) return null;
 
   return (
     <>

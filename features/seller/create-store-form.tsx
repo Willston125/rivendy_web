@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -66,7 +66,8 @@ type Step = 0 | 1 | 2 | 3;
 // ── Composant principal ─────────────────────────────────────
 export function CreateStoreForm() {
   const { user } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(0);
@@ -150,7 +151,7 @@ export function CreateStoreForm() {
           commission_amount: commissionAmount,
           category: p.category,
           condition: ["restaurant", "alimentation"].includes(p.category) ? "Neuf" : p.condition,
-          country_id: country.id,
+          country_id: country?.id,
           photos: urls,
           status: "active",
           stock_quantity: 1,
@@ -344,7 +345,7 @@ export function CreateStoreForm() {
           />
         </FormField>
 
-        <FormField label={`Votre prix (${country.currency_symbol}) *`} required>
+        <FormField label={`Votre prix (${country?.currency_symbol}) *`} required>
           <input
             type="number"
             value={current.price}
@@ -534,6 +535,8 @@ export function CreateStoreForm() {
 
   // ── Rendu principal ────────────────────────────────────────
   const stepTitles = ["Photos des produits","Détails des produits","Récapitulatif","Publication…"];
+
+  if (!country) return null;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:px-6 md:py-8">

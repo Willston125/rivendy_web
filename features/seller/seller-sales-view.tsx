@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -63,6 +63,8 @@ function StatusPill({ status }: { status: string }) {
     validated:{ label: "Validé",     cls: "bg-green-50 text-green-700" },
   };
   const cfg = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-500" };
+  
+
   return (
     <span className={`rounded-lg px-2.5 py-1 text-xs font-black ${cfg.cls}`}>
       {cfg.label}
@@ -82,7 +84,8 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 
 export function SellerSalesView() {
   const { user, profile } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -37,7 +37,8 @@ interface WalletTransaction {
 
 export function WalletView() {
   const { user, profile } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -105,7 +106,7 @@ export function WalletView() {
     0,
   );
 
-  const MIN_WITHDRAW = country.id === "KM" ? 5000 : 2000;
+  const MIN_WITHDRAW = country?.id === "KM" ? 5000 : 2000;
   const canWithdraw = confirmedEarnings >= MIN_WITHDRAW;
 
   // ── Demande de retrait via WhatsApp ────────────────────────
@@ -121,9 +122,9 @@ export function WalletView() {
     // Enregistrer dans Supabase
     await supabase.from("payout_requests").insert({
       seller_id: user.id,
-      country_id: country.id,
+      country_id: country?.id,
       amount: confirmedEarnings,
-      currency_code: country.currency_code,
+      currency_code: country?.currency_code,
       method: "whatsapp",
       phone_number: country.whatsapp_number,
       notes: `Demande web — ${deliveredOrders.length} commande(s) livrée(s)`,
@@ -156,6 +157,8 @@ export function WalletView() {
       </div>
     );
   }
+
+  if (!country) return null;
 
   return (
     <div className="w-full">

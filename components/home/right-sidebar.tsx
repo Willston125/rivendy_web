@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -24,7 +24,9 @@ const STATS = [
 
 export function RightSidebar() {
   const { items, totalAmount, removeItem } = useCart();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  if (!countryNullable) return null;
+  const country = countryNullable;
 
   const previewItems = items.slice(0, 3);
 

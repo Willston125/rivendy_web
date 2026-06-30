@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { BadgeCheck, Copy, CheckCircle2 } from "lucide-react";
@@ -103,7 +103,8 @@ const PAYMENT_METHODS = [
 
 export function SubscriptionView() {
   const { user, profile } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -128,11 +129,11 @@ export function SubscriptionView() {
       const payload: SellerSubscriptionInput = {
         seller_id: user.id,
         plan: plan.id,
-        price_paid: priceForMarket(plan, country.id),
+        price_paid: priceForMarket(plan, country?.id),
         duration_days: plan.durationDays,
         status: "pending",
         payment_method: "manual",
-        country_id: country.id,
+        country_id: country?.id,
         payment_reference: reference,
       };
       await supabase.from("seller_subscriptions").insert(payload);
@@ -140,7 +141,7 @@ export function SubscriptionView() {
       // non-blocking
     }
 
-    const formattedPrice = formatMoney(priceForMarket(plan, country.id), country);
+    const formattedPrice = formatMoney(priceForMarket(plan, country?.id), country);
     const msg = encodeURIComponent(
       `Bonjour Rivendy, j'ai effectué le paiement pour mon abonnement Vendeur Certifié.\n\n` +
         `• Plan : ${plan.label} (${plan.durationLabel})\n` +
@@ -153,6 +154,8 @@ export function SubscriptionView() {
     setSelectedPlan(null);
     setSubmitting(false);
   }
+
+  if (!country) return null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
@@ -190,7 +193,7 @@ export function SubscriptionView() {
               </div>
             </div>
             <div className="p-2">
-              <p className="text-sm font-black text-[#009688]">{formatMoney(priceForMarket(PLANS[1], country.id), country)}</p>
+              <p className="text-sm font-black text-[#009688]">{formatMoney(priceForMarket(PLANS[1], country?.id), country)}</p>
               <p className="truncate text-xs text-slate-500">Produit exemple</p>
             </div>
           </div>
@@ -223,7 +226,7 @@ export function SubscriptionView() {
         {PLANS.map((plan) => {
           const displaySavings = plan.savingsLabel
             ? plan.id === "yearly"
-              ? `${plan.savingsLabel} — soit ~${Math.round(priceForMarket(plan, country.id) / 12).toLocaleString("fr-FR")} ${country.currency_symbol}/mois`
+              ? `${plan.savingsLabel} — soit ~${Math.round(priceForMarket(plan, country?.id) / 12).toLocaleString("fr-FR")} ${country?.currency_symbol}/mois`
               : plan.savingsLabel
             : null;
 
@@ -254,7 +257,7 @@ export function SubscriptionView() {
                     plan.isPopular ? "text-[#009688]" : "text-[#1A1A1A]"
                   }`}
                 >
-                  {formatMoney(priceForMarket(plan, country.id), country)}
+                  {formatMoney(priceForMarket(plan, country?.id), country)}
                 </p>
                 <p className="text-xs text-slate-400">/ {plan.durationLabel}</p>
               </div>
@@ -326,7 +329,7 @@ export function SubscriptionView() {
                 </p>
                 <p className="text-sm text-slate-500">
                   {selectedPlan.durationLabel} ·{" "}
-                  {formatMoney(priceForMarket(selectedPlan, country.id), country)}
+                  {formatMoney(priceForMarket(selectedPlan, country?.id), country)}
                 </p>
               </div>
             </div>
@@ -343,7 +346,7 @@ export function SubscriptionView() {
               <div className="text-sm text-slate-600">
                 <p>
                   Envoie{" "}
-                  <strong>{formatMoney(priceForMarket(selectedPlan, country.id), country)}</strong>{" "}
+                  <strong>{formatMoney(priceForMarket(selectedPlan, country?.id), country)}</strong>{" "}
                   sur l&apos;un de ces numéros :
                 </p>
                 <ul className="mt-2 space-y-1">

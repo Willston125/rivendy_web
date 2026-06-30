@@ -20,7 +20,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
-import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry } from "@/features/country/country-provider";
+
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp, orderId } from "@/lib/utils/format";
 import type { CartItem, PaymentMethod } from "@/types/rivendy";
 
@@ -45,7 +46,9 @@ export function CheckoutForm() {
   const { user, profile } = useAuth();
   const { groups, totalAmount, totalItems, sellerCount, clearCart } = useCart();
   const { country: countryOrNull, paymentMethods, needsMarketSelection } = useCountry();
-  const country = useCountryOrDefault();
+  // country est alias de countryOrNull — utilise optional chaining partout
+  const country = countryOrNull;
+
 
   // Infos acheteur
   const [buyerName, setBuyerName] = useState(profile?.full_name || "");
@@ -70,7 +73,8 @@ export function CheckoutForm() {
     () => [
       {
         id: 0,
-        country_id: country.id,
+        country_id: country?.id ?? "DJ",
+
         name: "Cash à la livraison",
         type: "cash",
         logo_icon: null,
@@ -80,8 +84,10 @@ export function CheckoutForm() {
         display_order: 0,
       },
     ],
-    [country.id],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [country?.id],
   );
+
 
   const activeMethods = paymentMethods.length ? paymentMethods : fallbackMethods;
 
@@ -135,10 +141,11 @@ export function CheckoutForm() {
     lines.push("─────────────────");
     for (const item of groupItems) {
       const subtotal = item.product.price * item.quantity;
-      lines.push(`• ${item.product.title} × ${item.quantity} → ${Math.round(subtotal).toLocaleString("fr-FR")} ${country.currency_symbol || country.currency_code || "FDJ"}`);
+      lines.push(`• ${item.product.title} × ${item.quantity} → ${Math.round(subtotal).toLocaleString("fr-FR")} ${country?.currency_symbol || country?.currency_code || "FDJ"}`);
+
     }
     lines.push("─────────────────");
-    lines.push(`💰 Total : ${Math.round(groupTotal).toLocaleString("fr-FR")} ${country.currency_symbol || country.currency_code || "FDJ"}`);
+    lines.push(`💰 Total : ${Math.round(groupTotal).toLocaleString("fr-FR")} ${country?.currency_symbol || country?.currency_code || "FDJ"}`);
     lines.push(`💳 Paiement : ${paymentName}`);
     lines.push("─────────────────");
     if (deliveryMode === "pickup") {
@@ -226,7 +233,7 @@ export function CheckoutForm() {
           p_buyer_zone: effectiveZoneLabel,
           p_payment_method: paymentName,
           p_payment_status: paymentStatus,
-          p_country_id: country.id,
+          p_country_id: country?.id ?? "DJ",
           p_transaction_ref: transactionRef.trim() || null,
           p_items: group.items.map((item) => ({
             product_id: item.product.id,
@@ -246,8 +253,8 @@ export function CheckoutForm() {
         // Log WhatsApp
         const msg = buildWhatsAppMessage(group.sellerName, group.items, actualTotal, id, paymentName);
         supabase.from("whatsapp_logs").insert({
-          country_id: country.id,
-          phone_number: country.whatsapp_number,
+          country_id: country?.id ?? "DJ",
+          phone_number: country?.whatsapp_number ?? null,
           message_type: "order_confirmation",
           order_id: id,
           recipient_name: buyerName.trim(),
@@ -275,7 +282,7 @@ export function CheckoutForm() {
         paymentName,
       );
       const whatsapp = normalizePhoneForWhatsApp(
-        country.whatsapp_number || process.env.NEXT_PUBLIC_RIVENDY_WHATSAPP_FALLBACK || "",
+        country?.whatsapp_number || process.env.NEXT_PUBLIC_RIVENDY_WHATSAPP_FALLBACK || "",
       );
       if (whatsapp) {
         window.open(

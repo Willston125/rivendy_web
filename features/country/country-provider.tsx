@@ -190,15 +190,26 @@ export function useCountry() {
   return context;
 }
 
-/** Hook pratique — retourne le pays actif ou DJ comme dernier recours d'affichage (jamais null). */
-export function useCountryOrDefault(): Country {
-  const { country } = useCountry();
-  return country ?? {
-    id: DEFAULT_COUNTRY_ID,
-    name: "Djibouti",
-    currency_code: "FDJ",
-    currency_symbol: "FDJ",
-    whatsapp_number: process.env.NEXT_PUBLIC_RIVENDY_WHATSAPP_FALLBACK || "+25377145306",
-    is_active: true,
-  };
+/**
+ * Hook pratique — retourne le pays actif ou null si le marché n'est pas encore résolu.
+ *
+ * ⚠️ RÈGLE : ne jamais forcer DJ en fallback silencieux.
+ * Un retour null pendant le chargement permet aux composants d'afficher
+ * un skeleton plutôt que du contenu Djibouti erroné.
+ *
+ * Usage typique :
+ *   const country = useCountryOrDefault();
+ *   if (!country) return <Skeleton />;
+ */
+export function useCountryOrDefault(): Country | null {
+  const { country, loading } = useCountry();
+  // Pendant le chargement initial, on retourne null plutôt que DJ
+  if (loading) return null;
+  return country;
+}
+
+/** Retourne true pendant la résolution initiale du marché. */
+export function useCountryLoading(): boolean {
+  const { loading } = useCountry();
+  return loading;
 }

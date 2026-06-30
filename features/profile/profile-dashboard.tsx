@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -75,7 +75,8 @@ interface FollowedStore {
 
 export function ProfileDashboard() {
   const { user, profile, signOut } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
 
   const [orders,    setOrders]    = useState<AppOrder[]>([]);
   const [favorites, setFavorites] = useState<Product[]>([]);
@@ -190,6 +191,8 @@ export function ProfileDashboard() {
   /* Formatage date courte */
   const fmtDate = (iso: string) =>
     new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+
+  if (!country) return null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10">

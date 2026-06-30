@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -11,6 +11,8 @@ import type { Product } from "@/types/rivendy";
 
 /* ── Squelette de chargement ─────────────────────────────────────── */
 function FavoritesSkeleton() {
+  
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 8 }).map((_, i) => (
@@ -58,7 +60,8 @@ function FavoritesEmpty() {
 /* ── Composant principal ─────────────────────────────────────────── */
 export function FavoritesView() {
   const { user } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 

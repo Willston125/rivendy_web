@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Tag } from "lucide-react";
@@ -8,7 +8,8 @@ import { supabase } from "@/lib/supabase/client";
 import type { Product } from "@/types/rivendy";
 
 export function PromoView() {
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,6 +38,8 @@ export function PromoView() {
     }
     load();
   }, []);
+
+  if (!country) return null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">

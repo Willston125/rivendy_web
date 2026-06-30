@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,8 @@ const MAX_PHOTOS = 8;
 
 /* ── Séparateur de section ───────────────────────────────────────── */
 function SectionTitle({ children }: { children: React.ReactNode }) {
+  
+
   return (
     <p className="border-b border-slate-100 pb-2 text-[13px] font-black uppercase tracking-wider text-slate-400">
       {children}
@@ -33,7 +35,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export function ProductForm({ product }: { product?: EditableProduct }) {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
 
   const [title, setTitle]               = useState(product?.title ?? "");
   const [description, setDescription]   = useState(product?.description ?? "");
@@ -64,7 +67,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     const { data: rule } = await supabase
       .from("commission_rules")
       .select("rate")
-      .eq("country_id", country.id)
+      .eq("country_id", country?.id)
       .eq("category", category)
       .maybeSingle();
     if (rule?.rate != null) return Number(rule.rate) / 100;
@@ -72,7 +75,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     const { data: commission } = await supabase
       .from("commissions")
       .select("rate")
-      .eq("country_id", country.id)
+      .eq("country_id", country?.id)
       .eq("category", categoryLabel(category))
       .eq("is_active", true)
       .maybeSingle();
@@ -114,7 +117,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         id: user.id,
         full_name: profile?.full_name || user.user_metadata?.full_name || "Utilisateur Rivendy",
         whatsapp_number: profile?.whatsapp_number || user.user_metadata?.whatsapp_number || "",
-        country_id: country.id,
+        country_id: country?.id,
         updated_at: new Date().toISOString(),
       });
 

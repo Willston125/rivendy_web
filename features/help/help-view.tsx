@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { ChevronDown, Mail, MessageCircle } from "lucide-react";
@@ -46,7 +46,9 @@ const FAQS = [
 
 export function HelpView() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  if (!countryNullable) return null;
+  const country = countryNullable;
 
   const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
   const waMsg = encodeURIComponent("Bonjour, j'ai besoin d'aide avec Rivendy.");

@@ -297,10 +297,12 @@ function OrderCard({ order, country, userId }: { order: AppOrder; country: Count
 /* ── Vue principale ─────────────────────────────────────────────── */
 export function OrdersView() {
   const { user } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
   const [orders, setOrders]   = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");
+
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }

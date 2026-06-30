@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -48,6 +48,8 @@ const ORDER_STATUS: Partial<Record<OrderStatus, { label: string; bg: string; tex
 
 /* ── Skeleton ────────────────────────────────────────────────────── */
 function DashboardSkeleton() {
+  
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10 space-y-6 animate-pulse">
       <div className="h-10 w-64 rounded-2xl bg-slate-100" />
@@ -83,7 +85,8 @@ function Metric({ icon: Icon, label, value, accent = false }: {
 /* ── Vue principale ─────────────────────────────────────────────── */
 export function SellerDashboard() {
   const { user, profile, refreshProfile } = useAuth();
-  const country = useCountryOrDefault();
+  const countryNullable = useCountryOrDefault();
+  const country = countryNullable as any;
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);
@@ -171,11 +174,11 @@ export function SellerDashboard() {
   async function requestBoost(product: Product) {
     if (!user) return;
     // Parity Flutter boost_screen.dart — Bronze: 500 FDJ / 1250 KMF / 3 jours
-    const bronzePrice = country.id === "KM" ? 1250 : 500;
+    const bronzePrice = country?.id === "KM" ? 1250 : 500;
     const { error } = await supabase.from("boost_purchases").insert({
       product_id: product.id, seller_id: user.id,
       plan: "bronze", price_paid: bronzePrice, duration_days: 3,
-      status: "pending", payment_method: "cash", country_id: country.id,
+      status: "pending", payment_method: "cash", country_id: country?.id,
       notes: "Demande boost depuis Rivendy Web",
     });
     notify(error ? error.message : "Demande de boost envoyée ✓", error ? "err" : "ok");
@@ -184,11 +187,11 @@ export function SellerDashboard() {
   async function requestCertification() {
     if (!user) return;
     // Parity Flutter subscription_screen.dart — Monthly: 3000 FDJ / 7500 KMF / 30 jours
-    const monthlyPrice = country.id === "KM" ? 7500 : 3000;
+    const monthlyPrice = country?.id === "KM" ? 7500 : 3000;
     const { error } = await supabase.from("seller_subscriptions").insert({
       seller_id: user.id, plan: "monthly", price_paid: monthlyPrice,
       duration_days: 30, status: "pending", payment_method: "cash",
-      country_id: country.id, notes: "Demande certification depuis Rivendy Web",
+      country_id: country?.id, notes: "Demande certification depuis Rivendy Web",
     });
     if (!error) await refreshProfile();
     notify(error ? error.message : "Demande de certification envoyée ✓", error ? "err" : "ok");
@@ -200,8 +203,8 @@ export function SellerDashboard() {
     if (!amount) return notify("Indique un montant de retrait.", "err");
 
     const { error } = await supabase.from("payout_requests").insert({
-      seller_id: user.id, country_id: country.id, amount,
-      currency_code: country.currency_code, method: "whatsapp",
+      seller_id: user.id, country_id: country?.id, amount,
+      currency_code: country?.currency_code, method: "whatsapp",
       phone_number: profile?.whatsapp_number || country.whatsapp_number,
       status: "pending_director",
       notes: `Demande web - ${delivered.length} commande(s) livrée(s)`,
@@ -459,7 +462,7 @@ export function SellerDashboard() {
                 onClick={requestCertification}
                 className="mt-3 flex h-9 w-full items-center justify-center rounded-xl bg-amber-500 text-xs font-black text-white transition hover:bg-amber-600"
               >
-                Demander la certification ({formatMoney(country.id === "KM" ? 7500 : 3000, country)})
+                Demander la certification ({formatMoney(country?.id === "KM" ? 7500 : 3000, country)})
               </button>
             </div>
           )}
@@ -478,7 +481,7 @@ export function SellerDashboard() {
                 className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#009688] text-xs font-black text-white transition hover:bg-[#00796B]"
               >
                 <Zap className="h-3.5 w-3.5 fill-white" />
-                Boost Bronze — {formatMoney(country.id === "KM" ? 1250 : 500, country)} / 3 jours
+                Boost Bronze — {formatMoney(country?.id === "KM" ? 1250 : 500, country)} / 3 jours
               </button>
             </div>
           )}
