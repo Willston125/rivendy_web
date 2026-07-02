@@ -19,6 +19,8 @@ import {
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
 import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/features/products/restaurant-grouping";
 import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
+import { groupPharmacies, PHARMACY_FILTERS, PHARMACY_FILTER_ALL } from "@/features/products/pharmacy-grouping";
+import { PharmacyEstablishmentCard } from "@/features/products/pharmacy-establishment-card";
 import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "@/features/products/location-listings";
 import { LocationOfferCard } from "@/features/products/location-offer-card";
 import { groupHotels, HOTEL_FILTERS, HOTEL_FILTER_ALL } from "@/features/products/hotel-listings";
@@ -67,6 +69,7 @@ type HomeSearchParams = Promise<{
   resType?: string;
   locType?: string;
   hotelType?: string;
+  pharmaRayon?: string;
 }>;
 
 export default async function HomePage({
@@ -81,6 +84,7 @@ export default async function HomePage({
   const resType = params.resType;
   const locType = params.locType;
   const hotelType = params.hotelType;
+  const pharmaRayon = params.pharmaRayon;
   const q = params.q;
   const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
   const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
@@ -118,6 +122,10 @@ export default async function HomePage({
   const isHotel = category === "hotel";
   const hotelSummaries = isHotel
     ? groupHotels(products, hotelType ?? HOTEL_FILTER_ALL)
+    : [];
+  const isPharmacy = category === "pharmacie";
+  const pharmacyGroups = isPharmacy
+    ? groupPharmacies(products, pharmaRayon ?? PHARMACY_FILTER_ALL)
     : [];
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
   const recent  = products.filter((p) => p.status !== "boosted");
@@ -329,13 +337,41 @@ export default async function HomePage({
             </div>
           )}
 
+          {/* ── Filtres Pharmacie (rayons produits) ───────────────── */}
+          {isPharmacy && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {PHARMACY_FILTERS.map((value) => {
+                const active =
+                  (!pharmaRayon && value === PHARMACY_FILTER_ALL) || pharmaRayon === value;
+                const href =
+                  value === PHARMACY_FILTER_ALL
+                    ? `/?country=${countryId}&category=pharmacie`
+                    : `/?country=${countryId}&category=pharmacie&pharmaRayon=${encodeURIComponent(value)}`;
+                return (
+                  <Link
+                    key={value}
+                    href={href}
+                    className={cn(
+                      "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                      active
+                        ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-[#009688]/30 hover:text-[#009688]",
+                    )}
+                  >
+                    {value}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Bannière pub d'onglet (ciblée, dashboard) — jamais sur l'accueil ── */}
           {categoryBannerAds.length > 0 && (
             <BannerAdCarousel ads={categoryBannerAds} fallbackHref={`/?category=${category}`} />
           )}
 
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
-          {(category || q) && !isRestaurant && !isLocation && !isHotel && (
+          {(category || q) && !isRestaurant && !isLocation && !isHotel && !isPharmacy && (
             <CatalogToolbar
               resultCount={products.length}
               currencySymbol={country.currency_symbol}
@@ -392,7 +428,7 @@ export default async function HomePage({
           )}
 
           {/* ── Produits boostés ────────────────────────────────── */}
-          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && (
+          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && !isPharmacy && (
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -504,8 +540,43 @@ export default async function HomePage({
             </section>
           )}
 
+          {/* ── Section Pharmacie (établissement d'abord) ─────────── */}
+          {isPharmacy && (
+            <section>
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#009688] to-[#007168] p-5">
+                <div>
+                  <p className="text-lg font-black text-white">Votre santé, simplement avec Rivendy</p>
+                  <p className="mt-0.5 text-[12.5px] font-medium text-white/85">
+                    Médicaments du quotidien, hygiène, bébé, bien-être et plus encore
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#FF6B35] px-3.5 py-1.5 text-[12.5px] font-bold text-white">
+                    Explorer la pharmacie
+                  </span>
+                </div>
+                <span className="hidden text-4xl sm:block">💊</span>
+              </div>
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-[15px] font-black text-slate-900">Pharmacies recommandées</h2>
+                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
+                  {pharmacyGroups.length} pharmacie{pharmacyGroups.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              {pharmacyGroups.length > 0 ? (
+                <div className="space-y-3">
+                  {pharmacyGroups.map((group) => (
+                    <PharmacyEstablishmentCard key={group.sellerId || group.sellerName} group={group} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+                  Aucune pharmacie disponible pour ce filtre.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
-          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && (
+          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && !isPharmacy && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">

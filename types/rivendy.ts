@@ -14,6 +14,7 @@ export const CATEGORIES = [
   { id: "location", label: "Location" },
   { id: "mariage", label: "Mariage" },
   { id: "restaurant", label: "Restaurant" },
+  { id: "pharmacie", label: "Pharmacie" },
   { id: "personnels", label: "Personnels" },
   { id: "hotel", label: "Hôtels" },
 ] as const;
