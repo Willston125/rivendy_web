@@ -9,6 +9,7 @@ import { BuyNowButton } from "@/features/checkout/buy-now-button";
 import { FavoriteButton } from "@/features/products/favorite-button";
 import { ShareButton } from "@/components/ui/share-button";
 import { ReportButton } from "@/features/products/report-button";
+import { RentalRequestForm } from "@/features/products/rental-request-form";
 
 /**
  * Bloc d'actions produit. Parity Flutter : si l'utilisateur connecté est le
@@ -43,21 +44,43 @@ export function ProductActions({ product }: { product: Product }) {
     );
   }
 
+  // Location : pas de panier — demande traitée par l'agence Rivendy (parité app).
+  const isRental = product.category === "location";
+
   return (
     <div className="space-y-2">
-      <div className="flex gap-2">
-        <AddToCartButton product={product} label="Ajouter au panier" size="lg" />
-        <FavoriteButton
-          productId={product.id}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
-        />
-        <ShareButton
-          title={product.title}
-          text={`Regarde ${product.title} sur Rivendy !`}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-        />
-      </div>
-      <BuyNowButton product={product} />
+      {isRental ? (
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <RentalRequestForm product={product} />
+          </div>
+          <FavoriteButton
+            productId={product.id}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
+          />
+          <ShareButton
+            title={product.title}
+            text={`Regarde ${product.title} sur Rivendy !`}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <AddToCartButton product={product} label="Ajouter au panier" size="lg" />
+            <FavoriteButton
+              productId={product.id}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
+            />
+            <ShareButton
+              title={product.title}
+              text={`Regarde ${product.title} sur Rivendy !`}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+            />
+          </div>
+          <BuyNowButton product={product} />
+        </>
+      )}
       <ReportButton targetId={product.id} />
     </div>
   );
