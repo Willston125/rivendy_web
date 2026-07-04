@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { ArrowLeft, Zap } from "lucide-react";
+import { UniverseGrid } from "@/components/home/universe-grid";
 import { CATEGORIES, SUBCATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
 import { AdCarousel } from "@/features/ads/ad-carousel";
 import { ProductGrid } from "@/features/products/product-grid";
@@ -185,46 +186,21 @@ export default async function HomePage({
             </div>
           )}
 
-          {/* ── Onglets catégories ──────────────────────────────── */}
-          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-
-            {/* Tout */}
-            <Link
-              href={`/?country=${countryId}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-              className={cn(
-                "shrink-0 rounded-full px-5 py-2 text-[13px] font-bold transition",
-                !category
-                  ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
-                  : "border border-slate-200 bg-white text-slate-600 hover:border-[#009688]/30 hover:text-[#009688]",
-              )}
-            >
-              Tout
-            </Link>
-
-            {/* Catégories standard */}
-            {CATEGORIES.map((item) => (
+          {/* ── Navigation : grille d'univers (Tout) OU retour + libellé ── */}
+          {!category ? (
+            <UniverseGrid countryId={countryId} q={q} />
+          ) : (
+            <div className="flex items-center gap-3">
               <Link
-                key={item.id}
-                href={`/?country=${countryId}&category=${item.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-                className={cn(
-                  "shrink-0 rounded-full px-5 py-2 text-[13px] font-bold transition",
-                  category === item.id
-                    ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
-                    : "border border-slate-200 bg-white text-slate-600 hover:border-[#009688]/30 hover:text-[#009688]",
-                )}
+                href={`/?country=${countryId}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-3.5 py-2 text-[12.5px] font-bold text-slate-600 transition hover:bg-slate-200"
               >
-                {item.label}
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Tous les univers
               </Link>
-            ))}
-
-            {/* Onglet Sur commande */}
-            <Link
-              href="/preorders"
-              className="shrink-0 rounded-full border border-slate-200 bg-white px-5 py-2 text-[13px] font-bold text-slate-600 transition hover:border-[#009688]/30 hover:text-[#009688]"
-            >
-              Sur commande
-            </Link>
-          </div>
+              <h1 className="truncate text-[17px] font-black text-slate-900">{categoryLabel}</h1>
+            </div>
+          )}
 
           {/* ── Subcatégories (2e niveau de filtre) ──────────────── */}
           {category && subcategories.length > 0 && (
