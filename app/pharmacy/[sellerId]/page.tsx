@@ -50,7 +50,10 @@ function attr(p: Product, key: string): string {
  * côté Flutter). « Populaires » (boostés) d'abord, puis chaque rayon présent.
  */
 function buildSections(products: Product[]) {
-  const boosted = products.filter((p) => p.status === "boosted");
+  // getSellerPublicProducts renvoie TOUS les produits du vendeur — filtrer
+  // explicitement par catégorie évite qu'un produit hors-pharmacie (mauvais
+  // seller_id, compte mixte) n'apparaisse dans "Populaires".
+  const boosted = products.filter((p) => p.category === "pharmacie" && p.status === "boosted");
   const sections: { key: string; label: string; items: Product[] }[] = [];
   if (boosted.length > 0) {
     sections.push({ key: "populaires", label: "Populaires", items: boosted });

@@ -39,7 +39,10 @@ export async function generateMetadata({
 
 /** Sections du menu, dans l'ordre, dérivées des sous-catégories réelles. */
 function buildSections(products: Product[]) {
-  const boosted = products.filter((p) => p.status === "boosted");
+  // getSellerPublicProducts renvoie TOUS les produits du vendeur — filtrer
+  // explicitement par catégorie évite qu'un produit hors-restaurant (mauvais
+  // seller_id, compte mixte) n'apparaisse dans "Populaires".
+  const boosted = products.filter((p) => p.category === "restaurant" && p.status === "boosted");
   const sections: { key: string; label: string; items: Product[] }[] = [
     { key: "populaires", label: "Populaires", items: boosted },
     {

@@ -10,6 +10,7 @@ import { FavoriteButton } from "@/features/products/favorite-button";
 import { ShareButton } from "@/components/ui/share-button";
 import { ReportButton } from "@/features/products/report-button";
 import { RentalRequestForm } from "@/features/products/rental-request-form";
+import { HotelReservationForm } from "@/features/products/hotel-reservation-form";
 
 /**
  * Bloc d'actions produit. Parity Flutter : si l'utilisateur connecté est le
@@ -44,12 +45,35 @@ export function ProductActions({ product }: { product: Product }) {
     );
   }
 
-  // Location : pas de panier — demande traitée par l'agence Rivendy (parité app).
+  // Location / Hôtel : pas de panier — demande traitée par l'agence Rivendy
+  // (parité app). Une chambre d'hôtel n'est jamais "achetée" directement.
   const isRental = product.category === "location";
+  const isHotelRoom = product.category === "hotel";
 
   return (
     <div className="space-y-2">
-      {isRental ? (
+      {isHotelRoom ? (
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <HotelReservationForm
+              sellerId={product.seller_id}
+              hotelName={product.seller_name || "Hôtel Rivendy"}
+              room={{ id: product.id, title: product.title }}
+              triggerLabel="Réserver / Demander"
+              className="flex h-12 w-full items-center justify-center rounded-full bg-[#009688] text-sm font-black text-white transition hover:bg-[#00897B]"
+            />
+          </div>
+          <FavoriteButton
+            productId={product.id}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
+          />
+          <ShareButton
+            title={product.title}
+            text={`Regarde ${product.title} sur Rivendy !`}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+          />
+        </div>
+      ) : isRental ? (
         <div className="flex gap-2">
           <div className="flex-1">
             <RentalRequestForm product={product} />

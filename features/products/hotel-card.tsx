@@ -6,8 +6,9 @@ import { formatMoney } from "@/lib/utils/format";
 import type { HotelSummary } from "./hotel-listings";
 
 /**
- * Carte hôtel premium (hôtel = vendeur). Clic → /store/[id] (catalogue
- * du vendeur = ses chambres). Aucun contact direct. Charte Rivendy.
+ * Carte hôtel premium (hôtel = vendeur). Clic → /hotel/[id] (page hôtel
+ * dédiée : chambres + réservation via l'agence). Aucun contact direct.
+ * Charte Rivendy.
  */
 export function HotelCard({ hotel, country }: { hotel: HotelSummary; country: Country }) {
   const priceText = hotel.minPrice > 0 ? `À partir de ${formatMoney(hotel.minPrice, country)} / nuit` : "";
@@ -66,7 +67,7 @@ export function HotelCard({ hotel, country }: { hotel: HotelSummary; country: Co
   if (!hotel.sellerId) return <div className="cursor-default opacity-90">{inner}</div>;
 
   return (
-    <Link href={`/store/${hotel.sellerId}`} className="block">
+    <Link href={`/hotel/${hotel.sellerId}`} className="block">
       {inner}
     </Link>
   );
