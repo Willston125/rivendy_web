@@ -17,7 +17,9 @@ export function CartView() {
     decrement,
     removeItem,
     clearCart,
+    setItemVariant,
   } = useCart();
+  const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const countryNullable = useCountryOrDefault();
   const country = countryNullable as any;
 
@@ -130,6 +132,37 @@ export function CartView() {
                             <p className="text-xs text-slate-400">
                               {formatMoney(item.product.price, country)} / unité
                             </p>
+
+                            {/* Sélection de variante (une ligne par produit — parity app) */}
+                            {(() => {
+                              const sizes = csv(item.product.extra_attributes?.sizes);
+                              const colors = csv(item.product.extra_attributes?.colors);
+                              if (sizes.length === 0 && colors.length === 0) return null;
+                              return (
+                                <div className="mt-1.5 flex flex-wrap gap-2">
+                                  {sizes.length > 0 && (
+                                    <select
+                                      value={item.selectedSize ?? ""}
+                                      onChange={(e) => setItemVariant(item.product.id, { size: e.target.value })}
+                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 focus:border-[#009688] focus:outline-none"
+                                    >
+                                      <option value="">Taille…</option>
+                                      {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                  )}
+                                  {colors.length > 0 && (
+                                    <select
+                                      value={item.selectedColor ?? ""}
+                                      onChange={(e) => setItemVariant(item.product.id, { color: e.target.value })}
+                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 focus:border-[#009688] focus:outline-none"
+                                    >
+                                      <option value="">Couleur…</option>
+                                      {colors.map((c) => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                  )}
+                                </div>
+                              );
+                            })()}
 
                             {/* Contrôles quantité + supprimer */}
                             <div className="mt-2 flex items-center gap-3">

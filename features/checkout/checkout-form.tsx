@@ -142,12 +142,14 @@ export function CheckoutForm() {
     for (const item of groupItems) {
       const subtotal = item.product.price * item.quantity;
       lines.push(`• ${item.product.title} × ${item.quantity} → ${Math.round(subtotal).toLocaleString("fr-FR")} ${country?.currency_symbol || country?.currency_code || "FDJ"}`);
-      // Variantes déclarées (options à préciser par l'acheteur avec le vendeur/Rivendy)
+      // Variante : choix de l'acheteur si fait, sinon options proposées.
       const extra = item.product.extra_attributes ?? {};
       const sizes = (extra.sizes ?? "").split(",").map((s) => s.trim()).filter(Boolean);
       const colors = (extra.colors ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-      if (sizes.length > 0) lines.push(`   ↳ Tailles proposées : ${sizes.join(", ")}`);
-      if (colors.length > 0) lines.push(`   ↳ Couleurs proposées : ${colors.join(", ")}`);
+      if (item.selectedSize) lines.push(`   ↳ Taille : ${item.selectedSize}`);
+      else if (sizes.length > 0) lines.push(`   ↳ Tailles proposées : ${sizes.join(", ")}`);
+      if (item.selectedColor) lines.push(`   ↳ Couleur : ${item.selectedColor}`);
+      else if (colors.length > 0) lines.push(`   ↳ Couleurs proposées : ${colors.join(", ")}`);
     }
     lines.push("─────────────────");
     lines.push(`💰 Total : ${Math.round(groupTotal).toLocaleString("fr-FR")} ${country?.currency_symbol || country?.currency_code || "FDJ"}`);

@@ -26,6 +26,7 @@ type CartContextValue = {
   clearCart: () => void;
   clearGroup: (sellerId: string) => void;
   quantityOf: (productId: string) => number;
+  setItemVariant: (productId: string, variant: { size?: string; color?: string }) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -107,6 +108,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [items],
   );
 
+  const setItemVariant = useCallback(
+    (productId: string, variant: { size?: string; color?: string }) => {
+      setItems((current) =>
+        current.map((item) =>
+          item.product.id === productId
+            ? {
+                ...item,
+                ...(variant.size !== undefined ? { selectedSize: variant.size || undefined } : {}),
+                ...(variant.color !== undefined ? { selectedColor: variant.color || undefined } : {}),
+              }
+            : item,
+        ),
+      );
+    },
+    [],
+  );
+
   const groups = useMemo(() => groupItems(items), [items]);
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalAmount = useMemo(
@@ -128,8 +146,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       clearCart,
       clearGroup,
       quantityOf,
+      setItemVariant,
     }),
-    [addItem, clearCart, clearGroup, decrement, groups, increment, items, quantityOf, removeItem, totalAmount, totalItems],
+    [addItem, clearCart, clearGroup, decrement, groups, increment, items, quantityOf, removeItem, setItemVariant, totalAmount, totalItems],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -232,6 +232,9 @@ export interface AppOrder {
 export interface CartItem {
   product: Product;
   quantity: number;
+  /** Variante choisie par l'acheteur dans le panier (une ligne par produit). */
+  selectedSize?: string;
+  selectedColor?: string;
 }
 
 export interface SellerCartGroup {
