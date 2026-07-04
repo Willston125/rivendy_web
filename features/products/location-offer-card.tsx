@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, ArrowRight } from "lucide-react";
+import { MapPin, ArrowRight, Phone } from "lucide-react";
 import type { Product, Country } from "@/types/rivendy";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import {
@@ -27,10 +27,8 @@ export function LocationOfferCard({ product, country }: { product: Product; coun
   const priceText = `${formatMoney(locationPriceValue(product), country)} / ${locationPriceUnit(product)}`;
 
   return (
-    <Link
-      href={`/products/${product.id}`}
-      className="group block overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-    >
+    <div className="group block overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <Link href={`/products/${product.id}`} className="block">
       <div className="relative aspect-[16/10] w-full bg-slate-100">
         <Image
           src={firstPhoto(product)}
@@ -78,11 +76,29 @@ export function LocationOfferCard({ product, country }: { product: Product; coun
           </div>
         )}
 
-        <span className="mt-3 flex items-center justify-center gap-1 rounded-xl bg-[#009688] py-2.5 text-[13px] font-bold text-white">
+      </div>
+      </Link>
+
+      {/* Actions : voir l'offre (détail) + appeler Rivendy (jamais le vendeur) */}
+      <div className="flex gap-2 px-3.5 pb-3.5">
+        <Link
+          href={`/products/${product.id}`}
+          className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#009688] py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#00897B]"
+        >
           Voir l&apos;offre
           <ArrowRight className="h-3.5 w-3.5" />
-        </span>
+        </Link>
+        {country.whatsapp_number && (
+          <a
+            href={`tel:${country.whatsapp_number}`}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#009688] px-3.5 py-2.5 text-[13px] font-bold text-[#009688] transition-colors hover:bg-[#009688]/5"
+            aria-label="Appeler Rivendy"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            Appeler
+          </a>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
