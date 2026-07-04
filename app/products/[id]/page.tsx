@@ -159,6 +159,39 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
           </div>
 
+          {/* Variantes déclarées (tailles / couleurs) — parity app */}
+          {(() => {
+            const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+            const sizes = csv(product.extra_attributes?.sizes);
+            const colors = csv(product.extra_attributes?.colors);
+            if (sizes.length === 0 && colors.length === 0) return null;
+            return (
+              <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+                {sizes.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Tailles disponibles</p>
+                    <div className="flex flex-wrap gap-2">
+                      {sizes.map((s) => (
+                        <span key={s} className="rounded-lg border border-slate-200 px-3 py-1 text-sm font-bold text-slate-700">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {colors.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Couleurs disponibles</p>
+                    <div className="flex flex-wrap gap-2">
+                      {colors.map((c) => (
+                        <span key={c} className="rounded-lg border border-slate-200 px-3 py-1 text-sm font-bold text-slate-700">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-slate-400">Précisez votre choix de taille / couleur lors de la commande.</p>
+              </div>
+            );
+          })()}
+
           {/* Livraison estimée */}
           {product.delivery_days != null && product.delivery_days > 0 && (
             <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm shadow-sm">

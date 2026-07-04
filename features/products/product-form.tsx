@@ -43,6 +43,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const [sellerPrice, setSellerPrice]   = useState(String(product?.seller_price || product?.price || ""));
   const [category, setCategory]         = useState<CategoryId>((product?.category as CategoryId) || "femme");
   const [size, setSize]                 = useState(product?.size ?? "");
+  const [variantSizes, setVariantSizes] = useState(product?.extra_attributes?.sizes ?? "");
+  const [variantColors, setVariantColors] = useState(product?.extra_attributes?.colors ?? "");
   const [condition, setCondition]       = useState(product?.condition ?? "Bon état");
   const [stock, setStock]               = useState(String(product?.stock_quantity ?? 1));
   const [packageContents, setPackageContents] = useState(product?.package_contents ?? "");
@@ -55,6 +57,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const previews           = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   const numericSellerPrice = Number(sellerPrice || 0);
   const isFood             = category === "alimentation";
+  const showVariants       = ["femme", "homme", "bebeEnfants"].includes(category);
   const totalPhotos        = existingPhotos.length + files.length;
   const canAddMore         = totalPhotos < MAX_PHOTOS;
 
@@ -121,6 +124,17 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         updated_at: new Date().toISOString(),
       });
 
+      // Variantes (vêtements) : tailles + couleurs en CSV, format lu par
+      // Product.availableSizes / availableColors côté app.
+      const csv = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean).join(",");
+      const variantExtra: Record<string, string> = showVariants
+        ? {
+            ...(product?.extra_attributes ?? {}),
+            ...(csv(variantSizes) ? { sizes: csv(variantSizes) } : {}),
+            ...(csv(variantColors) ? { colors: csv(variantColors) } : {}),
+          }
+        : {};
+
       const payload = {
         seller_id:        user.id,
         title:            title.trim(),
@@ -129,13 +143,14 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         commission_amount: commissionAmount,
         price:            displayPrice,
         category,
-        size:             isFood ? "" : size.trim(),
+        size:             isFood ? "" : (showVariants ? csv(variantSizes).split(",")[0] ?? "" : size.trim()),
         condition:        isFood ? "Neuf" : condition,
         photos,
         status:           product?.id ? product.status || "pending" : "pending",
         stock_quantity:   Number(stock || 1),
         product_type:     isFood ? "food_package" : "standard",
         package_contents: isFood ? packageContents.trim() : "",
+        ...(showVariants && Object.keys(variantExtra).length > 0 ? { extra_attributes: variantExtra } : {}),
         updated_at:       new Date().toISOString(),
       };
 
@@ -258,15 +273,38 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         <div className="grid gap-4 sm:grid-cols-3">
           {!isFood && (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="size">Taille / variante</Label>
-                <Input
-                  id="size"
-                  value={size}
-                  onChange={(e) => setSize(e.target.value)}
-                  placeholder="M, 42, Unique…"
-                />
-              </div>
+              {showVariants ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="sizes">Tailles disponibles</Label>
+                    <Input
+                      id="sizes"
+                      value={variantSizes}
+                      onChange={(e) => setVariantSizes(e.target.value)}
+                      placeholder="S, M, L, XL"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="colors">Couleurs disponibles</Label>
+                    <Input
+                      id="colors"
+                      value={variantColors}
+                      onChange={(e) => setVariantColors(e.target.value)}
+                      placeholder="Noir, Blanc, Rouge"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="size">Taille / variante</Label>
+                  <Input
+                    id="size"
+                    value={size}
+                    onChange={(e) => setSize(e.target.value)}
+                    placeholder="M, 42, Unique…"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="condition">État</Label>
                 <Select
