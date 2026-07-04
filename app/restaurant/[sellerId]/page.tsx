@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BadgeCheck, Star, Clock, Bike, Utensils, UtensilsCrossed } from "lucide-react";
+import { BadgeCheck, Star, Clock, Bike, Utensils, UtensilsCrossed, Phone } from "lucide-react";
 import { ProductGrid } from "@/features/products/product-grid";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import {
@@ -170,6 +170,16 @@ export default async function RestaurantMenuPage({
           <p className="mt-4 text-sm font-medium text-slate-500">
             Commandez vos menus préférés directement sur Rivendy
           </p>
+          {/* Appel dispo/urgence → toujours Rivendy (jamais le vendeur). Charte. */}
+          {country.whatsapp_number && (
+            <a
+              href={`tel:${country.whatsapp_number}`}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#009688] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#00897B]"
+            >
+              <Phone className="h-4 w-4" />
+              Appeler Rivendy
+            </a>
+          )}
         </div>
       </section>
 
