@@ -21,6 +21,13 @@ export const CATEGORIES = [
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 
+/** Catégories publiables par un vendeur (formulaire web). Pharmacie et Hôtels
+ * sont gérées exclusivement par l'agence Rivendy via le dashboard (modèle
+ * abonnement, champs métier dédiés) — jamais par un vendeur, ni app ni web. */
+export const VENDOR_CATEGORIES = CATEGORIES.filter(
+  (c) => c.id !== "pharmacie" && c.id !== "hotel",
+);
+
 /** Subcategories per main category — mirrors Flutter _subcategoriesMap */
 export const SUBCATEGORIES: Partial<Record<CategoryId, string[]>> = {
   femme: [

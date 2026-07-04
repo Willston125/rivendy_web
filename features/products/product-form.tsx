@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { uploadProductPhotos } from "@/services/image-upload";
-import { CATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
+import { VENDOR_CATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
 import { categoryLabel, formatMoney } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
@@ -103,6 +103,12 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) return;
+    // Garde-fou (défense en profondeur) : Pharmacie et Hôtels sont réservées à
+    // l'agence Rivendy (dashboard) — jamais publiables par un vendeur.
+    if (category === "pharmacie" || category === "hotel") {
+      setError("Cette catégorie est réservée à Rivendy et ne peut pas être publiée depuis ce formulaire.");
+      return;
+    }
     setLoading(true);
     setError("");
     setSuccess("");
@@ -234,7 +240,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
               value={category}
               onChange={(e) => setCategory(e.target.value as CategoryId)}
             >
-              {CATEGORIES.map((item) => (
+              {VENDOR_CATEGORIES.map((item) => (
                 <option value={item.id} key={item.id}>{item.label}</option>
               ))}
             </Select>
