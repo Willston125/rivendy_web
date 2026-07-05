@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Zap } from "lucide-react";
 import { UniverseGrid } from "@/components/home/universe-grid";
@@ -27,6 +26,7 @@ import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "
 import { LocationOfferCard } from "@/features/products/location-offer-card";
 import { groupHotels, HOTEL_FILTERS, HOTEL_FILTER_ALL } from "@/features/products/hotel-listings";
 import { HotelCard } from "@/features/products/hotel-card";
+import { FoodPackageCard } from "@/features/products/food-package-card";
 import {
   groupConstructionCompanies,
   CONSTRUCTION_MATERIALS,
@@ -497,50 +497,19 @@ export default async function HomePage({
             </section>
           )}
 
-          {/* ── Section Supermarché (layout spécial) ───────────────── */}
+          {/* ── Section Supermarché — Cartons alimentaires (parité app) ── */}
           {isAlimentation && recent.length > 0 && (
             <section>
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-xl">🛒</span>
-                <h2 className="text-[15px] font-black text-slate-900">Supermarché</h2>
+                <h2 className="text-[15px] font-black text-slate-900">Cartons alimentaires</h2>
                 <span className="rounded-full bg-[#E8F5E9] px-2 py-0.5 text-[11px] font-bold text-[#2E7D32]">
                   {recent.length} article{recent.length > 1 ? "s" : ""}
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {recent.map((p) => (
-                  <Link key={p.id} href={`/products/${p.id}`} className="group flex gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:shadow-md">
-                    {/* Photo grande */}
-                    <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                      {p.photos[0] && (
-                        <Image src={p.photos[0]} alt={p.title} fill sizes="112px" className="object-cover transition group-hover:scale-105" />
-                      )}
-                      {p.status === "boosted" && (
-                        <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-[#1A1A1A]">
-                          <Zap className="h-3 w-3 fill-white text-white" />
-                        </span>
-                      )}
-                    </div>
-                    {/* Infos */}
-                    <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
-                      <div>
-                        <h3 className="line-clamp-2 text-sm font-bold text-[#1A1A1A]">{p.title}</h3>
-                        {p.package_contents && (
-                          <p className="mt-1 line-clamp-1 text-xs text-slate-400">{p.package_contents}</p>
-                        )}
-                      </div>
-                      <div className="mt-auto flex items-end justify-between">
-                        <p className="text-lg font-black text-[#007168]">
-                          {p.price.toLocaleString("fr-FR")} {country.currency_symbol}
-                        </p>
-                        {p.stock_quantity > 0 ? (
-                          <span className="rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[10px] font-bold text-[#2E7D32]">En stock</span>
-                        ) : (
-                          <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-500">Épuisé</span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
+                  <FoodPackageCard key={p.id} product={p} country={country} />
                 ))}
               </div>
             </section>
