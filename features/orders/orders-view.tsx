@@ -195,7 +195,17 @@ function DeliveryCodeBanner({ orderId, userId }: { orderId: string, userId: stri
 }
 
 /* ── Carte commande ─────────────────────────────────────────────── */
-function OrderCard({ order, country, userId }: { order: AppOrder; country: Country, userId: string }) {
+function OrderCard({
+  order,
+  country,
+  userId,
+  onCancelled,
+}: {
+  order: AppOrder;
+  country: Country;
+  userId: string;
+  onCancelled: (orderId: string) => void;
+}) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
   const shortRef = order.id.split("-")[0].toUpperCase();
   const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(order.created_at));
@@ -204,6 +214,26 @@ function OrderCard({ order, country, userId }: { order: AppOrder; country: Count
   const isActive    = !["delivered", "delivered_by_rider", "completed", "cancelled"].includes(order.status);
   const curStep     = stepIndex(order.status);
   const isAwaitingCode = ["arrived", "code_generated", "awaiting_customer_confirmation"].includes(order.status);
+  // Parité RLS `buyer_cancel_own_pending_order` : l'acheteur peut annuler
+  // uniquement tant que la commande est encore en attente.
+  const canCancel = ["pending", "pending_whatsapp"].includes(order.status);
+  const [cancelling, setCancelling] = useState(false);
+
+  async function cancelOrder() {
+    if (!canCancel || cancelling) return;
+    const ok = window.confirm("Annuler cette commande ? Cette action est définitive.");
+    if (!ok) return;
+    setCancelling(true);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "cancelled" })
+        .eq("id", order.id);
+      if (!error) onCancelled(order.id);
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
@@ -246,6 +276,18 @@ function OrderCard({ order, country, userId }: { order: AppOrder; country: Count
             </span>
           )}
         </div>
+
+        {canCancel && (
+          <button
+            type="button"
+            onClick={cancelOrder}
+            disabled={cancelling}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+          >
+            <XCircle className="h-3.5 w-3.5" />
+            {cancelling ? "Annulation…" : "Annuler la commande"}
+          </button>
+        )}
       </div>
 
       {/* Code de confirmation */}
@@ -440,7 +482,15 @@ export function OrdersView() {
       ) : (
         <div className="space-y-3">
           {filtered.map((order) => (
-            <OrderCard key={order.id} order={order} country={country} userId={user?.id || ""} />
+            <OrderCard
+              key={order.id}
+              order={order}
+              country={country}
+              userId={user?.id || ""}
+              onCancelled={(orderId) =>
+                setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o)))
+              }
+            />
           ))}
         </div>
       )}
