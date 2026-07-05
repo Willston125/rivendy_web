@@ -49,7 +49,10 @@ export function SearchView() {
       dbQuery = dbQuery.eq("country_id", country.id);
     if (cat) dbQuery = dbQuery.eq("category", cat);
     if (sub?.trim()) dbQuery = dbQuery.eq("subcategory", sub.trim());
-    if (q.trim()) dbQuery = dbQuery.ilike("title", `%${q.trim()}%`);
+    if (q.trim()) {
+      const term = q.trim().replace(/[%,]/g, "");
+      dbQuery = dbQuery.or(`title.ilike.%${term}%,description.ilike.%${term}%`);
+    }
 
     const { data } = await dbQuery;
     setProducts((data as Product[]) ?? []);

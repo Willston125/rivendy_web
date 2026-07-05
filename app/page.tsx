@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Zap } from "lucide-react";
 import { UniverseGrid } from "@/components/home/universe-grid";
@@ -512,7 +513,7 @@ export default async function HomePage({
                     {/* Photo grande */}
                     <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-slate-100">
                       {p.photos[0] && (
-                        <img src={p.photos[0]} alt={p.title} className="h-full w-full object-cover transition group-hover:scale-105" />
+                        <Image src={p.photos[0]} alt={p.title} fill sizes="112px" className="object-cover transition group-hover:scale-105" />
                       )}
                       {p.status === "boosted" && (
                         <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-[#1A1A1A]">

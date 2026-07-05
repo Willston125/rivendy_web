@@ -221,7 +221,10 @@ export async function getProducts({
   if (countryId && countryId !== "all") query = query.eq("country_id", countryId);
   if (category && category !== "all") query = query.eq("category", category);
   if (subcategory?.trim()) query = query.eq("subcategory", subcategory.trim());
-  if (search?.trim()) query = query.ilike("title", `%${search.trim()}%`);
+  if (search?.trim()) {
+    const term = search.trim().replace(/[%,]/g, "");
+    query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%`);
+  }
   // Fourchette de prix — parity Flutter (filtre _priceMin / _priceMax)
   if (typeof priceMin === "number" && !Number.isNaN(priceMin)) query = query.gte("price", priceMin);
   if (typeof priceMax === "number" && !Number.isNaN(priceMax)) query = query.lte("price", priceMax);
