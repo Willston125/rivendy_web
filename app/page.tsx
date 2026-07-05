@@ -26,6 +26,14 @@ import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "
 import { LocationOfferCard } from "@/features/products/location-offer-card";
 import { groupHotels, HOTEL_FILTERS, HOTEL_FILTER_ALL } from "@/features/products/hotel-listings";
 import { HotelCard } from "@/features/products/hotel-card";
+import {
+  groupConstructionCompanies,
+  CONSTRUCTION_MATERIALS,
+  CONSTRUCTION_FILTER_ALL,
+  CONSTRUCTION_FILTER_PROMOS,
+  CONSTRUCTION_FILTER_DELIVERY,
+} from "@/features/products/construction-listings";
+import { ConstructionCompanyCard } from "@/features/products/construction-company-card";
 import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
 
@@ -71,6 +79,7 @@ type HomeSearchParams = Promise<{
   locType?: string;
   hotelType?: string;
   pharmaRayon?: string;
+  constrType?: string;
 }>;
 
 export default async function HomePage({
@@ -86,6 +95,7 @@ export default async function HomePage({
   const locType = params.locType;
   const hotelType = params.hotelType;
   const pharmaRayon = params.pharmaRayon;
+  const constrType = params.constrType;
   const q = params.q;
   const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
   const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
@@ -127,6 +137,10 @@ export default async function HomePage({
   const isPharmacy = category === "pharmacie";
   const pharmacyGroups = isPharmacy
     ? groupPharmacies(products, pharmaRayon ?? PHARMACY_FILTER_ALL)
+    : [];
+  const isConstruction = category === "materiauxConstruction";
+  const constructionCompanies = isConstruction
+    ? groupConstructionCompanies(products, constrType ?? CONSTRUCTION_FILTER_ALL)
     : [];
   const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
   const recent  = products.filter((p) => p.status !== "boosted");
@@ -341,13 +355,45 @@ export default async function HomePage({
             </div>
           )}
 
+          {/* ── Filtres Construction (matériaux + promos/livraison) ──── */}
+          {isConstruction && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {[
+                { key: CONSTRUCTION_FILTER_ALL, label: "Tous" },
+                ...CONSTRUCTION_MATERIALS.map((m) => ({ key: m.key, label: m.label })),
+                { key: CONSTRUCTION_FILTER_PROMOS, label: "Promotions" },
+                { key: CONSTRUCTION_FILTER_DELIVERY, label: "Livraison" },
+              ].map((f) => {
+                const active = (!constrType && f.key === CONSTRUCTION_FILTER_ALL) || constrType === f.key;
+                const href =
+                  f.key === CONSTRUCTION_FILTER_ALL
+                    ? `/?country=${countryId}&category=materiauxConstruction`
+                    : `/?country=${countryId}&category=materiauxConstruction&constrType=${encodeURIComponent(f.key)}`;
+                return (
+                  <Link
+                    key={f.key}
+                    href={href}
+                    className={cn(
+                      "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                      active
+                        ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-[#009688]/30 hover:text-[#009688]",
+                    )}
+                  >
+                    {f.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Bannière pub d'onglet (ciblée, dashboard) — jamais sur l'accueil ── */}
           {categoryBannerAds.length > 0 && (
             <BannerAdCarousel ads={categoryBannerAds} fallbackHref={`/?category=${category}`} />
           )}
 
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
-          {(category || q) && !isRestaurant && !isLocation && !isHotel && !isPharmacy && (
+          {(category || q) && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && (
             <CatalogToolbar
               resultCount={products.length}
               currencySymbol={country.currency_symbol}
@@ -403,8 +449,31 @@ export default async function HomePage({
             </section>
           )}
 
+          {/* ── Section Construction (fournisseur-first) ──────────── */}
+          {isConstruction && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-[15px] font-black text-slate-900">Fournisseurs recommandés</h2>
+                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
+                  {constructionCompanies.length} fournisseur{constructionCompanies.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              {constructionCompanies.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {constructionCompanies.map((c) => (
+                    <ConstructionCompanyCard key={c.sellerId || c.sellerName} company={c} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+                  Aucun fournisseur disponible pour ce filtre.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* ── Produits boostés ────────────────────────────────── */}
-          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && !isPharmacy && (
+          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && (
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -552,7 +621,7 @@ export default async function HomePage({
           )}
 
           {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
-          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && !isPharmacy && (
+          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">
