@@ -12,11 +12,13 @@ import {
   MessageSquare,
   Package,
   ShoppingBag,
+  ShoppingCart,
   Shirt,
   Smartphone,
   Sparkles,
   Store,
-  UtensilsCrossed,
+  Utensils,
+  Pill,
   BedDouble,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -32,13 +34,15 @@ import type { CategoryId } from "@/types/rivendy";
 
 /* ── Catégories rapides ──────────────────────────────────────────── */
 const QUICK_CATEGORIES: { id: CategoryId | string; label: string; icon: LucideIcon }[] = [
+  { id: "restaurant",    label: "Restaurant",     icon: Utensils },
+  { id: "alimentation",  label: "Supermarché",    icon: ShoppingCart },
+  { id: "pharmacie",     label: "Pharmacie",      icon: Pill },
   { id: "femme",         label: "Femme",          icon: ShoppingBag },
   { id: "homme",         label: "Homme",           icon: Shirt },
   { id: "bebeEnfants",   label: "Bébé & Enfants",  icon: Baby },
   { id: "electronique",  label: "Électronique",    icon: Smartphone },
   { id: "maison",        label: "Maison",          icon: Package },
   { id: "beauteParfums", label: "Beauté & Parfum", icon: Sparkles },
-  { id: "alimentation",  label: "Alimentation",    icon: UtensilsCrossed },
   { id: "hotel",         label: "Hôtels",          icon: BedDouble },
 ];
 
