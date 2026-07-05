@@ -128,6 +128,14 @@ export function CheckoutForm() {
 
   // ── Message WhatsApp (format identique à l'app Flutter) ──────────────────
 
+  /** Kind du groupe (parité OrderKind app) : restaurant/pharmacie si TOUS les
+   * articles appartiennent à cette catégorie, sinon commande standard. */
+  function groupKind(items: CartItem[]): "restaurant" | "pharmacie" | "standard" {
+    if (items.length > 0 && items.every((i) => i.product.category === "restaurant")) return "restaurant";
+    if (items.length > 0 && items.every((i) => i.product.category === "pharmacie")) return "pharmacie";
+    return "standard";
+  }
+
   function buildWhatsAppMessage(
     groupSellerName: string,
     groupItems: CartItem[],
@@ -136,7 +144,12 @@ export function CheckoutForm() {
     paymentName: string,
   ): string {
     const lines: string[] = [];
-    lines.push(`🛒 *Nouvelle commande — ${groupSellerName}*`);
+    const kind = groupKind(groupItems);
+    const header =
+      kind === "restaurant" ? "🍽️ *Commande Restaurant"
+      : kind === "pharmacie" ? "💊 *Demande Pharmacie"
+      : "🛒 *Nouvelle commande";
+    lines.push(`${header} — ${groupSellerName}*`);
     lines.push(`📋 Réf : ${ref}`);
     lines.push("─────────────────");
     for (const item of groupItems) {
@@ -164,6 +177,13 @@ export function CheckoutForm() {
     lines.push("─────────────────");
     lines.push(`👤 ${buyerName.trim()}`);
     lines.push(`📞 ${buyerPhone.trim()}`);
+    const closing =
+      kind === "restaurant"
+        ? "Merci de confirmer la disponibilité et le délai de préparation."
+        : kind === "pharmacie"
+          ? "Merci de confirmer la disponibilité des produits et le délai de livraison. Pour les médicaments soumis à ordonnance, une validation peut être nécessaire."
+          : "Merci de confirmer la disponibilité, les frais exacts de livraison et le délai de traitement.";
+    lines.push(closing);
     return lines.join("\n");
   }
 
