@@ -86,10 +86,10 @@ export default function DeleteAccountPage() {
           Si vous ne parvenez pas à supprimer votre compte depuis
           l&apos;application, écrivez-nous à{" "}
           <a
-            href="mailto:support@rivendy.app"
+            href="mailto:fortixa28@gmail.com"
             className="font-medium text-teal-700 hover:underline"
           >
-            support@rivendy.app
+            fortixa28@gmail.com
           </a>{" "}
           en précisant le numéro de téléphone ou l&apos;email associé à votre
           compte. Nous traiterons votre demande sous 30 jours.
