@@ -67,118 +67,118 @@ export function StoreHero({
   const sales = seller.total_sales ?? 0;
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-      <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
-        {/* ── Panneau identité (gauche) ─────────────────────────────── */}
-        <div className="order-2 flex flex-col justify-center gap-4 p-6 md:p-8 lg:order-1">
-          {seller.is_certified && (
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#E0F2F1] px-3 py-1 text-xs font-black text-[#009688]">
-              <BadgeCheck className="h-3.5 w-3.5 fill-[#009688] text-white" />
-              Vendeur certifié
-            </span>
-          )}
+    <section className="relative overflow-hidden rounded-3xl border border-slate-100 shadow-sm lg:h-[440px]">
+      {/* ── Bannière — pleine largeur, visible jusque derrière l'avatar (desktop) ──── */}
+      <div className="relative h-56 sm:h-72 lg:absolute lg:inset-0 lg:h-full">
+        {bannerSrc ? (
+          <Image src={bannerSrc} alt="" fill sizes="100vw" priority className="object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,#009688_0%,#004D40_100%)]" />
+        )}
+        {/* Voile clair à gauche pour la lisibilité du texte — la photo reste visible partout, y compris derrière l'avatar */}
+        <div className="absolute inset-0 hidden bg-gradient-to-r from-white from-[38%] via-white/75 via-[58%] to-white/0 lg:block" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent lg:hidden" />
+        <StoreCoverEditButton sellerId={seller.id} />
 
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <div className="relative shrink-0">
-              <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-[#E0F2F1] shadow-md md:h-28 md:w-28">
-                {seller.avatar_url ? (
-                  <Image src={seller.avatar_url} alt={sellerName} fill sizes="112px" className="object-cover" />
-                ) : (
-                  <div className="grid h-full w-full place-items-center text-4xl font-black text-[#009688]">
-                    {sellerName.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-              </div>
-              {seller.is_certified && (
-                <span className="absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-[#009688]">
-                  <BadgeCheck className="h-3.5 w-3.5 text-white" />
-                </span>
-              )}
-              <StoreAvatarEditButton sellerId={seller.id} />
+        {/* Carte stats flottante — ancrée au coin bas-droit de la bannière (mobile et desktop) */}
+        <div className="absolute bottom-4 right-4 z-10 lg:bottom-5 lg:right-5">
+          <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/60 bg-white/95 p-3 shadow-lg backdrop-blur-sm lg:gap-2 lg:p-4">
+            <StatItem
+              icon={Star}
+              numeric={trust.totalReviews > 0}
+              primary={trust.totalReviews > 0 ? String(trust.totalReviews) : "Pas encore d'avis"}
+              secondary={trust.totalReviews > 0 ? "avis" : "0 avis"}
+            />
+            <div className="border-x border-slate-100">
+              <StatItem icon={Users} numeric primary={String(followersCount)} secondary="Abonnés" />
             </div>
+            <StatItem
+              icon={ShoppingBag}
+              numeric={sales > 0}
+              primary={sales > 0 ? String(sales) : "Première commande"}
+              secondary={sales > 0 ? "ventes" : "à venir"}
+            />
+          </div>
+        </div>
+      </div>
 
-            {/* Nom + méta */}
-            <div className="min-w-0 pt-1">
-              <h1 className="text-2xl font-black leading-tight text-slate-900 md:text-3xl lg:text-4xl">
-                {sellerName}
-              </h1>
+      {/* ── Panneau identité — superposé à la photo sur desktop ──────────── */}
+      <div className="relative flex flex-col justify-center gap-4 bg-white p-6 md:p-8 lg:absolute lg:inset-y-0 lg:left-0 lg:z-10 lg:w-[58%] lg:max-w-xl lg:bg-transparent lg:pr-4">
+        {seller.is_certified && (
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#E0F2F1] px-3 py-1 text-xs font-black text-[#009688]">
+            <BadgeCheck className="h-3.5 w-3.5 fill-[#009688] text-white" />
+            Vendeur certifié
+          </span>
+        )}
 
-              {cats.length > 0 && (
-                <p className="mt-1 text-sm font-bold text-slate-500">
-                  {cats.map((c) => categoryLabel(c)).join(" • ")}
-                </p>
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="relative shrink-0">
+            <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-[#E0F2F1] shadow-md md:h-28 md:w-28">
+              {seller.avatar_url ? (
+                <Image src={seller.avatar_url} alt={sellerName} fill sizes="112px" className="object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center text-4xl font-black text-[#009688]">
+                  {sellerName.slice(0, 1).toUpperCase()}
+                </div>
               )}
-
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-400">
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {country.name}
-                </span>
-                {memberSince ? (
-                  <span className="flex items-center gap-1">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    Membre depuis {memberSince}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-[#009688]">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    Nouveau vendeur
-                  </span>
-                )}
-              </div>
             </div>
+            {seller.is_certified && (
+              <span className="absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-[#009688]">
+                <BadgeCheck className="h-3.5 w-3.5 text-white" />
+              </span>
+            )}
+            <StoreAvatarEditButton sellerId={seller.id} />
           </div>
 
-          {seller.store_description && (
-            <p className="max-w-lg text-sm leading-relaxed text-slate-500">{seller.store_description}</p>
-          )}
+          {/* Nom + méta */}
+          <div className="min-w-0 pt-1">
+            <h1 className="text-2xl font-black leading-tight text-slate-900 md:text-3xl lg:text-4xl">
+              {sellerName}
+            </h1>
 
-          {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <StoreHeroCta sellerId={seller.id} />
-            <ShareButton
-              variant="button"
-              label="Partager"
-              title={sellerName}
-              text={`Découvrez la boutique ${sellerName} sur Rivendy !`}
-              url={shareUrl}
-              className="h-11 rounded-full px-5"
-            />
-            <FollowButton sellerId={seller.id} />
+            {cats.length > 0 && (
+              <p className="mt-1 text-sm font-bold text-slate-500">
+                {cats.map((c) => categoryLabel(c)).join(" • ")}
+              </p>
+            )}
+
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-400">
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                {country.name}
+              </span>
+              {memberSince ? (
+                <span className="flex items-center gap-1">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Membre depuis {memberSince}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[#009688]">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Nouveau vendeur
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── Bannière + stats flottantes (droite) ──────────────────── */}
-        <div className="relative order-1 min-h-[220px] bg-slate-900 lg:order-2 lg:min-h-full">
-          {bannerSrc ? (
-            <Image src={bannerSrc} alt="" fill sizes="(max-width: 1024px) 100vw, 45vw" priority className="object-cover" />
-          ) : (
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,#009688_0%,#004D40_100%)]" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent lg:bg-gradient-to-l" />
-          <StoreCoverEditButton sellerId={seller.id} />
+        {seller.store_description && (
+          <p className="max-w-lg text-sm leading-relaxed text-slate-500">{seller.store_description}</p>
+        )}
 
-          {/* Carte stats flottante */}
-          <div className="absolute inset-x-4 bottom-4 lg:inset-x-auto lg:bottom-5 lg:right-5">
-            <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/60 bg-white/95 p-3 shadow-lg backdrop-blur-sm lg:gap-2 lg:p-4">
-              <StatItem
-                icon={Star}
-                numeric={trust.totalReviews > 0}
-                primary={trust.totalReviews > 0 ? String(trust.totalReviews) : "Pas encore d'avis"}
-                secondary={trust.totalReviews > 0 ? "avis" : "0 avis"}
-              />
-              <div className="border-x border-slate-100">
-                <StatItem icon={Users} numeric primary={String(followersCount)} secondary="Abonnés" />
-              </div>
-              <StatItem
-                icon={ShoppingBag}
-                numeric={sales > 0}
-                primary={sales > 0 ? String(sales) : "Première commande"}
-                secondary={sales > 0 ? "ventes" : "à venir"}
-              />
-            </div>
-          </div>
+        {/* Actions */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StoreHeroCta sellerId={seller.id} />
+          <ShareButton
+            variant="button"
+            label="Partager"
+            title={sellerName}
+            text={`Découvrez la boutique ${sellerName} sur Rivendy !`}
+            url={shareUrl}
+            className="h-11 rounded-full px-5"
+          />
+          <FollowButton sellerId={seller.id} />
         </div>
       </div>
     </section>
