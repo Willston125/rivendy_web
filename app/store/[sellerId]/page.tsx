@@ -12,17 +12,18 @@ import {
   getSellerProfile,
   getSellerPublicProducts,
   getStoreTrustSummary,
-  getVendorPillars,
 } from "@/services/public-data";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StoreOwnerBar } from "@/features/store/store-owner-bar";
 import { StoreHero } from "@/features/store/store-hero";
 import { StoreTrustBar } from "@/features/store/store-trust-bar";
+import { VoiceNotePlayer } from "@/features/store/voice-note-player";
 import { StoreNavTabs } from "@/features/store/store-nav-tabs";
 import { StoreFeaturedProducts } from "@/features/store/store-featured-products";
 import { StoreCatalog } from "@/features/store/store-catalog";
 import { StoreAbout } from "@/features/store/store-about";
 import { StoreProtectionCard } from "@/features/store/store-protection-card";
+import { StoreBrowseProvider } from "@/features/store/store-browse-context";
 import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://rivendy.com";
@@ -72,10 +73,9 @@ export default async function StorePage({
   if (!seller) notFound();
 
   // Étape 2 : tout le reste en parallèle, y compris getCountry
-  const [products, trust, pillars, followCountRes, country] = await Promise.all([
+  const [products, trust, followCountRes, country] = await Promise.all([
     getSellerPublicProducts(sellerId, true),
     getStoreTrustSummary(sellerId),
-    getVendorPillars(sellerId),
     createAnonServerClient()
       .from("store_follows")
       .select("id", { count: "exact", head: true })
@@ -124,60 +124,77 @@ export default async function StorePage({
           seller={seller}
           country={country}
           trust={trust}
-          pillars={pillars}
           followersCount={followersCount}
           memberSince={memberSince}
           products={products}
+          shareUrl={shareUrl}
         />
       </div>
 
-      {/* Bande de confiance Rivendy */}
-      <StoreTrustBar />
+      {/* Présentation vocale + bande de confiance Rivendy */}
+      {seller.voice_note_url ? (
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+          <VoiceNotePlayer
+            audioUrl={seller.voice_note_url}
+            label="Écouter la présentation de la boutique"
+          />
+          <StoreTrustBar countryName={country.name} />
+        </div>
+      ) : (
+        <div className="mt-4">
+          <StoreTrustBar countryName={country.name} />
+        </div>
+      )}
 
-      {/* Navigation interne sticky */}
-      <StoreNavTabs showFeatured={featured.length > 0} sellerName={sellerName} />
+      {/* Navigation + catalogue + colonne latérale (état de recherche partagé) */}
+      <StoreBrowseProvider>
+        {/* Navigation interne sticky */}
+        <StoreNavTabs showFeatured={featured.length > 0} />
 
-      {/* Sélection vedette */}
-      <StoreFeaturedProducts products={featured} country={country} />
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          {/* Colonne principale : sélection vedette + catalogue */}
+          <div className="min-w-0 space-y-8">
+            <StoreFeaturedProducts products={featured} country={country} />
 
-      {/* Catalogue complet + colonne latérale À propos */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_300px]">
-        <section id="produits" className="scroll-mt-24 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black text-slate-900">
-              Tous les produits
-              {activeProducts.length > 0 && (
-                <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-bold text-slate-500">
-                  {activeProducts.length}
-                </span>
+            <section id="produits" className="scroll-mt-24 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-black text-slate-900">
+                  Tous les produits
+                  {activeProducts.length > 0 && (
+                    <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-bold text-slate-500">
+                      {activeProducts.length}
+                    </span>
+                  )}
+                </h2>
+                <PrintCatalog seller={seller} products={products} country={country} />
+              </div>
+
+              {activeProducts.length > 0 ? (
+                <StoreCatalog products={activeProducts} country={country} />
+              ) : (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
+                  <ShoppingBag className="h-10 w-10 text-slate-200" />
+                  <p className="mt-3 font-semibold text-slate-500">Aucun produit disponible pour le moment</p>
+                  <Link href="/" className="mt-4 text-sm font-bold text-[#009688] hover:underline">
+                    Explorer d&apos;autres boutiques →
+                  </Link>
+                </div>
               )}
-            </h2>
-            <PrintCatalog seller={seller} products={products} country={country} />
+
+              {/* Produits archivés (collapsible, client component) */}
+              <UnavailableProducts products={unavailable} />
+            </section>
           </div>
 
-          {activeProducts.length > 0 ? (
-            <StoreCatalog products={activeProducts} country={country} />
-          ) : (
-            <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
-              <ShoppingBag className="h-10 w-10 text-slate-200" />
-              <p className="mt-3 font-semibold text-slate-500">Aucun produit disponible pour le moment</p>
-              <Link href="/" className="mt-4 text-sm font-bold text-[#009688] hover:underline">
-                Explorer d&apos;autres boutiques →
-              </Link>
-            </div>
-          )}
-
-          {/* Produits archivés (collapsible, client component) */}
-          <UnavailableProducts products={unavailable} />
-        </section>
-
-        <StoreAbout seller={seller} country={country} products={products} memberSince={memberSince} shareUrl={shareUrl} />
-      </div>
+          {/* Colonne latérale — s'étend le long de la vedette + du catalogue */}
+          <StoreAbout seller={seller} country={country} products={products} memberSince={memberSince} shareUrl={shareUrl} />
+        </div>
+      </StoreBrowseProvider>
 
       {/* Avis et évaluations + protection Rivendy */}
       <section id="avis" className="mt-12 scroll-mt-24 border-t border-slate-100 pt-8">
-        <h2 className="mb-6 text-xl font-black text-slate-900">Avis de la boutique</h2>
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+        <h2 className="mb-6 text-xl font-black text-slate-900">Avis des clients</h2>
+        <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
           <StoreRatings sellerId={seller.id} />
           <StoreProtectionCard />
         </div>

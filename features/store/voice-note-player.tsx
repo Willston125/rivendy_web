@@ -14,7 +14,13 @@ function formatTime(seconds: number): string {
  * Lecteur de note vocale vendeur — réplique web de `voice_note_player.dart`.
  * Style « message WhatsApp » : bouton play + barre de progression + durée.
  */
-export function VoiceNotePlayer({ audioUrl }: { audioUrl: string }) {
+export function VoiceNotePlayer({
+  audioUrl,
+  label = "Message du vendeur",
+}: {
+  audioUrl: string;
+  label?: string;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -87,7 +93,7 @@ export function VoiceNotePlayer({ audioUrl }: { audioUrl: string }) {
   const progress = duration > 0 ? Math.min(1, position / duration) : 0;
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="flex h-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
@@ -110,7 +116,7 @@ export function VoiceNotePlayer({ audioUrl }: { audioUrl: string }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-[#009688]">
           <AudioLines className="h-3.5 w-3.5" />
-          <span className="text-xs font-bold text-slate-800">Message du vendeur</span>
+          <span className="text-xs font-bold text-slate-800">{label}</span>
         </div>
         <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200">
           <div

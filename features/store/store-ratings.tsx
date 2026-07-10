@@ -160,9 +160,12 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
     }
   };
 
+  const hasReviews = stats.count > 0;
+
   return (
-    <div className="grid gap-6 md:grid-cols-[280px_1fr]">
-      {/* ── COLONNE GAUCHE : STATISTIQUES ───────────────────────────── */}
+    <div className={hasReviews ? "grid gap-6 md:grid-cols-[280px_1fr]" : "space-y-6"}>
+      {/* ── COLONNE GAUCHE : STATISTIQUES (masquée si aucun avis) ────── */}
+      {hasReviews && (
       <section className="space-y-4 rounded-3xl bg-slate-50 p-5 text-center md:text-left">
         <div>
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Avis global</h3>
@@ -205,6 +208,7 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
           })}
         </div>
       </section>
+      )}
 
       {/* ── COLONNE DROITE : FORMULAIRE & AVIS ───────────────────────── */}
       <section className="space-y-6">

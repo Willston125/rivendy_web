@@ -48,41 +48,16 @@ export function StoreFeaturedProducts({
 
   return (
     <section id="nouveautes" className="mt-8 scroll-mt-24">
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#FFF3ED] text-[#FF6B35]">
+          <Sparkles className="h-4 w-4" />
+        </span>
         <div>
-          <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#FFF3ED] text-[#FF6B35]">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <h2 className="text-xl font-black text-slate-900">Sélection coup de cœur</h2>
-          </div>
-          <p className="ml-10 mt-0.5 text-xs font-semibold text-slate-400">
+          <h2 className="text-xl font-black text-slate-900">Sélection coup de cœur</h2>
+          <p className="mt-0.5 text-xs font-semibold text-slate-400">
             Une sélection des meilleurs produits de cette boutique
           </p>
         </div>
-
-        {!isGridOnly && (
-          <div className="hidden shrink-0 items-center gap-2 sm:flex">
-            <button
-              type="button"
-              onClick={() => scrollBy(-1)}
-              disabled={!canPrev}
-              aria-label="Produits précédents"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollBy(1)}
-              disabled={!canNext}
-              aria-label="Produits suivants"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        )}
       </div>
 
       {isGridOnly ? (
@@ -102,15 +77,39 @@ export function StoreFeaturedProducts({
           ))}
         </div>
       ) : (
-        <div
-          ref={trackRef}
-          className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 no-scrollbar sm:mx-0 sm:gap-4 sm:px-0"
-        >
-          {products.map((p) => (
-            <div key={p.id} className="w-44 shrink-0 snap-start sm:w-[calc(25%-12px)] sm:min-w-[220px]">
-              <ProductCard product={p} country={country} />
-            </div>
-          ))}
+        <div className="relative">
+          {/* Flèche précédente — sur le bord gauche */}
+          <button
+            type="button"
+            onClick={() => scrollBy(-1)}
+            disabled={!canPrev}
+            aria-label="Produits précédents"
+            className="absolute -left-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-0 sm:flex"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div
+            ref={trackRef}
+            className="flex snap-x gap-3 overflow-x-auto pb-2 no-scrollbar sm:gap-4"
+          >
+            {products.map((p) => (
+              <div key={p.id} className="w-44 shrink-0 snap-start sm:w-[calc(25%-12px)] sm:min-w-[200px]">
+                <ProductCard product={p} country={country} />
+              </div>
+            ))}
+          </div>
+
+          {/* Flèche suivante — sur le bord droit */}
+          <button
+            type="button"
+            onClick={() => scrollBy(1)}
+            disabled={!canNext}
+            aria-label="Produits suivants"
+            className="absolute -right-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-0 sm:flex"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
       )}
     </section>

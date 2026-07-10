@@ -1,17 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Info, MapPin, CalendarDays, Tag, ShieldCheck, Check, Link2 } from "lucide-react";
+import { Info, MapPin, CalendarDays, Tag, Check, Link2, MessageCircle, Sparkles, Truck } from "lucide-react";
 import type { Country, Product, Profile } from "@/types/rivendy";
 import { categoryLabel } from "@/lib/utils/format";
 import { distinctCategories } from "@/features/store/store-helpers";
-import { FacebookIcon, WhatsAppIcon } from "@/components/ui/social-icons";
+import { FacebookIcon, WhatsAppIcon, TwitterIcon } from "@/components/ui/social-icons";
+import { ReportButton } from "@/features/products/report-button";
+
+const SERVICE_POINTS = [
+  { icon: MessageCircle, label: "Service client réactif" },
+  { icon: Sparkles, label: "Produits sélectionnés avec soin" },
+  { icon: Truck, label: "Livraison rapide et sécurisée" },
+];
 
 /**
  * Colonne latérale « À propos » de la boutique : description, infos clés,
- * et partage du lien public. Le partage WhatsApp/Facebook ne fait que
- * relayer l'URL de la boutique — jamais de mise en relation directe avec
- * le vendeur (règle métier Rivendy : tout contact passe par la plateforme).
+ * et partage du lien public. Le partage ne relaie que l'URL de la boutique —
+ * jamais de mise en relation directe avec le vendeur (règle métier Rivendy).
  */
 export function StoreAbout({
   seller,
@@ -24,7 +30,6 @@ export function StoreAbout({
   country: Country;
   products: Product[];
   memberSince: string | null;
-  /** URL canonique calculée côté serveur (évite un hydration mismatch avec window.location) */
   shareUrl: string;
 }) {
   const cats = distinctCategories(products);
@@ -44,7 +49,7 @@ export function StoreAbout({
   };
 
   return (
-    <aside id="a-propos" className="scroll-mt-24 space-y-4">
+    <aside id="a-propos" className="scroll-mt-24 space-y-4 lg:sticky lg:top-32">
       {/* À propos */}
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center gap-2">
@@ -60,40 +65,42 @@ export function StoreAbout({
           <p className="text-sm text-slate-400">{sellerName} n&apos;a pas encore ajouté de description.</p>
         )}
 
-        <div className="mt-4 flex items-start gap-2 rounded-2xl bg-slate-50 p-3.5">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#009688]" />
-          <p className="text-xs leading-relaxed text-slate-500">
-            Toutes les commandes et paiements passent par Rivendy : le service client est centralisé,
-            vous ne payez jamais le vendeur directement.
-          </p>
-        </div>
+        <ul className="mt-4 space-y-2.5 border-t border-slate-100 pt-4">
+          {SERVICE_POINTS.map(({ icon: Icon, label }) => (
+            <li key={label} className="flex items-center gap-2.5 text-sm font-semibold text-slate-600">
+              <Icon className="h-4 w-4 shrink-0 text-[#009688]" />
+              {label}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Informations */}
-      <div className="space-y-2.5 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-1 text-sm font-black text-slate-900">Informations</h3>
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-          {country.name}
+      <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="flex items-start gap-2.5">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Localisation</p>
+            <p className="text-sm font-semibold text-slate-700">{country.name}</p>
+          </div>
         </div>
         {memberSince && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
-            Ouverte depuis {memberSince}
+          <div className="flex items-start gap-2.5">
+            <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ouverte depuis</p>
+              <p className="text-sm font-semibold text-slate-700">{memberSince}</p>
+            </div>
           </div>
         )}
         {cats.length > 0 && (
-          <div className="flex items-start gap-2 text-sm text-slate-600">
+          <div className="flex items-start gap-2.5">
             <Tag className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            <div className="flex flex-wrap gap-1.5">
-              {cats.slice(0, 6).map((c) => (
-                <span
-                  key={c}
-                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600"
-                >
-                  {categoryLabel(c)}
-                </span>
-              ))}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Catégories</p>
+              <p className="text-sm font-semibold text-slate-700">
+                {cats.slice(0, 6).map((c) => categoryLabel(c)).join(", ")}
+              </p>
             </div>
           </div>
         )}
@@ -122,6 +129,15 @@ export function StoreAbout({
           >
             <WhatsAppIcon className="h-[18px] w-[18px]" />
           </a>
+          <a
+            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Partager sur X"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-900 transition hover:bg-slate-200"
+          >
+            <TwitterIcon className="h-4 w-4" />
+          </a>
           <button
             type="button"
             onClick={copyLink}
@@ -133,6 +149,11 @@ export function StoreAbout({
             {copied ? <Check className="h-[18px] w-[18px]" /> : <Link2 className="h-[18px] w-[18px]" />}
           </button>
         </div>
+      </div>
+
+      {/* Signalement — discret */}
+      <div className="px-1">
+        <ReportButton targetId={seller.id} type="seller" className="pt-0" />
       </div>
     </aside>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { UserPlus, UserCheck, Loader2 } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -91,7 +91,7 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
     return (
       <button
         disabled
-        className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-5 text-xs font-bold text-slate-400"
+        className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-5 text-sm font-bold text-slate-400"
       >
         <Loader2 className="h-4 w-4 animate-spin" />
       </button>
@@ -108,23 +108,23 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
       onClick={handleToggleFollow}
       disabled={toggling}
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-full px-5 text-xs font-black transition-all active:scale-95",
+        "inline-flex h-11 items-center gap-2 rounded-full border px-5 text-sm font-bold transition-all active:scale-95",
         following
-          ? "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-          : "bg-[#009688] text-white shadow-sm shadow-[#009688]/20 hover:bg-[#00796B]"
+          ? "border-[#009688] bg-[#E0F2F1] text-[#009688] hover:bg-[#009688]/15"
+          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
       )}
     >
       {toggling ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin" />
       ) : following ? (
         <>
-          <UserCheck className="h-3.5 w-3.5" />
-          Abonné
+          <Heart className="h-4 w-4 fill-[#009688]" />
+          Suivi
         </>
       ) : (
         <>
-          <UserPlus className="h-3.5 w-3.5" />
-          S&apos;abonner
+          <Heart className="h-4 w-4" />
+          Suivre
         </>
       )}
     </button>
