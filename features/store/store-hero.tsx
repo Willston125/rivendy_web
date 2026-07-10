@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { BadgeCheck, CalendarDays, MapPin, ShieldCheck, Star } from "lucide-react";
-import type { Country, Profile } from "@/types/rivendy";
+import type { Country, Product, Profile } from "@/types/rivendy";
+import { categoryLabel } from "@/lib/utils/format";
 import { FacebookIcon, InstagramIcon, TikTokIcon } from "@/components/ui/social-icons";
 import { FollowButton } from "@/features/store/follow-button";
 import { ShareButton } from "@/components/ui/share-button";
@@ -9,6 +10,7 @@ import { VoiceNotePlayer } from "@/features/store/voice-note-player";
 import { VendorTrustPillars } from "@/features/store/vendor-trust-pillars";
 import { StoreCoverEditButton, StoreAvatarEditButton } from "@/features/store/store-image-editor";
 import { StoreHeroCta } from "@/features/store/store-hero-cta";
+import { distinctCategories } from "@/features/store/store-helpers";
 import type { VendorPillars } from "@/services/public-data";
 
 interface TrustSummary {
@@ -64,6 +66,7 @@ export function StoreHero({
   pillars,
   followersCount,
   memberSince,
+  products,
 }: {
   seller: Profile;
   country: Country;
@@ -71,10 +74,12 @@ export function StoreHero({
   pillars: VendorPillars | null;
   followersCount: number;
   memberSince: string | null;
+  products: Product[];
 }) {
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
   const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
   const hasSocials = seller.facebook_url || seller.instagram_url || seller.tiktok_url;
+  const cats = distinctCategories(products).slice(0, 4);
 
   return (
     <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
@@ -118,6 +123,12 @@ export function StoreHero({
                   </span>
                 )}
               </div>
+
+              {cats.length > 0 && (
+                <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#009688]">
+                  {cats.map((c) => categoryLabel(c)).join(" · ")}
+                </p>
+              )}
 
               {seller.store_description && (
                 <p className="mt-1 line-clamp-2 max-w-md text-sm text-slate-500">{seller.store_description}</p>

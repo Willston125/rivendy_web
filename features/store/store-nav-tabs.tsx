@@ -10,13 +10,18 @@ export function StoreNavTabs({
   sellerName: string;
 }) {
   const tabs = [
-    { id: "produits", label: "Produits" },
+    { id: "hero", label: "Accueil" },
+    { id: "produits", label: "Tous les produits" },
     ...(showFeatured ? [{ id: "nouveautes", label: "Nouveautés" }] : []),
     { id: "avis", label: "Avis" },
     { id: "a-propos", label: "À propos" },
   ];
 
   const go = (id: string) => {
+    if (id === "hero") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 

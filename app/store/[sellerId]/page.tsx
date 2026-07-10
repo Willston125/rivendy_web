@@ -22,7 +22,10 @@ import { StoreNavTabs } from "@/features/store/store-nav-tabs";
 import { StoreFeaturedProducts } from "@/features/store/store-featured-products";
 import { StoreCatalog } from "@/features/store/store-catalog";
 import { StoreAbout } from "@/features/store/store-about";
+import { StoreProtectionCard } from "@/features/store/store-protection-card";
 import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://rivendy.com";
 
 /* ── Déduplication React.cache — évite 2 appels DB identiques
    (generateMetadata + page body appellent tous deux getSellerProfile) ── */
@@ -100,6 +103,7 @@ export default async function StorePage({
 
   const featured = pickFeatured(activeProducts, 8);
   const completeness = storeCompleteness(seller, products.length > 0);
+  const shareUrl = `${SITE_URL}/store/${sellerId}`;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-5 md:px-6 md:py-8">
@@ -115,14 +119,17 @@ export default async function StorePage({
       />
 
       {/* Hero premium */}
-      <StoreHero
-        seller={seller}
-        country={country}
-        trust={trust}
-        pillars={pillars}
-        followersCount={followersCount}
-        memberSince={memberSince}
-      />
+      <div id="hero" className="scroll-mt-24">
+        <StoreHero
+          seller={seller}
+          country={country}
+          trust={trust}
+          pillars={pillars}
+          followersCount={followersCount}
+          memberSince={memberSince}
+          products={products}
+        />
+      </div>
 
       {/* Bande de confiance Rivendy */}
       <StoreTrustBar />
@@ -133,43 +140,47 @@ export default async function StorePage({
       {/* Sélection vedette */}
       <StoreFeaturedProducts products={featured} country={country} />
 
-      {/* Catalogue complet */}
-      <section id="produits" className="mt-8 scroll-mt-24 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-black text-slate-900">
-            Produits disponibles
-            {activeProducts.length > 0 && (
-              <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-bold text-slate-500">
-                {activeProducts.length}
-              </span>
-            )}
-          </h2>
-          <PrintCatalog seller={seller} products={products} country={country} />
-        </div>
-
-        {activeProducts.length > 0 ? (
-          <StoreCatalog products={activeProducts} country={country} />
-        ) : (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
-            <ShoppingBag className="h-10 w-10 text-slate-200" />
-            <p className="mt-3 font-semibold text-slate-500">Aucun produit disponible pour le moment</p>
-            <Link href="/" className="mt-4 text-sm font-bold text-[#009688] hover:underline">
-              Explorer d&apos;autres boutiques →
-            </Link>
+      {/* Catalogue complet + colonne latérale À propos */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_300px]">
+        <section id="produits" className="scroll-mt-24 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-slate-900">
+              Tous les produits
+              {activeProducts.length > 0 && (
+                <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-bold text-slate-500">
+                  {activeProducts.length}
+                </span>
+              )}
+            </h2>
+            <PrintCatalog seller={seller} products={products} country={country} />
           </div>
-        )}
-      </section>
 
-      {/* Produits archivés (collapsible, client component) */}
-      <UnavailableProducts products={unavailable} />
+          {activeProducts.length > 0 ? (
+            <StoreCatalog products={activeProducts} country={country} />
+          ) : (
+            <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
+              <ShoppingBag className="h-10 w-10 text-slate-200" />
+              <p className="mt-3 font-semibold text-slate-500">Aucun produit disponible pour le moment</p>
+              <Link href="/" className="mt-4 text-sm font-bold text-[#009688] hover:underline">
+                Explorer d&apos;autres boutiques →
+              </Link>
+            </div>
+          )}
 
-      {/* À propos de la boutique */}
-      <StoreAbout seller={seller} country={country} products={products} memberSince={memberSince} />
+          {/* Produits archivés (collapsible, client component) */}
+          <UnavailableProducts products={unavailable} />
+        </section>
 
-      {/* Avis et évaluations */}
+        <StoreAbout seller={seller} country={country} products={products} memberSince={memberSince} shareUrl={shareUrl} />
+      </div>
+
+      {/* Avis et évaluations + protection Rivendy */}
       <section id="avis" className="mt-12 scroll-mt-24 border-t border-slate-100 pt-8">
         <h2 className="mb-6 text-xl font-black text-slate-900">Avis de la boutique</h2>
-        <StoreRatings sellerId={seller.id} />
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <StoreRatings sellerId={seller.id} />
+          <StoreProtectionCard />
+        </div>
       </section>
     </div>
   );
