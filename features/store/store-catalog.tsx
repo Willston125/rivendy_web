@@ -51,13 +51,13 @@ export function StoreCatalog({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           {cats.length > 1 && (
             <select
               value={cat}
               onChange={(e) => setCat(e.target.value)}
               aria-label="Filtrer par catégorie"
-              className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-[#009688]"
+              className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-[#009688] sm:flex-none"
             >
               <option value="all">Toutes catégories</option>
               {cats.map((c) => (
@@ -67,13 +67,13 @@ export function StoreCatalog({
               ))}
             </select>
           )}
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as Sort)}
               aria-label="Trier les produits"
-              className="h-10 rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none focus:border-[#009688]"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none focus:border-[#009688]"
             >
               <option value="recent">Plus récent</option>
               <option value="price_asc">Prix croissant</option>

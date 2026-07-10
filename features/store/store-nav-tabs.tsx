@@ -21,8 +21,8 @@ export function StoreNavTabs({
   };
 
   return (
-    <nav className="sticky top-16 z-20 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur">
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+    <nav className="sticky top-[110px] z-20 mt-6 flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur md:top-16">
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto no-scrollbar">
         {tabs.map((t) => (
           <button
             key={t.id}
