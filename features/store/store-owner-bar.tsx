@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ChevronDown, Pencil, Plus, LayoutGrid, BarChart3, Printer, Share2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 
@@ -15,6 +15,7 @@ interface OwnerBarProps {
 /** Barre propriétaire compacte, alignée au fil d'Ariane — pas un dashboard. */
 export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }: OwnerBarProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [previewing, setPreviewing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -35,6 +36,23 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
     } catch {
       // silencieux — pas d'alert() bloquant
     }
+  };
+
+  /**
+   * Navigation programmatique plutôt que <Link href> : fermer le menu (état React,
+   * démonte le panneau) puis compter sur la navigation native de l'ancre créait une
+   * course où le démontage pouvait annuler la navigation avant qu'elle ne parte.
+   * router.push() est appelé explicitement, donc la navigation est garantie
+   * indépendamment du démontage du menu.
+   */
+  const goTo = (href: string) => {
+    setMenuOpen(false);
+    router.push(href);
+  };
+
+  const scrollToProducts = () => {
+    setMenuOpen(false);
+    document.getElementById("produits")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   if (previewing) {
@@ -91,48 +109,49 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
                       <div className="h-full rounded-full bg-[#009688]" style={{ width: `${completenessPct}%` }} />
                     </div>
                     {missing[0] && (
-                      <Link
-                        href={missing[0].href || "/seller"}
-                        className="mt-1 inline-block text-[11px] font-bold text-[#009688] hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => goTo(missing[0].href || "/seller")}
+                        className="mt-1 block text-left text-[11px] font-bold text-[#009688] hover:underline"
                       >
                         → {missing[0].label}
-                      </Link>
+                      </button>
                     )}
                   </div>
                 )}
 
-                <Link
-                  href="/seller"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                <button
+                  type="button"
+                  onClick={() => goTo("/seller")}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <Pencil className="h-4 w-4 text-slate-400" />
                   Modifier le profil
-                </Link>
-                <Link
-                  href="/sell"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo("/sell")}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <Plus className="h-4 w-4 text-slate-400" />
                   Ajouter un produit
-                </Link>
-                <a
-                  href="#produits"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToProducts}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <LayoutGrid className="h-4 w-4 text-slate-400" />
                   Organiser le catalogue
-                </a>
-                <Link
-                  href="/seller/sales"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo("/seller/sales")}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <BarChart3 className="h-4 w-4 text-slate-400" />
                   Voir les statistiques
-                </Link>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -144,14 +163,14 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
                   <Share2 className="h-4 w-4 text-slate-400" />
                   Partager la boutique
                 </button>
-                <a
-                  href="#produits"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                <button
+                  type="button"
+                  onClick={scrollToProducts}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <Printer className="h-4 w-4 text-slate-400" />
                   Imprimer le catalogue
-                </a>
+                </button>
               </div>
             </>
           )}

@@ -72,10 +72,11 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
           e.target.value = "";
         }}
       />
+      {/* Positionné en haut (le bas de la bannière est occupé par la carte de stats flottante) */}
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-black/70"
+        className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-black/70"
       >
         <Camera className="h-3.5 w-3.5" />
         Modifier la couverture
@@ -83,7 +84,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
 
       {/* Message d'erreur inline (pas d'alert()) */}
       {errMsg && (
-        <div className="absolute bottom-14 right-3 z-10 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow">
+        <div className="absolute right-3 top-14 z-10 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow">
           {errMsg}
         </div>
       )}
