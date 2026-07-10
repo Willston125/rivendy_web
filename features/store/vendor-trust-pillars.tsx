@@ -77,7 +77,7 @@ const GREY = "#9E9E9E";
 
 function prepCard(hours: number | null): CardData {
   if (hours == null)
-    return { value: "N/A", sub: "Bientôt", color: GREY, muted: true, title: "Délai moyen entre la commande et la remise au livreur" };
+    return { value: "—", sub: "Bientôt", color: GREY, muted: true, title: "Délai moyen entre la commande et la remise au livreur" };
   const value = hours < 1 ? "< 1h" : `${Math.round(hours)}h`;
   let sub: string, color: string;
   if (hours < 2) { sub = "⚡ Très rapide"; color = GREEN; }
@@ -89,7 +89,7 @@ function prepCard(hours: number | null): CardData {
 
 function conformityCard(rate: number | null): CardData {
   const title = "Pourcentage de commandes livrées sans signalement de non-conformité";
-  if (rate == null) return { value: "N/A", sub: "Bientôt", color: GREY, muted: true, title };
+  if (rate == null) return { value: "—", sub: "Bientôt", color: GREY, muted: true, title };
   const value = `${Math.round(rate)}%`;
   let sub: string, color: string;
   if (rate >= 95) { sub = "🌟 Excellent"; color = GREEN; }
