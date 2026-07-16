@@ -30,14 +30,15 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    // Hôtes autorisés pour l'optimiseur next/image. Restreint au Storage
+    // Supabase (source unique des images marchandes — vérifié en prod le
+    // 2026-07-16 : tous les /_next/image servis pointent ce host). Le joker
+    // "**" précédent faisait de l'optimiseur un proxy d'images ouvert
+    // (RIV-007). Si un nouvel hôte d'images est introduit, l'ajouter ici.
     remotePatterns: [
       {
         protocol: "https",
         hostname: "eiifosnczbgymcbhycwe.supabase.co",
-      },
-      {
-        protocol: "https",
-        hostname: "**",
       },
     ],
   },
