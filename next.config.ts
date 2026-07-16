@@ -1,10 +1,29 @@
 import type { NextConfig } from "next";
 
-// En-têtes de sécurité appliqués à toutes les routes. Volontairement
-// non-cassants : pas de Content-Security-Policy stricte ici (elle
-// nécessite des nonces avec Next/Turbopack — chantier dédié) pour ne
-// pas casser le rendu SSR / les images distantes.
+const SUPABASE_HOST = "https://eiifosnczbgymcbhycwe.supabase.co";
+
+// Content-Security-Policy en mode REPORT-ONLY (RIV-008). Ne bloque RIEN : le
+// navigateur signale seulement les violations dans la console. C'est l'étape
+// d'observation avant un éventuel passage en mode bloquant (qui nécessitera
+// des nonces avec Next/Turbopack). 'unsafe-inline' reste toléré ici car Next
+// injecte du style/script inline sans nonce ; connect-src autorise l'API +
+// le Realtime (wss) Supabase.
+const cspReportOnly = [
+  "default-src 'self'",
+  `img-src 'self' data: blob: ${SUPABASE_HOST}`,
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "font-src 'self' data:",
+  `connect-src 'self' ${SUPABASE_HOST} wss://eiifosnczbgymcbhycwe.supabase.co`,
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+// En-têtes de sécurité appliqués à toutes les routes.
 const securityHeaders = [
+  // CSP d'observation (non bloquante) — voir cspReportOnly ci-dessus.
+  { key: "Content-Security-Policy-Report-Only", value: cspReportOnly },
   // Anti-clickjacking : le site ne peut être embarqué que par lui-même.
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   // Empêche le navigateur de "deviner" le type MIME (anti-sniffing).
