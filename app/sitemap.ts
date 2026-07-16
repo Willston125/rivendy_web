@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { CATEGORIES } from "@/types/rivendy";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://rivendy.com";
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
 
 /**
  * Sitemap statique de base : accueil + une entrée par catégorie.

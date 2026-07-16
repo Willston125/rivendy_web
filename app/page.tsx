@@ -53,7 +53,7 @@ export async function generateMetadata({
       title: `Rivendy — Marketplace ${country.name}`,
       description:
         "Découvrez des milliers de produits locaux sur Rivendy. Mode, électronique, beauté, alimentation et bien plus.",
-      url: "https://rivendy.com",
+      url: "https://www.rivendy.com",
       siteName: "Rivendy",
       images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
       locale: "fr_DJ",

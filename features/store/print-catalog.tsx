@@ -46,7 +46,7 @@ export function PrintCatalog({ seller, products, country }: PrintCatalogProps) {
   // URL de la boutique pour le QR Code
   const storeUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/store/${seller.id}`
-    : `https://rivendy.com/store/${seller.id}`;
+    : `https://www.rivendy.com/store/${seller.id}`;
   
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(storeUrl)}`;
 

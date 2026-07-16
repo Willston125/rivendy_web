@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
   description:
     "Rivendy est la marketplace multi-marchés africaine. Achetez, vendez et commandez des produits locaux en toute sécurité.",
-  metadataBase: new URL("https://rivendy.com"),
+  metadataBase: new URL("https://www.rivendy.com"),
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

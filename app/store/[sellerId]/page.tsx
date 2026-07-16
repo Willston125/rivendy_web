@@ -26,7 +26,7 @@ import { StoreProtectionCard } from "@/features/store/store-protection-card";
 import { StoreBrowseProvider } from "@/features/store/store-browse-context";
 import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://rivendy.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
 
 /* ── Déduplication React.cache — évite 2 appels DB identiques
    (generateMetadata + page body appellent tous deux getSellerProfile) ── */
