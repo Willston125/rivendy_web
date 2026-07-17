@@ -16,7 +16,7 @@ import { categoryLabel, formatMoney } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 
-type EditableProduct = Partial<Product> & { id?: string };
+type EditableProduct = Partial<Product> & { id?: string; country_id?: string | null };
 
 const CONDITION_OPTIONS = ["Neuf", "Très bon état", "Bon état", "Correct"];
 const MAX_PHOTOS = 8;
@@ -143,6 +143,11 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
 
       const payload = {
         seller_id:        user.id,
+        // country_id EXIGÉ par la policy RLS d'insertion (products_insert_own_market :
+        // le produit doit porter le marché du vendeur). Sans lui, l'INSERT est
+        // rejeté par la RLS — c'était la cause du « Publication impossible » (2026-07-17).
+        // En édition, on ne déplace pas le produit de marché : on garde sa valeur.
+        country_id:       product?.id ? (product.country_id ?? country?.id) : country?.id,
         title:            title.trim(),
         description:      description.trim(),
         seller_price:     numericSellerPrice,
@@ -177,7 +182,16 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         setSize(""); setFiles([]); setExistingPhotos([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Publication impossible, réessaie.");
+      // Les erreurs Supabase (PostgrestError, StorageError) ne sont PAS des
+      // instances de Error : sans cette extraction, toute vraie cause (RLS,
+      // contrainte, upload) était masquée par le message générique.
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Publication impossible, réessaie.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
