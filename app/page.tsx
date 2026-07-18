@@ -26,6 +26,8 @@ import { groupPharmacies, PHARMACY_FILTERS, PHARMACY_FILTER_ALL } from "@/featur
 import { PharmacyEstablishmentCard } from "@/features/products/pharmacy-establishment-card";
 import { filterLocationByChip, presentLocationChips } from "@/features/products/location-listings";
 import { LocationHome } from "@/features/products/location-home";
+import { filterWeddingByChip, presentWeddingChips } from "@/features/products/wedding-listings";
+import { WeddingHome } from "@/features/products/wedding-home";
 import { groupHotels, HOTEL_FILTERS, HOTEL_FILTER_ALL } from "@/features/products/hotel-listings";
 import { HotelCard } from "@/features/products/hotel-card";
 import { FoodPackageCard } from "@/features/products/food-package-card";
@@ -83,6 +85,7 @@ type HomeSearchParams = Promise<{
   hotelType?: string;
   pharmaRayon?: string;
   constrType?: string;
+  wedType?: string;
 }>;
 
 export default async function HomePage({
@@ -99,6 +102,7 @@ export default async function HomePage({
   const hotelType = params.hotelType;
   const pharmaRayon = params.pharmaRayon;
   const constrType = params.constrType;
+  const wedType = params.wedType;
   const q = params.q;
   const priceMin = params.priceMin ? Number(params.priceMin) : undefined;
   const priceMax = params.priceMax ? Number(params.priceMax) : undefined;
@@ -161,6 +165,9 @@ export default async function HomePage({
     ? groupPharmacies(products, pharmaRayon ?? PHARMACY_FILTER_ALL)
     : [];
   const isConstruction = category === "materiauxConstruction";
+  const isWedding = category === "mariage";
+  const weddingOffers = isWedding ? filterWeddingByChip(products, wedType ?? "tous") : [];
+  const weddingChips = isWedding ? presentWeddingChips(products) : [];
   const constructionCompanies = isConstruction
     ? groupConstructionCompanies(products, constrType ?? CONSTRUCTION_FILTER_ALL)
     : [];
@@ -323,6 +330,32 @@ export default async function HomePage({
             </div>
           )}
 
+          {/* ── Filtres Mariage (types de prestataires) ───────────── */}
+          {isWedding && (
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {weddingChips.map((c) => {
+                const active = (!wedType && c.id === "tous") || wedType === c.id;
+                const href = c.id === "tous"
+                  ? `/?country=${countryId}&category=mariage`
+                  : `/?country=${countryId}&category=mariage&wedType=${c.id}`;
+                return (
+                  <Link
+                    key={c.id || "all"}
+                    href={href}
+                    className={cn(
+                      "shrink-0 rounded-full px-4 py-1.5 text-[12px] font-bold transition",
+                      active
+                        ? "bg-[#009688] text-white shadow-sm shadow-[#009688]/20"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-[#009688]/30 hover:text-[#009688]",
+                    )}
+                  >
+                    {c.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Filtres Hôtels (ambiances) ────────────────────────── */}
           {isHotel && (
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
@@ -415,7 +448,7 @@ export default async function HomePage({
           )}
 
           {/* ── Barre catalogue (tri + prix) — mode filtre actif ── */}
-          {(category || q) && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && (
+          {(category || q) && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && !isWedding && (
             <CatalogToolbar
               resultCount={products.length}
               currencySymbol={country.currency_symbol}
@@ -428,6 +461,11 @@ export default async function HomePage({
           {/* ── Section Location (offre-first) ────────────────────── */}
           {isLocation && (
             <LocationHome offers={locationOffers} country={country} />
+          )}
+
+          {/* ── Section Mariage (prestataire-first) ───────────────── */}
+          {isWedding && (
+            <WeddingHome offers={weddingOffers} country={country} />
           )}
 
           {/* ── Section Hôtels (hôtel-first) ──────────────────────── */}
@@ -477,7 +515,7 @@ export default async function HomePage({
           )}
 
           {/* ── Produits boostés ────────────────────────────────── */}
-          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && (
+          {boosted.length > 0 && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && !isWedding && (
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -582,7 +620,7 @@ export default async function HomePage({
           )}
 
           {/* ── Section Nouveautés / Résultats (layout standard) ──── */}
-          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && (
+          {!isAlimentation && !isRestaurant && !isLocation && !isHotel && !isPharmacy && !isConstruction && !isWedding && (
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <h2 className="text-[15px] font-black text-slate-900">
