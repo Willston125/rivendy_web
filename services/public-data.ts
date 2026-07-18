@@ -434,3 +434,25 @@ export async function getStoreRatingsFor(
     ]),
   );
 }
+
+/** Bannières de boutique d'un lot de vendeurs (seller_id → URL non vide).
+ *  Préfère la bannière web dédiée (store_banner_url_web) si présente. */
+export async function getStoreBannersFor(
+  sellerIds: string[],
+): Promise<Record<string, string>> {
+  const ids = [...new Set(sellerIds.filter(Boolean))];
+  if (ids.length === 0) return {};
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, store_banner_url, store_banner_url_web")
+    .in("id", ids);
+  if (error || !data) return {};
+  const out: Record<string, string> = {};
+  for (const row of data) {
+    const url = String(row.store_banner_url_web ?? "").trim() ||
+      String(row.store_banner_url ?? "").trim();
+    if (url) out[String(row.id)] = url;
+  }
+  return out;
+}

@@ -14,6 +14,7 @@ import {
   getAdvertisements,
   getCountry,
   getProducts,
+  getStoreBannersFor,
   getStoreRatingsFor,
   getStoryProducts,
   type ProductSort,
@@ -131,9 +132,12 @@ export default async function HomePage({
     : [];
   // Notes ⭐ réelles des boutiques affichées (1 requête groupée ; map vide si
   // aucun avis — la carte n'affiche alors pas de note, spec « que du réel »).
-  const restaurantRatings = isRestaurant
-    ? await getStoreRatingsFor(restaurantGroups.map((g) => g.sellerId))
-    : {};
+  const [restaurantRatings, restaurantBanners] = isRestaurant
+    ? await Promise.all([
+        getStoreRatingsFor(restaurantGroups.map((g) => g.sellerId)),
+        getStoreBannersFor(restaurantGroups.map((g) => g.sellerId)),
+      ])
+    : [{}, {}];
   // Chips : « Tous » + UNIQUEMENT les types présents + filtres dérivés.
   const presentResTypes = new Set(
     restaurantGroups.map((g) => g.etablissementType).filter(Boolean),
@@ -550,7 +554,11 @@ export default async function HomePage({
                   <span className="hidden text-4xl sm:block">🍽️</span>
                 </div>
               )}
-              <RestaurantHome groups={restaurantGroups} ratings={restaurantRatings} />
+              <RestaurantHome
+                groups={restaurantGroups}
+                ratings={restaurantRatings}
+                banners={restaurantBanners}
+              />
             </section>
           )}
 

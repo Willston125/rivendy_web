@@ -17,24 +17,29 @@ export function RestaurantEstablishmentCard({
   group,
   avgRating,
   ratingCount = 0,
+  bannerUrl,
 }: {
   group: RestaurantGroup;
   avgRating?: number;
   ratingCount?: number;
+  /** Bannière boutique du restaurateur — prime sur la photo du dernier plat. */
+  bannerUrl?: string;
 }) {
   const plats = `${group.productCount} ${group.productCount > 1 ? "plats" : "plat"}`;
   const subtitle = [group.cuisine, group.deliveryZone].filter(Boolean).join(" · ");
   const hasHours = group.openingHours.length > 0;
   const isOpen = hasHours && isRestaurantOpen(group.openingHours);
   const dishes = topDishes(group);
+  // Couverture effective : bannière boutique > photo de plat > repli icône.
+  const cover = (bannerUrl ?? "").trim() || group.coverUrl;
 
   const inner = (
     <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:shadow-md">
       {/* Bandeau */}
       <div className="relative h-40 w-full bg-[#E0F2F1]">
-        {group.coverUrl ? (
+        {cover ? (
           <Image
-            src={group.coverUrl}
+            src={cover}
             alt={group.sellerName}
             fill
             sizes="(max-width: 680px) 100vw, 680px"

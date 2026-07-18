@@ -17,9 +17,12 @@ import type { StoreRatingSummary } from "@/services/public-data";
 export function RestaurantHome({
   groups,
   ratings,
+  banners = {},
 }: {
   groups: RestaurantGroup[];
   ratings: Record<string, StoreRatingSummary>;
+  /** seller_id → bannière boutique (prime sur la photo de plat). */
+  banners?: Record<string, string>;
 }) {
   const [query, setQuery] = useState("");
   const visible = useMemo(
@@ -78,6 +81,7 @@ export function RestaurantHome({
               group={group}
               avgRating={ratings[group.sellerId]?.average}
               ratingCount={ratings[group.sellerId]?.count ?? 0}
+              bannerUrl={banners[group.sellerId]}
             />
           ))}
         </div>
