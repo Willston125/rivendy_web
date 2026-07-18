@@ -403,3 +403,34 @@ export async function getStoryProducts(countryId = DEFAULT_COUNTRY_ID) {
   if (error || !data) return [];
   return data.map((row) => normalizeProduct(row as ProductRow));
 }
+
+export type StoreRatingSummary = { average: number; count: number };
+
+/** Notes moyennes d'un lot de boutiques en UNE requête (RLS lecture publique). */
+export async function getStoreRatingsFor(
+  sellerIds: string[],
+): Promise<Record<string, StoreRatingSummary>> {
+  const ids = [...new Set(sellerIds.filter(Boolean))];
+  if (ids.length === 0) return {};
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase
+    .from("store_ratings")
+    .select("seller_id, rating")
+    .in("seller_id", ids);
+  if (error || !data) return {};
+  const sums: Record<string, number> = {};
+  const counts: Record<string, number> = {};
+  for (const row of data) {
+    const id = String(row.seller_id ?? "");
+    const rating = Number(row.rating);
+    if (!id || Number.isNaN(rating)) continue;
+    sums[id] = (sums[id] ?? 0) + rating;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return Object.fromEntries(
+    Object.keys(counts).map((id) => [
+      id,
+      { average: sums[id] / counts[id], count: counts[id] },
+    ]),
+  );
+}
