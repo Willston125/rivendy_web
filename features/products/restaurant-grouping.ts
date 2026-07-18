@@ -40,6 +40,8 @@ export interface RestaurantGroup {
   isVerified: boolean;
   hasDelivery: boolean;
   hasPromo: boolean; // au moins un plat boosté
+  /** Titres des plats (ordre d'apparition) — recherche + chips spécialités. */
+  dishTitles: string[];
 }
 
 /** Lecture tolérante d'un attribut extra_attributes (→ string trimée). */
@@ -164,7 +166,27 @@ export function groupRestaurants(
       isVerified: Boolean(first.seller_is_certified),
       hasDelivery,
       hasPromo,
+      dishTitles: list.map((p) => p.title.trim()).filter(Boolean),
     });
   }
   return groups;
+}
+
+/** Les 3 premières spécialités à afficher sur la carte. */
+export function topDishes(group: RestaurantGroup): string[] {
+  return group.dishTitles.slice(0, 3);
+}
+
+/** Filtre par recherche : nom d'établissement OU titre de plat. */
+export function filterRestaurantGroupsByQuery(
+  groups: RestaurantGroup[],
+  query: string,
+): RestaurantGroup[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return groups;
+  return groups.filter(
+    (g) =>
+      g.sellerName.toLowerCase().includes(q) ||
+      g.dishTitles.some((t) => t.toLowerCase().includes(q)),
+  );
 }
