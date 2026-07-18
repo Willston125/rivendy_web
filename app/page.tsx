@@ -14,12 +14,13 @@ import {
   getAdvertisements,
   getCountry,
   getProducts,
+  getStoreRatingsFor,
   getStoryProducts,
   type ProductSort,
 } from "@/services/public-data";
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
-import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL } from "@/features/products/restaurant-grouping";
-import { RestaurantEstablishmentCard } from "@/features/products/restaurant-establishment-card";
+import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL, RESTAURANT_TYPE_FILTERS } from "@/features/products/restaurant-grouping";
+import { RestaurantHome } from "@/features/products/restaurant-home";
 import { groupPharmacies, PHARMACY_FILTERS, PHARMACY_FILTER_ALL } from "@/features/products/pharmacy-grouping";
 import { PharmacyEstablishmentCard } from "@/features/products/pharmacy-establishment-card";
 import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "@/features/products/location-listings";
@@ -128,6 +129,20 @@ export default async function HomePage({
   const restaurantGroups = isRestaurant
     ? groupRestaurants(products, resType ?? RESTAURANT_FILTER_ALL)
     : [];
+  // Notes ⭐ réelles des boutiques affichées (1 requête groupée ; map vide si
+  // aucun avis — la carte n'affiche alors pas de note, spec « que du réel »).
+  const restaurantRatings = isRestaurant
+    ? await getStoreRatingsFor(restaurantGroups.map((g) => g.sellerId))
+    : {};
+  // Chips : « Tous » + UNIQUEMENT les types présents + filtres dérivés.
+  const presentResTypes = new Set(
+    restaurantGroups.map((g) => g.etablissementType).filter(Boolean),
+  );
+  const visibleRestaurantFilters = RESTAURANT_FILTERS.filter(
+    (f) =>
+      !(RESTAURANT_TYPE_FILTERS as readonly string[]).includes(f) ||
+      presentResTypes.has(f),
+  );
   const locationOffers = isLocation
     ? filterLocationOffers(products, locType ?? LOCATION_FILTER_ALL)
     : [];
@@ -251,7 +266,7 @@ export default async function HomePage({
           {/* ── Filtres Restaurant (type d'établissement) ─────────── */}
           {isRestaurant && (
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-              {RESTAURANT_FILTERS.map((value) => {
+              {visibleRestaurantFilters.map((value) => {
                 const active =
                   (!resType && value === RESTAURANT_FILTER_ALL) || resType === value;
                 const href =
@@ -535,23 +550,7 @@ export default async function HomePage({
                   <span className="hidden text-4xl sm:block">🍽️</span>
                 </div>
               )}
-              <div className="mb-3 flex items-center gap-2">
-                <h2 className="text-[15px] font-black text-slate-900">Restaurants populaires</h2>
-                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
-                  {restaurantGroups.length} établissement{restaurantGroups.length > 1 ? "s" : ""}
-                </span>
-              </div>
-              {restaurantGroups.length > 0 ? (
-                <div className="space-y-3">
-                  {restaurantGroups.map((group) => (
-                    <RestaurantEstablishmentCard key={group.sellerId || group.sellerName} group={group} />
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
-                  Aucun restaurant disponible pour ce filtre.
-                </p>
-              )}
+              <RestaurantHome groups={restaurantGroups} ratings={restaurantRatings} />
             </section>
           )}
 
