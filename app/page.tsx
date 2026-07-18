@@ -24,8 +24,8 @@ import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL, RESTAURANT
 import { RestaurantHome } from "@/features/products/restaurant-home";
 import { groupPharmacies, PHARMACY_FILTERS, PHARMACY_FILTER_ALL } from "@/features/products/pharmacy-grouping";
 import { PharmacyEstablishmentCard } from "@/features/products/pharmacy-establishment-card";
-import { filterLocationOffers, LOCATION_CATEGORIES, LOCATION_FILTER_ALL } from "@/features/products/location-listings";
-import { LocationOfferCard } from "@/features/products/location-offer-card";
+import { filterLocationByChip, presentLocationChips } from "@/features/products/location-listings";
+import { LocationHome } from "@/features/products/location-home";
 import { groupHotels, HOTEL_FILTERS, HOTEL_FILTER_ALL } from "@/features/products/hotel-listings";
 import { HotelCard } from "@/features/products/hotel-card";
 import { FoodPackageCard } from "@/features/products/food-package-card";
@@ -147,9 +147,11 @@ export default async function HomePage({
       !(RESTAURANT_TYPE_FILTERS as readonly string[]).includes(f) ||
       presentResTypes.has(f),
   );
+  // Chips remappées (mix 2026-07-18 : Motos séparées, Disponible, présence).
   const locationOffers = isLocation
-    ? filterLocationOffers(products, locType ?? LOCATION_FILTER_ALL)
+    ? filterLocationByChip(products, locType ?? "tous")
     : [];
+  const locationChips = isLocation ? presentLocationChips(products) : [];
   const isHotel = category === "hotel";
   const hotelSummaries = isHotel
     ? groupHotels(products, hotelType ?? HOTEL_FILTER_ALL)
@@ -298,9 +300,9 @@ export default async function HomePage({
           {/* ── Filtres Location (catégories) ─────────────────────── */}
           {isLocation && (
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-              {[{ id: "", label: "Tous" }, ...LOCATION_CATEGORIES].map((c) => {
-                const active = (!locType && c.id === "") || locType === c.id;
-                const href = c.id === ""
+              {locationChips.map((c) => {
+                const active = (!locType && c.id === "tous") || locType === c.id;
+                const href = c.id === "tous"
                   ? `/?country=${countryId}&category=location`
                   : `/?country=${countryId}&category=location&locType=${c.id}`;
                 return (
@@ -425,25 +427,7 @@ export default async function HomePage({
 
           {/* ── Section Location (offre-first) ────────────────────── */}
           {isLocation && (
-            <section>
-              <div className="mb-3 flex items-center gap-2">
-                <h2 className="text-[15px] font-black text-slate-900">Offres recommandées</h2>
-                <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
-                  {locationOffers.length} offre{locationOffers.length > 1 ? "s" : ""}
-                </span>
-              </div>
-              {locationOffers.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                  {locationOffers.map((p) => (
-                    <LocationOfferCard key={p.id} product={p} country={country} />
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
-                  Aucune offre disponible pour ce filtre.
-                </p>
-              )}
-            </section>
+            <LocationHome offers={locationOffers} country={country} />
           )}
 
           {/* ── Section Hôtels (hôtel-first) ──────────────────────── */}

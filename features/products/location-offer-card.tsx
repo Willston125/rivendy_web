@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, ArrowRight, Phone } from "lucide-react";
+import { MapPin, ArrowRight, Phone, BadgeCheck } from "lucide-react";
 import type { Product, Country } from "@/types/rivendy";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import {
@@ -42,13 +42,22 @@ export function LocationOfferCard({ product, country }: { product: Product; coun
             {category}
           </span>
         )}
-        <span
-          className={`absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold shadow-sm ${
-            available ? "text-[#16A34A]" : "text-[#FF6B35]"
-          }`}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${available ? "bg-[#16A34A]" : "bg-[#FF6B35]"}`} />
-          {available ? "Disponible" : "Loué"}
+        <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold shadow-sm ${
+              available ? "text-[#16A34A]" : "text-[#FF6B35]"
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${available ? "bg-[#16A34A]" : "bg-[#FF6B35]"}`} />
+            {available ? "Disponible" : "Loué"}
+          </span>
+          {/* ✓ Vendeur vérifié (mockup 2026-07-18) — uniquement si certifié */}
+          {product.seller_is_certified && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 px-2 py-1 text-[10.5px] font-bold text-white shadow-sm">
+              <BadgeCheck className="h-3 w-3" />
+              Vendeur vérifié
+            </span>
+          )}
         </span>
       </div>
 
