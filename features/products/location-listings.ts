@@ -118,3 +118,55 @@ export function locationKeyInfos(p: Product): string[] {
   if (typePrestation) out.push(typePrestation);
   return out.slice(0, 3);
 }
+
+// ── Chips de l'ACCUEIL Location (mix validé 2026-07-18, parité app) ──
+// Motos séparées des Voitures, Bureaux sans chip (sous « Tous »),
+// + chip de statut « Disponible ».
+
+export interface LocationHomeChip {
+  id: string;
+  label: string;
+  typeKeys: string[]; // vide pour tous/disponible
+}
+
+export const LOCATION_HOME_CHIPS: LocationHomeChip[] = [
+  { id: "tous", label: "Tous", typeKeys: [] },
+  { id: "voitures", label: "Voitures", typeKeys: ["location_voiture", "vente_voiture"] },
+  { id: "motos", label: "Motos", typeKeys: ["location_moto"] },
+  { id: "maisons", label: "Maisons", typeKeys: ["location_appartement", "location_studio", "location_vacances"] },
+  { id: "salles", label: "Salles", typeKeys: ["location_salle", "location_evenementiel"] },
+  { id: "materiel", label: "Matériel", typeKeys: ["location_materiel"] },
+  { id: "disponible", label: "Disponible", typeKeys: [] },
+];
+
+/** Filtre par chip d'accueil (id). Parité Dart `filterLocationByChip`. */
+export function filterLocationByChip(products: Product[], chipId: string): Product[] {
+  if (!chipId || chipId === "tous") return products;
+  if (chipId === "disponible") return products.filter(locationIsAvailable);
+  const chip = LOCATION_HOME_CHIPS.find((c) => c.id === chipId);
+  if (!chip || chip.typeKeys.length === 0) return products;
+  return products.filter((p) => chip.typeKeys.includes(p.subcategory ?? ""));
+}
+
+/** Recherche live : titre, zone, marque/modèle (insensible à la casse). */
+export function searchLocationOffers(products: Product[], query: string): Product[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return products;
+  const hit = (p: Product) =>
+    p.title.toLowerCase().includes(q) ||
+    attrAny(p, ["zone_couverture", "zone", "localisation"]).toLowerCase().includes(q) ||
+    attrAny(p, ["marque", "modele"]).toLowerCase().includes(q);
+  return products.filter(hit);
+}
+
+/** Chips à afficher : Tous + types présents + Disponible si ≥1 offre libre. */
+export function presentLocationChips(products: Product[]): LocationHomeChip[] {
+  const subs = new Set(products.map((p) => p.subcategory ?? ""));
+  const anyAvailable = products.some(locationIsAvailable);
+  return LOCATION_HOME_CHIPS.filter(
+    (c) =>
+      c.id === "tous" ||
+      (c.id === "disponible" && anyAvailable) ||
+      c.typeKeys.some((k) => subs.has(k)),
+  );
+}
