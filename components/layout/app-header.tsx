@@ -86,20 +86,15 @@ export function AppHeader() {
       <div className="mx-auto flex max-w-[1440px] items-center gap-2 px-4 py-2.5 lg:gap-4 lg:px-6">
 
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
-            <Image
-              src="/brand/rivendy-logo-square.png"
-              alt="Rivendy"
-              fill
-              sizes="36px"
-              className="object-cover"
-              priority
-            />
-          </div>
-          <span className="hidden text-xl font-extrabold tracking-tight text-slate-900 lg:block">
-            Rivendy
-          </span>
+        <Link href="/" className="flex shrink-0 items-center">
+          <Image
+            src="/brand/rivendy-wordmark.png"
+            alt="Rivendy"
+            width={1214}
+            height={428}
+            priority
+            className="h-8 w-auto lg:h-9"
+          />
         </Link>
 
         {/* Barre de recherche — desktop */}

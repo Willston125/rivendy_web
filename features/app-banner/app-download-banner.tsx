@@ -45,7 +45,7 @@ export function AppDownloadBanner() {
 
   const AppIcon = (
     <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
-      <Image src="/brand/rivendy-logo-square.png" alt="Rivendy" fill sizes="44px" className="object-cover" />
+      <Image src="/brand/rivendy-logo-mark.png" alt="Rivendy" fill sizes="44px" className="object-cover" />
     </span>
   );
 

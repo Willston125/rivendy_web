@@ -82,11 +82,14 @@ export function SiteFooter() {
         <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
           {/* Marque */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
-                <Image src="/brand/rivendy-logo-square.png" alt="Rivendy" fill sizes="36px" className="object-cover" />
-              </span>
-              <span className="text-xl font-extrabold tracking-tight text-slate-900">Rivendy</span>
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/brand/rivendy-wordmark.png"
+                alt="Rivendy"
+                width={1214}
+                height={428}
+                className="h-9 w-auto"
+              />
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate-500">
               La marketplace de confiance. Achetez et vendez des produits locaux,
