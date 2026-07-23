@@ -89,7 +89,7 @@ export function AppHeader() {
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
             <Image
-              src="/brand/rivendy-logo.jpg"
+              src="/brand/rivendy-logo-square.png"
               alt="Rivendy"
               fill
               sizes="36px"

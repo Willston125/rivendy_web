@@ -13,7 +13,7 @@ export function formatMoney(value: number | null | undefined, country?: Pick<Cou
 }
 
 export function firstPhoto(product?: Pick<Product, "photos"> | null) {
-  return product?.photos?.find(Boolean) || "/brand/rivendy-logo.jpg";
+  return product?.photos?.find(Boolean) || "/brand/rivendy-logo-square.png";
 }
 
 export function isProductVisible(product: Pick<Product, "status" | "stock_quantity">) {

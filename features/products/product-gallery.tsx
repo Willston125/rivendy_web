@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 export function ProductGallery({ photos, title }: { photos: string[]; title: string }) {
-  const safePhotos = photos.filter(Boolean).length ? photos.filter(Boolean) : ["/brand/rivendy-logo.jpg"];
+  const safePhotos = photos.filter(Boolean).length ? photos.filter(Boolean) : ["/brand/rivendy-logo-square.png"];
   const [activeIdx, setActiveIdx] = useState(0);
   const active = safePhotos[activeIdx];
 

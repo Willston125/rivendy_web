@@ -84,7 +84,7 @@ export function SiteFooter() {
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2.5">
               <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
-                <Image src="/brand/rivendy-logo.jpg" alt="Rivendy" fill sizes="36px" className="object-cover" />
+                <Image src="/brand/rivendy-logo-square.png" alt="Rivendy" fill sizes="36px" className="object-cover" />
               </span>
               <span className="text-xl font-extrabold tracking-tight text-slate-900">Rivendy</span>
             </Link>
