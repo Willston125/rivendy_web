@@ -1,4 +1,4 @@
-import { CATEGORIES, type CategoryId, type Country, type Product } from "@/types/rivendy";
+import { CATEGORIES, type Country, type Product } from "@/types/rivendy";
 
 export function categoryLabel(category: string) {
   return CATEGORIES.find((item) => item.id === category)?.label ?? category;
@@ -40,20 +40,15 @@ export function syntheticEmailFromPhone(phone: string) {
   return `${digits}@nikey.app`;
 }
 
-export function categoryToCommissionName(category: CategoryId | string) {
-  const map: Record<string, string> = {
-    femme: "Femme",
-    homme: "Homme",
-    bebeEnfants: "Bebe & Enfants",
-    electronique: "Electronique",
-    maison: "Maison",
-    beauteParfums: "Beaute & Parfums",
-    artisanatLocal: "Artisanat",
-    materiauxConstruction: "Construction",
-    alimentation: "Alimentation",
-  };
-  return map[category] ?? category;
-}
+// `categoryToCommissionName` a été supprimée le 2026-07-25 : jamais appelée,
+// et ses libellés étaient SANS accents ('Electronique', 'Beaute & Parfums'),
+// donc incapables de correspondre à `commission_rules.category` qui les stocke
+// accentués. La correspondance catégorie → libellé de commission vit désormais
+// dans `lib/utils/commission.ts` (COMMISSION_CATEGORY_LABELS), à côté du calcul.
+//
+// ⚠️ Ne pas réutiliser `categoryLabel()` ci-dessus pour une recherche en base :
+// c'est un libellé d'AFFICHAGE ('Artisanat local', 'Supermarché') qui diffère
+// des valeurs stockées ('Artisanat', 'Alimentation').
 
 export function normalizePhoneForWhatsApp(phone: string) {
   return phone.replace(/\D/g, "");

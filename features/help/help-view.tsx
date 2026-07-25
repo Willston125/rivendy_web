@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: "Quels sont les frais et commissions Rivendy ?",
-    a: "Rivendy prélève une commission de 5% sur chaque vente réalisée via la plateforme. Cette commission est automatiquement calculée et affichée lors de la publication de votre article. Les achats sont gratuits pour les acheteurs.",
+    a: "La commission dépend de la catégorie de votre article : 7 % pour la mode, la maison, la beauté, l'électronique et le mariage, 5 % pour l'artisanat local, 10 % pour les matériaux de construction. Les catégories Location, Restaurant, Personnels, Hôtels, Pharmacie et Supermarché ne sont soumises à aucune commission. La commission s'ajoute à votre prix : vous encaissez exactement le montant que vous avez saisi. Le montant exact est affiché lors de la publication. Les achats sont gratuits pour les acheteurs.",
   },
 ] as const;
 

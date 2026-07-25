@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
+import { breakdown, referenceRate } from "@/lib/utils/commission";
 import { uploadProductPhotos } from "@/services/image-upload";
 import { CATEGORIES, type CategoryId } from "@/types/rivendy";
 
@@ -27,14 +28,20 @@ const MAX_PRODUCTS = 20;
 const CONDITIONS = ["Comme neuf","Très bon état","Bon état","Satisfaisant","Neuf"];
 
 // ── Calcul commission ───────────────────────────────────────
-function calcCommission(price: number, _category: string) {
-  const rate = 0.05; // 5% Rivendy
-  const commission = price * rate;
+// ⚠️ Ce wizard appliquait 5 % à TOUT, en ignorant la catégorie (le paramètre
+// s'appelait `_category`, non utilisé). Un artisan payait donc 5 % comme prévu,
+// mais un vendeur de matériaux payait 5 % au lieu de 10 %, et une vitrine
+// (Location/Restaurant) se voyait facturer 5 % alors qu'elle doit être à 0 %.
+// Le taux vient désormais de la grille de référence, catégorie par catégorie
+// (audit AUDIT_COMMISSIONS_CATEGORIES_2026-07-25.md, §C10).
+function calcCommission(price: number, category: string) {
+  const rate = referenceRate(category);
+  const { commission, displayPrice } = breakdown(price, rate);
   return {
     sellerPrice: price,
     commissionAmount: commission,
-    displayPrice: price + commission,
-    rateLabel: "5%",
+    displayPrice,
+    rateLabel: `${Math.round(rate * 100)} %`,
   };
 }
 

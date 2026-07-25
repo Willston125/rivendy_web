@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Loader2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { uploadProductPhotos } from "@/services/image-upload";
 import { VENDOR_CATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
-import { categoryLabel, formatMoney } from "@/lib/utils/format";
+import { formatMoney } from "@/lib/utils/format";
+import { breakdown, getCommissionRate, referenceRate } from "@/lib/utils/commission";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 
@@ -61,30 +62,25 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const totalPhotos        = existingPhotos.length + files.length;
   const canAddMore         = totalPhotos < MAX_PHOTOS;
 
-  /* ── Commission estimate (7 % par défaut) ──────────────────────── */
-  const estimatedCommission = Number((numericSellerPrice * 0.07).toFixed(0));
-  const estimatedDisplay    = numericSellerPrice + estimatedCommission;
+  /* ── Aperçu commission ──────────────────────────────────────────
+   * Taux réel de la catégorie (lu en base dès qu'il a répondu, sinon grille
+   * de référence). Remplace l'ancien « ~7 % » codé en dur, qui annonçait
+   * 7 % même sur les catégories à 0 % ou à 10 %.                        */
+  const [dbRate, setDbRate] = useState<number | null>(null);
+  const effectiveRate = dbRate ?? referenceRate(category);
 
-  /* ── Helpers ────────────────────────────────────────────────────── */
-  async function getCommissionRate() {
-    const { data: rule } = await supabase
-      .from("commission_rules")
-      .select("rate")
-      .eq("country_id", country?.id)
-      .eq("category", category)
-      .maybeSingle();
-    if (rule?.rate != null) return Number(rule.rate) / 100;
+  useEffect(() => {
+    let cancelled = false;
+    setDbRate(null);
+    getCommissionRate(category, country?.id)
+      .then((rate) => { if (!cancelled) setDbRate(rate); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [category, country?.id]);
 
-    const { data: commission } = await supabase
-      .from("commissions")
-      .select("rate")
-      .eq("country_id", country?.id)
-      .eq("category", categoryLabel(category))
-      .eq("is_active", true)
-      .maybeSingle();
-    const rate = Number(commission?.rate ?? 0.07);
-    return rate > 1 ? rate / 100 : rate;
-  }
+  const preview             = breakdown(numericSellerPrice, isFood ? 0 : effectiveRate);
+  const estimatedCommission = preview.commission;
+  const estimatedDisplay    = preview.displayPrice;
 
   function onFilesChange(nextFiles: FileList | null) {
     if (!nextFiles) return;
@@ -118,9 +114,11 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       const photos   = [...existingPhotos, ...uploaded].filter(Boolean);
       if (!photos.length) throw new Error("Ajoute au moins une photo du produit.");
 
-      const rate             = isFood ? 0 : await getCommissionRate();
-      const commissionAmount = Number((numericSellerPrice * rate).toFixed(2));
-      const displayPrice     = Number((numericSellerPrice + commissionAmount).toFixed(2));
+      // Taux relu au moment de l'envoi (et non celui de l'aperçu) : l'admin
+      // peut l'avoir changé pendant la saisie. Même fonction que l'aperçu →
+      // aucune divergence possible entre ce qui est montré et ce qui est écrit.
+      const rate = isFood ? 0 : await getCommissionRate(category, country?.id);
+      const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate);
 
       await supabase.from("profiles").upsert({
         id: user.id,
@@ -271,16 +269,20 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
                 <span className="font-bold">{formatMoney(numericSellerPrice, country)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Commission Rivendy (~7%)</span>
+                <span>
+                  Commission Rivendy ({isFood ? "incluse" : `${Math.round(effectiveRate * 100)} %`})
+                </span>
                 <span className="font-bold">+ {formatMoney(estimatedCommission, country)}</span>
               </div>
               <div className="flex justify-between border-t border-[#B2DFDB] pt-1">
-                <span className="font-black">Prix acheteur estimé</span>
+                <span className="font-black">Prix acheteur</span>
                 <span className="font-black">{formatMoney(estimatedDisplay, country)}</span>
               </div>
             </div>
             <p className="mt-2 text-[10px] text-[#009688]/70">
-              * La commission exacte est calculée selon la catégorie et le pays.
+              {estimatedCommission > 0
+                ? `Tu encaisses exactement ${formatMoney(numericSellerPrice, country)}. La commission s'ajoute par-dessus.`
+                : "Aucune commission sur cette catégorie — tu encaisses 100 % de ton prix."}
             </p>
           </div>
         )}
