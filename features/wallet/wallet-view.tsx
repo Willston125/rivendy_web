@@ -191,9 +191,12 @@ export function WalletView() {
           </div>
         )}
 
+        {/* Le taux dépend de la catégorie (0 % à 10 %) — annoncer « 5 % » ici
+            était faux pour presque toutes les catégories. Le montant exact est
+            affiché à la publication et déduit avant crédit du portefeuille. */}
         <div className="mt-3 flex items-center gap-1.5 text-xs text-white/50">
           <span>ℹ️</span>
-          Commission Rivendy : 5% par vente
+          Commission Rivendy selon la catégorie — montants déjà nets
         </div>
 
         {/* Seuil retrait */}

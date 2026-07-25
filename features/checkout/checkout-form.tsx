@@ -23,6 +23,15 @@ import { useCart } from "@/features/cart/cart-provider";
 import { useCountry } from "@/features/country/country-provider";
 
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp, orderId } from "@/lib/utils/format";
+import {
+  formatKmf,
+  fullAddressLabel,
+  isDeliverable,
+  isStructuredDeliveryMarket,
+  orderSnapshotParams,
+  type DeliveryAddress,
+} from "@/lib/utils/delivery-location";
+import { DeliveryAddressPicker } from "./delivery-address-picker";
 import type { CartItem, PaymentMethod } from "@/types/rivendy";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -105,19 +114,49 @@ export function CheckoutForm() {
     [groups],
   );
 
+  // ── 🛵 Livraison structurée (zones Grande Comore, 2026-07-25) ────────────
+  // Sur les marchés couverts, le champ texte libre est remplacé par le parcours
+  // Région → Localité → Quartier, avec tarif. Les autres marchés conservent
+  // exactement le comportement précédent (texte libre, aucun frais).
+  const usesStructuredAddress = isStructuredDeliveryMarket(country?.id);
+
+  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddress | null>(null);
+
+  const deliveryFee = useMemo(() => {
+    if (deliveryMode !== "delivery" || !usesStructuredAddress) return 0;
+    return deliveryAddress?.deliveryFeeKmf ?? 0;
+  }, [deliveryMode, usesStructuredAddress, deliveryAddress]);
+
+  /** Total réellement dû par l'acheteur : produits + livraison. */
+  const amountDue = totalAmount + deliveryFee;
+
   // Label zone effectif selon mode de livraison
   const effectiveZoneLabel = useMemo(() => {
-    if (deliveryMode === "delivery") return buyerZone.trim();
+    if (deliveryMode === "delivery") {
+      // `buyer_zone` reste alimenté même en mode structuré : le dashboard et
+      // l'écran d'affectation des livreurs le lisent en repli.
+      return usesStructuredAddress
+        ? deliveryAddress
+          ? fullAddressLabel(deliveryAddress)
+          : ""
+        : buyerZone.trim();
+    }
     if (deliveryMode === "pickup") return "Retrait personnel";
     return "";
-  }, [deliveryMode, buyerZone]);
+  }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress]);
 
   // Livraison prête ?
   const isDeliveryReady = useMemo(() => {
-    if (deliveryMode === "delivery") return buyerZone.trim().length > 0;
+    if (deliveryMode === "delivery") {
+      // En mode structuré, on exige une adresse exploitable par un livreur :
+      // quartier (choisi ou saisi) ET point de repère.
+      return usesStructuredAddress
+        ? isDeliverable(deliveryAddress)
+        : buyerZone.trim().length > 0;
+    }
     if (deliveryMode === "pickup") return true;
     return false;
-  }, [deliveryMode, buyerZone]);
+  }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress]);
 
   // Formulaire complet ?
   const isFormValid =
@@ -172,7 +211,14 @@ export function CheckoutForm() {
       lines.push("🏪 Mode : Retrait personnel");
     } else {
       lines.push("🛵 Mode : Livraison à domicile");
-      lines.push(`📍 Zone : ${buyerZone.trim()}`);
+      // Adresse complète (quartier, localité, région, repère) sur les marchés
+      // couverts ; ancien champ texte libre ailleurs.
+      lines.push(`📍 Adresse : ${effectiveZoneLabel}`);
+      if (deliveryFee > 0) {
+        lines.push(`🛵 Frais de livraison : ${formatKmf(deliveryFee)}`);
+      }
+      const recipient = deliveryAddress?.recipientPhone?.trim();
+      if (recipient) lines.push(`📞 Destinataire : ${recipient}`);
     }
     lines.push("─────────────────");
     lines.push(`👤 ${buyerName.trim()}`);
@@ -246,8 +292,33 @@ export function CheckoutForm() {
         error?: string;
       };
 
+      // 🛵 Livraison multi-vendeurs — même règle que l'app Flutter :
+      // l'acheteur paie UNE seule livraison pour tout le panier, même si celui-ci
+      // génère N commandes (une par vendeur).
+      //   • le snapshot d'adresse est attaché à TOUTES les commandes, pour que
+      //     chaque vendeur et chaque livreur sache où livrer ;
+      //   • le TARIF n'est porté que par la PREMIÈRE, sinon la somme des
+      //     delivery_fee_kmf vaudrait N fois ce que l'acheteur a payé.
+      let deliveryFeeAssigned = false;
+
       for (const group of checkoutGroups) {
         const id = orderId();
+
+        // Snapshot d'adresse : uniquement en mode livraison structurée.
+        // Les clés absentes prennent la valeur par défaut de la RPC (NULL / 0),
+        // ce qui couvre le retrait et les marchés non couverts.
+        const snapshot =
+          deliveryMode === "delivery" && usesStructuredAddress && deliveryAddress
+            ? {
+                ...orderSnapshotParams(deliveryAddress),
+                p_delivery_fee_kmf: deliveryFeeAssigned
+                  ? 0
+                  : deliveryAddress.deliveryFeeKmf,
+              }
+            : {};
+        if (deliveryMode === "delivery" && usesStructuredAddress && deliveryAddress) {
+          deliveryFeeAssigned = true;
+        }
 
         // Appeler le RPC sécurisé pour créer la commande et les articles
         const { data: rpcResult, error: rpcError } = await supabase.rpc("secure_create_order", {
@@ -266,6 +337,7 @@ export function CheckoutForm() {
             product_id: item.product.id,
             quantity: item.quantity,
           })),
+          ...snapshot,
         });
 
         if (rpcError) throw rpcError;
@@ -445,29 +517,35 @@ export function CheckoutForm() {
             />
           </div>
 
-          {/* Champ zone — livraison uniquement */}
-          <div
-            className={`overflow-hidden transition-all duration-300 ease-out ${
-              deliveryMode === "delivery" ? "mt-4 max-h-24 opacity-100" : "max-h-0 opacity-0"
-            }`}
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="buyerZone" className="text-sm font-bold text-slate-700">
-                Votre quartier / zone de livraison
-              </Label>
-              <div className="relative">
-                <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#00C4B4]" />
-                <Input
-                  id="buyerZone"
-                  value={buyerZone}
-                  onChange={(e) => setBuyerZone(e.target.value)}
-                  placeholder="Balbala, Héron, PK12..."
-                  className="pl-9"
-                  required={deliveryMode === "delivery"}
-                />
-              </div>
+          {/* Adresse de livraison — livraison uniquement.
+              Marchés couverts : parcours structuré avec tarif.
+              Autres marchés : champ texte libre historique, inchangé.
+              Pas de max-h ici pour le mode structuré : la hauteur varie
+              beaucoup selon l'étape atteinte, un plafond fixe tronquerait. */}
+          {deliveryMode === "delivery" && (
+            <div className="mt-4">
+              {usesStructuredAddress ? (
+                <DeliveryAddressPicker onChange={setDeliveryAddress} />
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="buyerZone" className="text-sm font-bold text-slate-700">
+                    Votre quartier / zone de livraison
+                  </Label>
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#00C4B4]" />
+                    <Input
+                      id="buyerZone"
+                      value={buyerZone}
+                      onChange={(e) => setBuyerZone(e.target.value)}
+                      placeholder="Balbala, Héron, PK12..."
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Badge retrait personnel */}
           <div
@@ -591,10 +669,34 @@ export function CheckoutForm() {
         </div>
 
         <div className="border-t border-slate-100 pt-3 text-sm">
+          {/* Sous-total produits, puis livraison, puis total à payer.
+              Une SEULE livraison pour tout le panier, même multi-vendeurs. */}
           <div className="flex justify-between">
-            <span className="text-slate-500">Total</span>
-            <span className="text-lg font-black text-slate-950">{formatMoney(totalAmount, country)}</span>
+            <span className="text-slate-500">
+              {deliveryFee > 0 ? "Sous-total produits" : "Total"}
+            </span>
+            <span
+              className={`font-black text-slate-950 ${deliveryFee > 0 ? "text-sm" : "text-lg"}`}
+            >
+              {formatMoney(totalAmount, country)}
+            </span>
           </div>
+          {deliveryFee > 0 && (
+            <>
+              <div className="mt-1 flex justify-between">
+                <span className="text-slate-500">Frais de livraison</span>
+                <span className="font-bold text-[#009688]">
+                  + {formatKmf(deliveryFee)}
+                </span>
+              </div>
+              <div className="mt-2 flex justify-between border-t border-slate-100 pt-2">
+                <span className="font-bold text-slate-700">Total à payer</span>
+                <span className="text-lg font-black text-[#009688]">
+                  {formatMoney(amountDue, country)}
+                </span>
+              </div>
+            </>
+          )}
           {commissionTotal > 0 && (
             <div className="mt-1 flex justify-between text-xs">
               <span className="text-slate-400">dont commission Rivendy</span>
@@ -618,7 +720,7 @@ export function CheckoutForm() {
           ) : (
             <>
               <ShieldCheck className="mr-2 h-5 w-5" />
-              Commander · {formatMoney(totalAmount, country)}
+              Commander · {formatMoney(amountDue, country)}
             </>
           )}
         </button>
