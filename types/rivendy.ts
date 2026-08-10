@@ -264,13 +264,17 @@ export interface BoostPurchaseInput {
 
 export interface SellerSubscriptionInput {
   seller_id: string;
-  plan: "weekly" | "monthly" | "yearly";
+  // Grille 2026-08-09 : la formule hebdomadaire n'est plus vendue.
+  plan: "monthly" | "yearly";
+  // Formule d'abonnement — colonne `tier` de seller_subscriptions.
+  tier: "certified" | "pro";
   price_paid: number;
   duration_days: number;
   status: "pending";
   payment_method: string;
   country_id: string;
   payment_reference?: string | null;
+  notes?: string | null;
 }
 
 export type PayoutStatus =

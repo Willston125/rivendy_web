@@ -10,8 +10,13 @@ import type { SellerSubscriptionInput } from "@/types/rivendy";
 
 /* ── Plans ─────────────────────────────────────────────────── */
 
+type SubscriptionTier = "certified" | "pro";
+
 interface Plan {
-  id: "weekly" | "monthly" | "yearly";
+  id: string;
+  tier: SubscriptionTier;
+  /** Valeur envoyée dans la colonne plan ('monthly' | 'yearly'). */
+  dbPlan: "monthly" | "yearly";
   label: string;
   emoji: string;
   priceFDJ: number;
@@ -31,65 +36,93 @@ function priceForMarket(plan: Plan, countryId: string): number {
   return countryId === "KM" ? plan.priceKMF : plan.priceFDJ;
 }
 
+function tierLabel(tier: SubscriptionTier): string {
+  return tier === "pro" ? "Pro" : "Certifié";
+}
+
+// Grille validée par le propriétaire le 2026-08-09 — miroir EXACT de
+// rivendy_app/lib/features/auth/screens/subscription_screen.dart
+// (subscriptionPlans, gardé par subscription_plans_test.dart).
+// Annuel = 10 mois payés. La formule hebdomadaire n'est plus vendue.
+const CERTIFIED_FEATURES = [
+  "Badge ✅ Vendeur Certifié",
+  "Stories affichées 72 h au lieu de 24 h",
+  "⚡ 2 boosts 3 jours inclus / mois",
+  "🎬 Stories vidéo — bientôt",
+  "🎬 15 vidéos produit / mois — bientôt",
+  "🎬 Vidéo de couverture boutique — bientôt",
+];
+
+const PRO_FEATURES = [
+  "Badge ✅ Vendeur Certifié",
+  "Stories affichées 72 h au lieu de 24 h",
+  "⚡ 4 boosts 3 jours inclus / mois",
+  "🎬 Stories vidéo — bientôt",
+  "🎬 Vidéos produit illimitées — bientôt",
+  "🎬 Vidéo de couverture boutique — bientôt",
+];
+
 const PLANS: Plan[] = [
   {
-    id: "weekly",
-    label: "Hebdomadaire",
-    emoji: "🗓",
-    priceFDJ: 1000,
-    priceKMF: 2500,
-    durationDays: 7,
-    durationLabel: "7 jours",
-    buttonLabel: "S'abonner 7 jours",
-    features: [
-      "Badge ✅ Vendeur Certifié",
-      "Affiché sur votre profil",
-      "Affiché sur vos annonces",
-      "Confiance des acheteurs",
-    ],
-  },
-  {
-    id: "monthly",
+    id: "certified_monthly",
+    tier: "certified",
+    dbPlan: "monthly",
     label: "Mensuel",
     emoji: "📅",
-    priceFDJ: 3000,
+    priceFDJ: 1500,
+    priceKMF: 3000,
+    durationDays: 30,
+    durationLabel: "30 jours",
+    buttonLabel: "S'abonner 30 jours",
+    badge: "LE PLUS POPULAIRE",
+    badgeColor: "#009688",
+    isPopular: true,
+    features: CERTIFIED_FEATURES,
+  },
+  {
+    id: "certified_yearly",
+    tier: "certified",
+    dbPlan: "yearly",
+    label: "Annuel",
+    emoji: "🏆",
+    priceFDJ: 15000,
+    priceKMF: 30000,
+    durationDays: 365,
+    durationLabel: "1 an",
+    buttonLabel: "S'abonner 1 an",
+    savingsLabel: "2 mois offerts",
+    badge: "MEILLEUR PRIX",
+    badgeColor: "#FFB800",
+    features: CERTIFIED_FEATURES,
+  },
+  {
+    id: "pro_monthly",
+    tier: "pro",
+    dbPlan: "monthly",
+    label: "Mensuel",
+    emoji: "🚀",
+    priceFDJ: 3500,
     priceKMF: 7500,
     durationDays: 30,
     durationLabel: "30 jours",
     buttonLabel: "S'abonner 30 jours",
-    savingsLabel: "Économisez 25% vs hebdomadaire",
-    badge: "LE PLUS POPULAIRE",
-    badgeColor: "#009688",
-    isPopular: true,
-    features: [
-      "Badge ✅ Vendeur Certifié",
-      "Affiché sur votre profil",
-      "Affiché sur vos annonces",
-      "Confiance des acheteurs",
-      "Priorité dans les résultats",
-    ],
+    features: PRO_FEATURES,
   },
   {
-    id: "yearly",
+    id: "pro_yearly",
+    tier: "pro",
+    dbPlan: "yearly",
     label: "Annuel",
     emoji: "🏆",
-    priceFDJ: 25000,
-    priceKMF: 62500,
+    priceFDJ: 35000,
+    priceKMF: 75000,
     durationDays: 365,
     durationLabel: "1 an",
     buttonLabel: "S'abonner 1 an",
-    savingsLabel: "Économisez 52%",
+    savingsLabel: "2 mois offerts",
     badge: "MEILLEUR PRIX",
     badgeColor: "#FFB800",
-    features: [
-      "Badge ✅ Vendeur Certifié",
-      "Affiché sur votre profil",
-      "Affiché sur vos annonces",
-      "Confiance des acheteurs",
-      "Priorité dans les résultats",
-      "Statistiques de ventes avancées",
-      "Support prioritaire Rivendy",
-    ],
+    features: PRO_FEATURES,
   },
 ];
 
@@ -105,13 +138,17 @@ export function SubscriptionView() {
   const { user, profile } = useAuth();
   const countryNullable = useCountryOrDefault();
   const country = countryNullable as any;
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("certified");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const userName = profile?.full_name ?? "USER";
   const userId = userName.replace(/\s/g, "").toUpperCase().slice(0, 6) || "USER";
-  const reference = `CERT-${userId}`;
+  // Préfixe selon la formule — parité subscription_screen.dart (PRO-/CERT-).
+  const reference = `${(selectedPlan?.tier ?? selectedTier) === "pro" ? "PRO" : "CERT"}-${userId}`;
+
+  const visiblePlans = PLANS.filter((plan) => plan.tier === selectedTier);
 
   const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
 
@@ -128,7 +165,8 @@ export function SubscriptionView() {
     try {
       const payload: SellerSubscriptionInput = {
         seller_id: user.id,
-        plan: plan.id,
+        plan: plan.dbPlan,
+        tier: plan.tier,
         price_paid: priceForMarket(plan, country?.id),
         duration_days: plan.durationDays,
         status: "pending",
@@ -143,7 +181,8 @@ export function SubscriptionView() {
 
     const formattedPrice = formatMoney(priceForMarket(plan, country?.id), country);
     const msg = encodeURIComponent(
-      `Bonjour Rivendy, j'ai effectué le paiement pour mon abonnement Vendeur Certifié.\n\n` +
+      `Bonjour Rivendy, j'ai effectué le paiement pour mon abonnement Vendeur ${tierLabel(plan.tier)}.\n\n` +
+        `• Formule : ${tierLabel(plan.tier)}\n` +
         `• Plan : ${plan.label} (${plan.durationLabel})\n` +
         `• Montant : ${formattedPrice}\n` +
         `• Référence : ${reference}\n` +
@@ -193,7 +232,7 @@ export function SubscriptionView() {
               </div>
             </div>
             <div className="p-2">
-              <p className="text-sm font-black text-[#009688]">{formatMoney(priceForMarket(PLANS[1], country?.id), country)}</p>
+              <p className="text-sm font-black text-[#009688]">{formatMoney(priceForMarket(PLANS[0], country?.id), country)}</p>
               <p className="truncate text-xs text-slate-500">Produit exemple</p>
             </div>
           </div>
@@ -222,10 +261,28 @@ export function SubscriptionView() {
       </h2>
       <p className="mb-4 text-sm text-slate-400">Résiliable à tout moment</p>
 
-      <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
-        {PLANS.map((plan) => {
+      {/* Sélecteur de formule — parité subscription_screen.dart (_buildTierTab) */}
+      <div className="mb-5 flex rounded-xl bg-slate-100 p-1">
+        {(["certified", "pro"] as const).map((tier) => (
+          <button
+            key={tier}
+            type="button"
+            onClick={() => setSelectedTier(tier)}
+            className={`flex-1 rounded-lg py-2.5 text-sm font-black transition ${
+              selectedTier === tier
+                ? "bg-white text-[#009688] shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tier === "pro" ? "🚀 Pro" : "✅ Certifié"}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
+        {visiblePlans.map((plan) => {
           const displaySavings = plan.savingsLabel
-            ? plan.id === "yearly"
+            ? plan.dbPlan === "yearly"
               ? `${plan.savingsLabel} — soit ~${Math.round(priceForMarket(plan, country?.id) / 12).toLocaleString("fr-FR")} ${country?.currency_symbol}/mois`
               : plan.savingsLabel
             : null;
@@ -304,7 +361,8 @@ export function SubscriptionView() {
       <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
         Paiement vérifié manuellement sous 2h
         <br />
-        Support : WhatsApp +253 77 14 53 06
+        {/* Jamais de numéro en dur — source unique : le pays actif. */}
+        Support : WhatsApp {country.whatsapp_number}
       </p>
 
       {/* Payment modal overlay */}
@@ -325,7 +383,7 @@ export function SubscriptionView() {
               <BadgeCheck className="h-7 w-7 shrink-0 text-[#009688]" />
               <div>
                 <p className="font-black text-[#009688]">
-                  Abonnement {selectedPlan.label} sélectionné
+                  Abonnement {tierLabel(selectedPlan.tier)} {selectedPlan.label} sélectionné
                 </p>
                 <p className="text-sm text-slate-500">
                   {selectedPlan.durationLabel} ·{" "}

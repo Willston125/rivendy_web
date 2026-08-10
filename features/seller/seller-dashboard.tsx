@@ -186,10 +186,10 @@ export function SellerDashboard() {
 
   async function requestCertification() {
     if (!user) return;
-    // Parity Flutter subscription_screen.dart — Monthly: 3000 FDJ / 7500 KMF / 30 jours
-    const monthlyPrice = country?.id === "KM" ? 7500 : 3000;
+    // Grille 2026-08-09 — Certifié mensuel : 1500 FDJ / 3000 KMF / 30 jours
+    const monthlyPrice = country?.id === "KM" ? 3000 : 1500;
     const { error } = await supabase.from("seller_subscriptions").insert({
-      seller_id: user.id, plan: "monthly", price_paid: monthlyPrice,
+      seller_id: user.id, plan: "monthly", tier: "certified", price_paid: monthlyPrice,
       duration_days: 30, status: "pending", payment_method: "cash",
       country_id: country?.id, notes: "Demande certification depuis Rivendy Web",
     });
@@ -462,7 +462,7 @@ export function SellerDashboard() {
                 onClick={requestCertification}
                 className="mt-3 flex h-9 w-full items-center justify-center rounded-xl bg-amber-500 text-xs font-black text-white transition hover:bg-amber-600"
               >
-                Demander la certification ({formatMoney(country?.id === "KM" ? 7500 : 3000, country)})
+                Demander la certification ({formatMoney(country?.id === "KM" ? 3000 : 1500, country)})
               </button>
             </div>
           )}
