@@ -41,6 +41,7 @@ const ORDER_STATUS: Partial<Record<OrderStatus, { label: string; bg: string; tex
   code_generated:                { label: "Code envoyé",     bg: "bg-amber-50",  text: "text-amber-800" },
   awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50", text: "text-amber-800" },
   delivered_by_rider:            { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
+  delivered_confirmed:           { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   completed:                     { label: "Terminée ✓",     bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   cancelled:                     { label: "Annulée",         bg: "bg-red-50",    text: "text-red-600" },
   delivered:                     { label: "Livrée ✓",        bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
@@ -154,14 +155,14 @@ export function SellerDashboard() {
 
   /* ── Calculs ────────────────────────────────────────────────────── */
   const delivered = useMemo(
-    () => orders.filter((o) => ["completed", "delivered", "delivered_by_rider"].includes(o.status)),
+    () => orders.filter((o) => ["completed", "delivered", "delivered_by_rider", "delivered_confirmed"].includes(o.status)),
     [orders],
   );
   const earnings         = walletBalance;
   const pendingCount     = products.filter((p) => p.status === "pending").length;
   const activeCount      = products.filter((p) => p.status === "active").length;
   const boostedCount     = products.filter((p) => p.status === "boosted").length;
-  const pendingOrders    = orders.filter((o) => !["completed", "delivered", "delivered_by_rider", "cancelled"].includes(o.status));
+  const pendingOrders    = orders.filter((o) => !["completed", "delivered", "delivered_by_rider", "delivered_confirmed", "cancelled"].includes(o.status));
 
   const firstBoostable   = useMemo(() => products.find((p) => p.status === "active" || p.status === "boosted"), [products]);
 

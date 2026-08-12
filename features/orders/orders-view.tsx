@@ -34,6 +34,7 @@ const DELIVERY_STATUS: Record<OrderStatus, StatusConfig> = {
   code_generated:                { label: "Code envoyé 🔑",  bg: "bg-amber-50",    text: "text-amber-800",   icon: <Clock className="h-3 w-3" /> },
   awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50",   text: "text-amber-800",   icon: <Truck className="h-3 w-3" /> },
   delivered_by_rider:            { label: "Livrée ✓",        bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
+  delivered_confirmed:           { label: "Livrée ✓",        bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
   completed:                     { label: "Terminée ✓",      bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
   cancelled:                     { label: "Annulée",          bg: "bg-red-50",      text: "text-red-600",     icon: <XCircle className="h-3 w-3" /> },
   pending:                       { label: "En attente",       bg: "bg-amber-50",    text: "text-amber-700",   icon: <Clock className="h-3 w-3" /> },
@@ -54,6 +55,7 @@ const STEPS: { statuses: OrderStatus[]; label: string }[] = [
       "code_generated",
       "awaiting_customer_confirmation",
       "delivered_by_rider",
+      "delivered_confirmed",
       "completed",
       "shipped",
       "delivered"
@@ -75,9 +77,9 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 function filterOrders(orders: AppOrder[], f: Filter): AppOrder[] {
   if (f === "all") return orders;
-  if (f === "delivered") return orders.filter((o) => ["delivered", "delivered_by_rider", "completed"].includes(o.status));
+  if (f === "delivered") return orders.filter((o) => ["delivered", "delivered_by_rider", "delivered_confirmed", "completed"].includes(o.status));
   if (f === "cancelled") return orders.filter((o) => o.status === "cancelled");
-  return orders.filter((o) => !["delivered", "delivered_by_rider", "completed", "cancelled"].includes(o.status));
+  return orders.filter((o) => !["delivered", "delivered_by_rider", "delivered_confirmed", "completed", "cancelled"].includes(o.status));
 }
 
 /* ── Skeleton ───────────────────────────────────────────────────── */
@@ -211,7 +213,7 @@ function OrderCard({
   const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(order.created_at));
   const items    = order.items ?? [];
   const isCancelled = order.status === "cancelled";
-  const isActive    = !["delivered", "delivered_by_rider", "completed", "cancelled"].includes(order.status);
+  const isActive    = !["delivered", "delivered_by_rider", "delivered_confirmed", "completed", "cancelled"].includes(order.status);
   const curStep     = stepIndex(order.status);
   const isAwaitingCode = ["arrived", "code_generated", "awaiting_customer_confirmation"].includes(order.status);
   // Parité RLS `buyer_cancel_own_pending_order` : l'acheteur peut annuler

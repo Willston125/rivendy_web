@@ -191,6 +191,10 @@ export type OrderStatus =
   | "code_generated"
   | "awaiting_customer_confirmation"
   | "delivered_by_rider"
+  // Posé par la RPC admin_verify_delivery quand l'admin valide le code à
+  // 6 chiffres — état final « réception confirmée ». Connu de l'app et du
+  // dashboard : le retirer ici casserait le classement des commandes web.
+  | "delivered_confirmed"
   | "completed"
   | "cancelled"
   | "pending"

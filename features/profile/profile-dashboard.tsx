@@ -37,6 +37,7 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
   code_generated:                { label: "Code envoyé",      color: "bg-amber-100 text-amber-800" },
   awaiting_customer_confirmation:{ label: "Livreur chez vous", color: "bg-amber-100 text-amber-800" },
   delivered_by_rider:            { label: "Livrée",           color: "bg-green-100 text-green-700" },
+  delivered_confirmed:           { label: "Livrée ✓",         color: "bg-green-100 text-green-700" },
   completed:                     { label: "Terminée ✓",       color: "bg-green-100 text-green-700" },
   cancelled:                     { label: "Annulée",          color: "bg-red-100 text-red-600" },
   pending:                       { label: "En attente",       color: "bg-amber-100 text-amber-700" },

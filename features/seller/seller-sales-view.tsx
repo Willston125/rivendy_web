@@ -39,6 +39,7 @@ const SELLER_ORDER_STATUS: Record<string, { label: string; bg: string; text: str
   code_generated:                { label: "Code envoyé",     bg: "bg-amber-50",  text: "text-amber-800" },
   awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50", text: "text-amber-800" },
   delivered_by_rider:            { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
+  delivered_confirmed:           { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   completed:                     { label: "Terminée ✓",     bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   cancelled:                     { label: "Annulée",         bg: "bg-red-50",    text: "text-red-600" },
   delivered:                     { label: "Livrée ✓",        bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
@@ -124,7 +125,7 @@ export function SellerSalesView() {
   );
   
   const activeOrders = useMemo(
-    () => orders.filter((o) => !["delivered", "delivered_by_rider", "completed", "cancelled"].includes(o.status)),
+    () => orders.filter((o) => !["delivered", "delivered_by_rider", "delivered_confirmed", "completed", "cancelled"].includes(o.status)),
     [orders],
   );
 
