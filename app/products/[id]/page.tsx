@@ -83,7 +83,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
 
         {/* ── GALERIE ──────────────────────────────────────────────── */}
-        <ProductGallery photos={product.photos} title={product.title} />
+        <ProductGallery
+          photos={product.photos}
+          title={product.title}
+          videoUid={product.video_uid}
+          videoStatus={product.video_status}
+          videoThumbnail={product.video_thumbnail_url}
+        />
 
         {/* ── INFOS PRODUIT ────────────────────────────────────────── */}
         <section className="space-y-5">

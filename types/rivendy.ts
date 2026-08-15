@@ -149,6 +149,10 @@ export interface Product {
   seller_avatar_url?: string | null;
   seller_is_certified?: boolean | null;
   seller_country_id?: string | null;
+  /** 🎬 Vidéo produit (chantier vidéo, plan D) — null si le produit n'en a pas. */
+  video_uid?: string | null;
+  video_status?: string | null; // 'uploading' | 'processing' | 'ready' | 'error'
+  video_thumbnail_url?: string | null;
   business_type: string;
   extra_attributes: Record<string, string>;
 }
