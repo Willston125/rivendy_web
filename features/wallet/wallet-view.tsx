@@ -97,8 +97,15 @@ export function WalletView() {
   useEffect(() => { load(); }, [load]);
 
   // ── Calculs ────────────────────────────────────────────────
-  const pendingOrders = orders.filter((o) => o.payment_status === "pending_cash");
-  const deliveredOrders = orders.filter((o) => o.payment_status === "delivered");
+  // L'état livré vit dans `status` (delivered / delivered_by_rider /
+  // delivered_confirmed / completed) — même convention que seller-dashboard.
+  // `payment_status` ne prend que pending_cash/paid au checkout : l'ancien
+  // filtre `payment_status === "delivered"` comptait toujours 0.
+  const DELIVERED_STATUSES = ["completed", "delivered", "delivered_by_rider", "delivered_confirmed"];
+  const pendingOrders = orders.filter(
+    (o) => o.payment_status === "pending_cash" && o.status !== "cancelled",
+  );
+  const deliveredOrders = orders.filter((o) => DELIVERED_STATUSES.includes(o.status));
 
   const confirmedEarnings = walletBalance;
   const pendingEarnings = pendingOrders.reduce(
