@@ -1,12 +1,13 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Zap, CheckCircle2, Copy, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
+import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { BoostPurchaseInput, Product } from "@/types/rivendy";
 
 /* ── Tiers ─────────────────────────────────────────────────── */
@@ -81,11 +82,33 @@ const TIERS: BoostTier[] = [
   },
 ];
 
-const PAYMENT_METHODS = [
-  { name: "D-Money", number: "+253 77 14 53 06", color: "#1976D2" },
-  { name: "Waafi", number: "+253 77 14 53 06", color: "#388E3C" },
-  { name: "CAC Pay", number: "+253 77 14 53 06", color: "#E64A19" },
-];
+/* ── Boost inclus dans l'abonnement (crédits serveur) ──────────
+   Parité app : RPC get_boost_credit_status / use_boost_credit — fichier
+   propriétaire 20260809_subscription_tiers_boost_credits.sql. Le décompte
+   vit ENTIÈREMENT côté serveur ; le client ne fait qu'afficher. */
+
+interface BoostCreditStatus {
+  hasSubscription: boolean;
+  tier: string | null;
+  remaining: number;
+}
+
+const NO_CREDITS: BoostCreditStatus = {
+  hasSubscription: false,
+  tier: null,
+  remaining: 0,
+};
+
+// Codes RAISE EXCEPTION de use_boost_credit → messages métier affichables.
+const CREDIT_ERRORS: Record<string, string> = {
+  NO_ACTIVE_SUBSCRIPTION:
+    "Abonnement expiré — renouvelez-le pour retrouver vos boosts inclus.",
+  NOT_PRODUCT_OWNER: "Ce produit n'appartient pas à votre boutique.",
+  PRODUCT_NOT_BOOSTABLE:
+    "Seul un article actif peut recevoir un boost inclus.",
+  NO_CREDITS_LEFT:
+    "0 boost inclus restant ce mois-ci — ils reviennent au prochain cycle.",
+};
 
 /* ── Component ─────────────────────────────────────────────── */
 
@@ -94,12 +117,83 @@ export function BoostView({ product }: { product: Product }) {
   const countryNullable = useCountryOrDefault();
   const country = countryNullable as any;
   const [selectedTier, setSelectedTier] = useState<BoostTier | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState(0);
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [credits, setCredits] = useState<BoostCreditStatus>(NO_CREDITS);
+  const [confirmCredit, setConfirmCredit] = useState(false);
+  const [usingCredit, setUsingCredit] = useState(false);
+  const [creditMessage, setCreditMessage] =
+    useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadCredits = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.rpc("get_boost_credit_status");
+      if (error || !data) return;
+      const row = data as Record<string, unknown>;
+      setCredits({
+        hasSubscription: Boolean(row.has_subscription),
+        tier: (row.tier as string) ?? null,
+        remaining: Number(row.remaining ?? 0),
+      });
+    } catch {
+      // Silencieux — sans statut, la carte « boost inclus » ne s'affiche pas.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadCredits();
+  }, [loadCredits]);
+
+  // Miroir de la condition serveur : seul un produit 'active' est boostable
+  // (pas de produit suspendu/épuisé, pas d'empilement sur un boost en cours).
+  const isProductBoostable = product.status === "active";
+
+  async function useIncludedBoost() {
+    if (!user || usingCredit) return;
+    setUsingCredit(true);
+    setCreditMessage(null);
+    try {
+      const { data, error } = await supabase.rpc("use_boost_credit", {
+        p_product_id: product.id,
+      });
+      if (error) throw error;
+      const remaining = Number(
+        (data as Record<string, unknown> | null)?.remaining ?? 0,
+      );
+      setCredits((c) => ({ ...c, remaining }));
+      setConfirmCredit(false);
+      setCreditMessage({
+        ok: true,
+        text: `⚡ Boost 3 jours activé ! ${remaining} restant(s) ce mois-ci.`,
+      });
+    } catch (err) {
+      const raw = (err as { message?: string })?.message ?? "";
+      const known = Object.keys(CREDIT_ERRORS).find((k) => raw.includes(k));
+      setConfirmCredit(false);
+      setCreditMessage({
+        ok: false,
+        text: known ? CREDIT_ERRORS[known] : "Le boost inclus a échoué, réessayez.",
+      });
+      // Le refus peut venir d'un décompte dépassé : rafraîchir le compteur.
+      loadCredits();
+    } finally {
+      setUsingCredit(false);
+    }
+  }
+
+  // Jamais de numéro en dur — miroir de mobile_money_data.dart (parité app).
+  const paymentMethods = getMobileMoneyForCountry(country?.id ?? "");
+  const selectedMethod =
+    paymentMethods.find((m) => m.id === selectedMethodId && m.enabled) ??
+    paymentMethods.find((m) => m.enabled) ??
+    CASH_METHOD;
+  const isCash = selectedMethod.id === "cash";
 
   const reference = `BOOST-${product.id.slice(0, 8).toUpperCase()}-${selectedTier?.id.toUpperCase() ?? ""}`;
-  const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number || "25377145306");
+  // Jamais de numéro en dur — source unique : le pays actif.
+  const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
 
   function copyReference() {
     navigator.clipboard.writeText(reference);
@@ -119,7 +213,8 @@ export function BoostView({ product }: { product: Product }) {
         price_paid: priceForMarket(tier, country?.id),
         duration_days: tier.durationDays,
         status: "pending",
-        payment_method: PAYMENT_METHODS[selectedMethod].name,
+        // Parité subscription : l'id de la méthode choisie (waafi_dj, cash…).
+        payment_method: selectedMethod.id,
         country_id: country?.id,
         payment_reference: reference,
       };
@@ -180,6 +275,89 @@ export function BoostView({ product }: { product: Product }) {
           d&apos;acheteurs potentiels.
         </p>
       </div>
+
+      {/* Boost inclus — abonnés Certifié/Pro (parité app) */}
+      {credits.hasSubscription &&
+        (credits.tier === "certified" || credits.tier === "pro") && (
+          <div
+            className={`mb-6 rounded-2xl border-[1.5px] p-4 ${
+              credits.remaining > 0 && isProductBoostable
+                ? "border-[#009688] bg-[#E8F5F3]"
+                : "border-slate-300 bg-slate-100"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚡</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-[#1A1A1A]">
+                  Boost inclus — abonnement{" "}
+                  {credits.tier === "pro" ? "Pro" : "Certifié"}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {credits.remaining > 0
+                    ? `3 jours de mise en avant · ${credits.remaining} restant(s) ce mois-ci`
+                    : "0 restant ce mois-ci — revient au prochain cycle"}
+                </p>
+                {credits.remaining > 0 && !isProductBoostable && (
+                  <p className="mt-1 text-xs font-semibold text-orange-600">
+                    Seul un article actif peut recevoir un boost inclus.
+                  </p>
+                )}
+              </div>
+              {!confirmCredit && (
+                <button
+                  type="button"
+                  disabled={
+                    credits.remaining <= 0 || !isProductBoostable || usingCredit
+                  }
+                  onClick={() => setConfirmCredit(true)}
+                  className="shrink-0 rounded-xl bg-[#009688] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#00796B] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Booster ⚡
+                </button>
+              )}
+            </div>
+            {confirmCredit && (
+              <div className="mt-3 rounded-xl bg-white p-3">
+                <p className="text-sm text-slate-600">
+                  Votre article sera mis en avant pendant 3 jours, sans
+                  paiement. Il vous restera{" "}
+                  <strong>{credits.remaining - 1}</strong> boost(s) inclus ce
+                  mois-ci.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={usingCredit}
+                    onClick={useIncludedBoost}
+                    className="flex-1 rounded-xl bg-[#009688] py-2.5 text-sm font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
+                  >
+                    {usingCredit ? "Activation…" : "Confirmer — Booster ⚡"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={usingCredit}
+                    onClick={() => setConfirmCredit(false)}
+                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
+            {creditMessage && (
+              <p
+                className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold ${
+                  creditMessage.ok
+                    ? "bg-[#E0F2F1] text-[#00796B]"
+                    : "bg-red-50 text-red-600"
+                }`}
+              >
+                {creditMessage.text}
+              </p>
+            )}
+          </div>
+        )}
 
       {/* Tiers */}
       <h2 className="mb-3 text-lg font-black text-[#1A1A1A]">
@@ -252,7 +430,8 @@ export function BoostView({ product }: { product: Product }) {
       <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
         Paiement vérifié manuellement sous 24h
         <br />
-        Support : WhatsApp +253 77 14 53 06
+        {/* Jamais de numéro en dur — source unique : le pays actif. */}
+        Support : WhatsApp {country.whatsapp_number}
       </p>
 
       {/* Payment modal */}
@@ -289,22 +468,32 @@ export function BoostView({ product }: { product: Product }) {
             <p className="mb-2 font-bold text-[#1A1A1A]">
               Méthode de paiement
             </p>
-            <div className="mb-5 grid grid-cols-3 gap-2">
-              {PAYMENT_METHODS.map((m, i) => (
+            <div className="mb-5 grid grid-cols-2 gap-2">
+              {paymentMethods.map((m) => (
                 <button
-                  key={m.name}
+                  key={m.id}
                   type="button"
-                  onClick={() => setSelectedMethod(i)}
-                  className="rounded-xl border py-3 text-center text-xs font-bold transition"
+                  disabled={!m.enabled}
+                  onClick={() => setSelectedMethodId(m.id)}
+                  className="rounded-xl border px-2 py-3 text-center text-xs font-bold transition disabled:cursor-not-allowed"
                   style={{
                     borderColor:
-                      selectedMethod === i ? m.color : "#E2E8F0",
+                      selectedMethod.id === m.id ? m.color : "#E2E8F0",
                     backgroundColor:
-                      selectedMethod === i ? `${m.color}15` : "#F8FAFC",
-                    color: selectedMethod === i ? m.color : "#94A3B8",
+                      selectedMethod.id === m.id ? `${m.color}15` : "#F8FAFC",
+                    color: m.enabled
+                      ? selectedMethod.id === m.id
+                        ? m.color
+                        : "#475569"
+                      : "#CBD5E1",
                   }}
                 >
                   {m.name}
+                  {!m.enabled && (
+                    <span className="mt-1 block text-[9px] font-semibold text-slate-400">
+                      Bientôt disponible
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -323,16 +512,23 @@ export function BoostView({ product }: { product: Product }) {
                 >
                   1
                 </div>
-                <p className="text-sm text-slate-600">
-                  Envoyez{" "}
-                  <strong>{formatMoney(priceForMarket(selectedTier, country?.id), country)}</strong>{" "}
-                  au numéro :{" "}
-                  <strong
-                    style={{ color: selectedTier.color }}
-                  >
-                    {PAYMENT_METHODS[selectedMethod].number}
-                  </strong>
-                </p>
+                {!isCash && selectedMethod.number ? (
+                  <p className="text-sm text-slate-600">
+                    Envoyez{" "}
+                    <strong>{formatMoney(priceForMarket(selectedTier, country?.id), country)}</strong>{" "}
+                    au numéro {selectedMethod.name} :{" "}
+                    <strong
+                      style={{ color: selectedTier.color }}
+                    >
+                      {selectedMethod.number}
+                    </strong>
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    Contactez-nous sur WhatsApp pour convenir du paiement en
+                    espèces.
+                  </p>
+                )}
               </div>
 
               {/* Step 2 */}

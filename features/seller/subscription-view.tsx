@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
+import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { SellerSubscriptionInput } from "@/types/rivendy";
 
 /* ── Plans ─────────────────────────────────────────────────── */
@@ -126,12 +127,6 @@ const PLANS: Plan[] = [
   },
 ];
 
-const PAYMENT_METHODS = [
-  { name: "D-Money", number: "+253 77 00 00 01", color: "#1976D2" },
-  { name: "Waafi", number: "+253 77 00 00 02", color: "#388E3C" },
-  { name: "CAC Pay", number: "+253 77 00 00 03", color: "#E64A19" },
-];
-
 /* ── Component ─────────────────────────────────────────────── */
 
 export function SubscriptionView() {
@@ -140,8 +135,17 @@ export function SubscriptionView() {
   const country = countryNullable as any;
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("certified");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Jamais de numéro en dur — miroir de mobile_money_data.dart (parité app).
+  const paymentMethods = getMobileMoneyForCountry(country?.id ?? "");
+  const selectedMethod =
+    paymentMethods.find((m) => m.id === selectedMethodId && m.enabled) ??
+    paymentMethods.find((m) => m.enabled) ??
+    CASH_METHOD;
+  const isCash = selectedMethod.id === "cash";
 
   const userName = profile?.full_name ?? "USER";
   const userId = userName.replace(/\s/g, "").toUpperCase().slice(0, 6) || "USER";
@@ -170,7 +174,8 @@ export function SubscriptionView() {
         price_paid: priceForMarket(plan, country?.id),
         duration_days: plan.durationDays,
         status: "pending",
-        payment_method: "manual",
+        // Parité subscription_screen.dart — l'id de la méthode choisie.
+        payment_method: selectedMethod.id,
         country_id: country?.id,
         payment_reference: reference,
       };
@@ -185,6 +190,7 @@ export function SubscriptionView() {
         `• Formule : ${tierLabel(plan.tier)}\n` +
         `• Plan : ${plan.label} (${plan.durationLabel})\n` +
         `• Montant : ${formattedPrice}\n` +
+        `• Mode de paiement : ${selectedMethod.name}\n` +
         `• Référence : ${reference}\n` +
         `• Nom : ${userName}\n\n` +
         `Merci de valider mon badge. 🙏`
@@ -396,39 +402,89 @@ export function SubscriptionView() {
               Pour activer ton badge Vendeur Certifié :
             </p>
 
-            {/* Step 1 */}
+            {/* Step 1 — choix de la méthode (parité subscription_screen.dart) */}
             <div className="mb-3 flex gap-3">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
                 1
               </div>
-              <div className="text-sm text-slate-600">
-                <p>
-                  Envoie{" "}
-                  <strong>{formatMoney(priceForMarket(selectedPlan, country?.id), country)}</strong>{" "}
-                  sur l&apos;un de ces numéros :
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {PAYMENT_METHODS.map((m) => (
-                    <li key={m.name} className="flex items-center gap-2">
-                      <span
-                        className="text-xs font-bold"
-                        style={{ color: m.color }}
-                      >
-                        {m.name} :
-                      </span>
-                      <span className="font-bold text-[#1A1A1A]">
-                        {m.number}
-                      </span>
-                    </li>
+              <div className="flex-1 text-sm text-slate-600">
+                <p>Choisissez votre mode de paiement :</p>
+                <div className="mt-2 space-y-1.5">
+                  {paymentMethods.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={!m.enabled}
+                      onClick={() => setSelectedMethodId(m.id)}
+                      className="flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
+                      style={{
+                        borderColor:
+                          selectedMethod.id === m.id ? m.color : "#E2E8F0",
+                        backgroundColor:
+                          selectedMethod.id === m.id ? `${m.color}10` : "white",
+                        color: m.enabled ? "#1A1A1A" : "#94A3B8",
+                      }}
+                    >
+                      <span>{m.name}</span>
+                      {m.enabled ? (
+                        selectedMethod.id === m.id && (
+                          <CheckCircle2
+                            className="h-4 w-4"
+                            style={{ color: m.color }}
+                          />
+                        )
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-400">
+                          Bientôt disponible
+                        </span>
+                      )}
+                    </button>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
 
-            {/* Step 2 */}
+            {/* Step 2 — numéro (Mobile Money activé) ou note cash */}
             <div className="mb-3 flex gap-3">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
                 2
+              </div>
+              <div className="flex-1 text-sm text-slate-600">
+                {!isCash && selectedMethod.number ? (
+                  <>
+                    <p>
+                      Envoie{" "}
+                      <strong>{formatMoney(priceForMarket(selectedPlan, country?.id), country)}</strong>{" "}
+                      sur ce numéro :
+                    </p>
+                    <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: selectedMethod.color }}
+                      >
+                        {selectedMethod.name} :{" "}
+                      </span>
+                      <span
+                        className="text-base font-black"
+                        style={{ color: selectedMethod.color }}
+                      >
+                        {selectedMethod.number}
+                      </span>
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    Contactez-nous sur WhatsApp pour convenir du paiement en
+                    espèces.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="mb-3 flex gap-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
+                3
               </div>
               <div className="flex-1 text-sm text-slate-600">
                 <p>Référence obligatoire dans le motif :</p>
@@ -449,10 +505,10 @@ export function SubscriptionView() {
               </div>
             </div>
 
-            {/* Step 3 */}
+            {/* Step 4 */}
             <div className="mb-5 flex gap-3">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                3
+                4
               </div>
               <p className="text-sm text-slate-600">
                 Tape &quot;J&apos;ai payé&quot; — on t&apos;envoie sur WhatsApp
