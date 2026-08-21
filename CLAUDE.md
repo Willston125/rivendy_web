@@ -69,8 +69,10 @@ redéploiement, pas seulement un redémarrage.
 ## 6. Limite de taille Vercel
 
 Vercel rejette toute requête dont le corps dépasse **4,5 Mo**, avant même
-d'atteindre la route (`413 Request Entity Too Large`). Compresser les images
-côté navigateur (canvas JPEG) avant tout envoi à `/api/upload`.
+d'atteindre une route (`413 Request Entity Too Large`). Ce dépôt n'a AUCUNE
+route `app/api/` : les uploads partent directement du navigateur vers
+Supabase Storage — compresser les images côté client (canvas JPEG) et ne
+jamais faire transiter un fichier par une route Vercel.
 
 ---
 
