@@ -49,18 +49,18 @@ const CERTIFIED_FEATURES = [
   "Badge ✅ Vendeur Certifié",
   "Stories affichées 72 h au lieu de 24 h",
   "⚡ 2 boosts 3 jours inclus / mois",
-  "🎬 Stories vidéo — bientôt",
-  "🎬 15 vidéos produit / mois — bientôt",
-  "🎬 Vidéo de couverture boutique — bientôt",
+  "🎬 Stories vidéo",
+  "🎬 15 vidéos produit / mois",
+  "🎬 Vidéo de couverture boutique",
 ];
 
 const PRO_FEATURES = [
   "Badge ✅ Vendeur Certifié",
   "Stories affichées 72 h au lieu de 24 h",
   "⚡ 4 boosts 3 jours inclus / mois",
-  "🎬 Stories vidéo — bientôt",
-  "🎬 Vidéos produit illimitées — bientôt",
-  "🎬 Vidéo de couverture boutique — bientôt",
+  "🎬 Stories vidéo",
+  "🎬 Vidéos produit illimitées",
+  "🎬 Vidéo de couverture boutique",
 ];
 
 const PLANS: Plan[] = [
