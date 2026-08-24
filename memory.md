@@ -24,7 +24,7 @@ Un audit complet a été réalisé pour résoudre les bugs bloquants, les incoh�
 
 ### 3. Logique Métier Portefeuille & Statut de Livraison
 - **Synchronisation du statut `delivered_confirmed`** : Ce statut (marqué par l'admin via RPC pour valider les codes de livraison à 6 chiffres) était ignoré sur le Web. Il a été ajouté dans le système de types, le filtrage des commandes acheteurs (`orders-view.tsx`), et le dashboard vendeur (`seller-dashboard.tsx`, `seller-sales-view.tsx`).
-- **Déverrouillage des gains du Portefeuille** : Correction des calculs dans `wallet-view.tsx` pour inclure les commandes au statut `delivered_confirmed` dans le solde confirmé des vendeurs.
+- **Portefeuille (`wallet-view.tsx`) — corrigé réellement le 2026-08-22** : la version précédente de cette note annonçait une correction absente du code. Depuis le commit `4d1383d` : le compteur « Livrées » lit `status` (`completed`/`delivered`/`delivered_by_rider`/`delivered_confirmed` — même convention que `seller-dashboard`), les commandes annulées sont exclues des gains en attente, et le solde confirmé vient exclusivement de `wallets.balance` (serveur).
 - **Sidebar dynamique** : Le solde affiché dans la barre latérale gauche (`left-sidebar.tsx`) a été rendu dynamique en requêtant directement Supabase au lieu d'afficher une valeur hardcodée (`12450`).
 
 ### 4. Validation Technique
@@ -68,9 +68,25 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 
 ---
 
+## Stabilisation du 2026-08-22 (mission post-audit)
+
+- **Paiements vendeur par marché** (`lib/utils/mobile-money.ts`, miroir EXACT de
+  `rivendy_app/lib/core/utils/mobile_money_data.dart` — modifier les DEUX ensemble) :
+  fin des numéros factices de l'abonnement (`+253 77 00 00 0x`) et des numéros
+  Djibouti codés en dur du boost. Modals en 4 étapes à parité app ; sans numéro
+  configuré pour un marché → parcours espèces/WhatsApp de l'agence locale,
+  jamais de fallback Djibouti silencieux.
+- **Crédits boost inclus** : carte « Boost inclus » branchée sur les RPC serveur
+  `get_boost_credit_status` / `use_boost_credit` (décompte 100 % serveur,
+  produit `active` uniquement).
+- **Plan D déployé** : lecteur vidéo sur la fiche produit (`product-video-player.tsx`).
+- **Migrations** : `supabase/migrations/` de ce dépôt est ARCHIVÉ (voir son
+  README) — propriétaire unique : `rivendy_dashboard/supabase/migrations/`.
+
 ## Prochaines Étapes Envisagées
 1. **Recherche par image** : Actuellement en mode maquette UI sur Flutter, à évaluer pour implémentation via ML ou API externe.
 2. **Page Promo exclusive** : Création d'une page enrichie pour les promotions de la plateforme.
 3. **Paiement Mobile** : Intégration ou renforcement des API de paiement mobile local (Djibouti, Comores) si nécessaire à l'avenir.
+4. **Parité vidéo restante** : badge vidéo sur les cartes produit, stories vidéo dans `story-viewer.tsx`.
 
-*Dernière mise à jour : 26 Juin 2026 (Après Audit Complet & Correction Hooks)*
+*Dernière mise à jour : 22 Août 2026 (stabilisation post-audit : paiements par marché, crédits boost, wallet, plan D)*
