@@ -22,7 +22,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
 import { useCountry } from "@/features/country/country-provider";
 
-import { firstPhoto, formatMoney, normalizePhoneForWhatsApp, orderId } from "@/lib/utils/format";
+import { firstPhoto, formatMoney, orderId } from "@/lib/utils/format";
 import {
   formatKmf,
   fullAddressLabel,
@@ -165,74 +165,6 @@ export function CheckoutForm() {
     isDeliveryReady &&
     selectedMethod !== null;
 
-  // ── Message WhatsApp (format identique à l'app Flutter) ──────────────────
-
-  /** Kind du groupe (parité OrderKind app) : restaurant/pharmacie si TOUS les
-   * articles appartiennent à cette catégorie, sinon commande standard. */
-  function groupKind(items: CartItem[]): "restaurant" | "pharmacie" | "standard" {
-    if (items.length > 0 && items.every((i) => i.product.category === "restaurant")) return "restaurant";
-    if (items.length > 0 && items.every((i) => i.product.category === "pharmacie")) return "pharmacie";
-    return "standard";
-  }
-
-  function buildWhatsAppMessage(
-    groupSellerName: string,
-    groupItems: CartItem[],
-    groupTotal: number,
-    ref: string,
-    paymentName: string,
-  ): string {
-    const lines: string[] = [];
-    const kind = groupKind(groupItems);
-    const header =
-      kind === "restaurant" ? "🍽️ *Commande Restaurant"
-      : kind === "pharmacie" ? "💊 *Demande Pharmacie"
-      : "🛒 *Nouvelle commande";
-    lines.push(`${header} — ${groupSellerName}*`);
-    lines.push(`📋 Réf : ${ref}`);
-    lines.push("─────────────────");
-    for (const item of groupItems) {
-      const subtotal = item.product.price * item.quantity;
-      lines.push(`• ${item.product.title} × ${item.quantity} → ${Math.round(subtotal).toLocaleString("fr-FR")} ${country?.currency_symbol || country?.currency_code || "FDJ"}`);
-      // Variante : choix de l'acheteur si fait, sinon options proposées.
-      const extra = item.product.extra_attributes ?? {};
-      const sizes = (extra.sizes ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-      const colors = (extra.colors ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-      if (item.selectedSize) lines.push(`   ↳ Taille : ${item.selectedSize}`);
-      else if (sizes.length > 0) lines.push(`   ↳ Tailles proposées : ${sizes.join(", ")}`);
-      if (item.selectedColor) lines.push(`   ↳ Couleur : ${item.selectedColor}`);
-      else if (colors.length > 0) lines.push(`   ↳ Couleurs proposées : ${colors.join(", ")}`);
-    }
-    lines.push("─────────────────");
-    lines.push(`💰 Total : ${Math.round(groupTotal).toLocaleString("fr-FR")} ${country?.currency_symbol || country?.currency_code || "FDJ"}`);
-    lines.push(`💳 Paiement : ${paymentName}`);
-    lines.push("─────────────────");
-    if (deliveryMode === "pickup") {
-      lines.push("🏪 Mode : Retrait personnel");
-    } else {
-      lines.push("🛵 Mode : Livraison à domicile");
-      // Adresse complète (quartier, localité, région, repère) sur les marchés
-      // couverts ; ancien champ texte libre ailleurs.
-      lines.push(`📍 Adresse : ${effectiveZoneLabel}`);
-      if (deliveryFee > 0) {
-        lines.push(`🛵 Frais de livraison : ${formatKmf(deliveryFee)}`);
-      }
-      const recipient = deliveryAddress?.recipientPhone?.trim();
-      if (recipient) lines.push(`📞 Destinataire : ${recipient}`);
-    }
-    lines.push("─────────────────");
-    lines.push(`👤 ${buyerName.trim()}`);
-    lines.push(`📞 ${buyerPhone.trim()}`);
-    const closing =
-      kind === "restaurant"
-        ? "Merci de confirmer la disponibilité et le délai de préparation."
-        : kind === "pharmacie"
-          ? "Merci de confirmer la disponibilité des produits et le délai de livraison. Pour les médicaments soumis à ordonnance, une validation peut être nécessaire."
-          : "Merci de confirmer la disponibilité, les frais exacts de livraison et le délai de traitement.";
-    lines.push(closing);
-    return lines.join("\n");
-  }
-
   // ── Soumission ────────────────────────────────────────────────────────────
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -347,50 +279,15 @@ export function CheckoutForm() {
           throw new Error(resultObj?.error || "Une erreur est survenue lors de la création de la commande.");
         }
 
-        const actualTotal = resultObj.total_price;
-
-        // Log WhatsApp
-        const msg = buildWhatsAppMessage(group.sellerName, group.items, actualTotal, id, paymentName);
-        supabase.from("whatsapp_logs").insert({
-          country_id: country?.id ?? "DJ",
-          phone_number: country?.whatsapp_number ?? null,
-          message_type: "order_confirmation",
-          order_id: id,
-          recipient_name: buyerName.trim(),
-          message_content: msg,
-          status: "sent",
-        }).then(() => null, () => null);
-
         orderIds.push(id);
       }
 
       setCreatedIds(orderIds);
       clearCart();
 
-      // Ouvrir WhatsApp avec le message de la 1ère commande (résumé global)
-      const firstGroup = checkoutGroups[0];
-      const allTotal = checkoutGroups.reduce(
-        (sum, g) => sum + g.items.reduce((s, i) => s + i.product.price * i.quantity, 0),
-        0,
-      );
-      const summaryMsg = buildWhatsAppMessage(
-        sellerCount > 1 ? `${sellerCount} boutiques` : (firstGroup?.sellerName ?? "Rivendy"),
-        checkoutGroups.flatMap((g) => g.items),
-        allTotal,
-        orderIds.join(", "),
-        paymentName,
-      );
-      const whatsapp = normalizePhoneForWhatsApp(
-        country?.whatsapp_number || process.env.NEXT_PUBLIC_RIVENDY_WHATSAPP_FALLBACK || "",
-      );
-      if (whatsapp) {
-        window.open(
-          `https://wa.me/${whatsapp}?text=${encodeURIComponent(summaryMsg)}`,
-          "_blank",
-          "noopener,noreferrer",
-        );
-      }
-
+      // Dashboard-first (2026-08-30, parité app) : la commande existe dès que
+      // secure_create_order réussit. Aucun WhatsApp n'est ouvert — elle arrive
+      // au dashboard Rivendy, l'équipe la prend en charge et contacte le client.
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Commande impossible. Réessaie.");
@@ -431,11 +328,15 @@ export function CheckoutForm() {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#E0F2F1]">
-          <CheckCircle2 className="h-8 w-8 text-[#25D366]" />
+          <CheckCircle2 className="h-8 w-8 text-[#009688]" />
         </div>
-        <h1 className="mt-5 text-3xl font-black text-slate-950">Commandes envoyées !</h1>
+        <h1 className="mt-5 text-3xl font-black text-slate-950">
+          Commande{createdIds.length > 1 ? "s reçues" : " reçue"} ✅
+        </h1>
         <p className="mt-3 text-sm text-slate-500">
-          {createdIds.length} commande{createdIds.length > 1 ? "s" : ""} créée{createdIds.length > 1 ? "s" : ""} et transmise{createdIds.length > 1 ? "s" : ""} à Rivendy.
+          {createdIds.length > 1
+            ? `Vos ${createdIds.length} commandes ont bien été transmises à Rivendy. Notre équipe va les prendre en charge.`
+            : "Votre commande a bien été transmise à Rivendy. Notre équipe va la prendre en charge."}
         </p>
         <div className="mt-4 space-y-2">
           {createdIds.map((id) => (
