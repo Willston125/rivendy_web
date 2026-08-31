@@ -60,8 +60,41 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const fullStars = Math.floor(rating);
   const hasHalf   = rating - fullStars >= 0.5;
 
+  // Item K (audit) — JSON-LD Product : prix + devise + dispo pour les
+  // résultats enrichis Google. priceCurrency exige un code ISO 4217 :
+  // « FDJ » (symbole local) → DJF. Pas d'aggregateRating : le nombre
+  // d'avis n'est pas exposé ici et Google l'exige avec la note.
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
+  const isoCurrency =
+    country.currency_code === "FDJ" ? "DJF" : (country.currency_code || "DJF");
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    image: Array.isArray(product.photos) ? product.photos.slice(0, 4) : [],
+    ...(product.description ? { description: product.description.slice(0, 300) } : {}),
+    url: `${siteUrl}/products/${product.id}`,
+    offers: {
+      "@type": "Offer",
+      price: Number(product.price ?? 0),
+      priceCurrency: isoCurrency,
+      availability: "https://schema.org/InStock",
+      url: `${siteUrl}/products/${product.id}`,
+    },
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+
+      {/* Données structurées produit — title/description saisis par le
+          vendeur : échapper « < » pour qu'aucun </script> ne s'y glisse. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
 
       {/* Incrémente views_count — parity Flutter product_detail_screen */}
       <ProductViewTracker productId={product.id} />
