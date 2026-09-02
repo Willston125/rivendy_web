@@ -60,7 +60,7 @@ export function HotelRoomCard({
             sellerId={sellerId}
             hotelName={hotelName}
             room={{ id: room.id, title: room.title }}
-            triggerLabel="Réserver / Demander"
+            triggerLabel="Voir les disponibilités"
             className="shrink-0 rounded-lg bg-[#009688] px-3 py-2 text-[11.5px] font-bold text-white transition hover:bg-[#00897B]"
           />
         </div>

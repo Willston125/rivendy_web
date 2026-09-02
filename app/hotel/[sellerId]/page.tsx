@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BadgeCheck, Star, MapPin, Phone, BedDouble } from "lucide-react";
+import { BadgeCheck, Star, MapPin, BedDouble } from "lucide-react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import {
   getCountry,
@@ -147,25 +147,19 @@ export default async function HotelDetailPage({
           </div>
 
           <p className="mt-4 text-sm font-medium text-slate-500">
-            Réservez votre séjour directement via Rivendy
+            Réservation en ligne dans l&apos;application Rivendy
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <HotelReservationForm
               sellerId={sellerId}
               hotelName={name}
-              triggerLabel={priceText ? `${priceText} — Demander une réservation` : "Demander une réservation"}
+              triggerLabel={priceText ? `${priceText} — Réserver` : "Réserver"}
               className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B35] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#F0602D]"
             />
-            {country.whatsapp_number && (
-              <a
-                href={`tel:${country.whatsapp_number}`}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#009688] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#00897B]"
-              >
-                <Phone className="h-4 w-4" />
-                Appeler Rivendy
-              </a>
-            )}
+            {/* Le CTA « Appeler Rivendy » (tel:) vivait ici — retiré avec le gel
+                du flux WhatsApp le 2026-09-02. §1.11 : le CTA d'un hôtel est
+                « Voir les chambres », jamais « Appeler » ni WhatsApp. */}
           </div>
         </div>
       </section>

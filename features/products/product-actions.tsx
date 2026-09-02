@@ -59,7 +59,7 @@ export function ProductActions({ product }: { product: Product }) {
               sellerId={product.seller_id}
               hotelName={product.seller_name || "Hôtel Rivendy"}
               room={{ id: product.id, title: product.title }}
-              triggerLabel="Réserver / Demander"
+              triggerLabel="Voir les disponibilités"
               className="flex h-12 w-full items-center justify-center rounded-full bg-[#009688] text-sm font-black text-white transition hover:bg-[#00897B]"
             />
           </div>
