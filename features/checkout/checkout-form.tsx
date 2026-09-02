@@ -70,6 +70,11 @@ export function CheckoutForm() {
   // Méthode de paiement sélectionnée
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [transactionRef, setTransactionRef] = useState("");
+  // Note libre transmise à l'équipe Rivendy (`p_order_note`). L'app l'envoie
+  // depuis le 2026-08-30 — c'est par là que passe l'ordonnance d'une commande
+  // pharmacie ou une précision de livraison. Le web ne l'envoyait pas : la
+  // même commande passée sur le site arrivait sans son contexte.
+  const [orderNote, setOrderNote] = useState("");
 
   // État commande
   const [loading, setLoading] = useState(false);
@@ -265,6 +270,7 @@ export function CheckoutForm() {
           p_payment_status: paymentStatus,
           p_country_id: country?.id ?? "DJ",
           p_transaction_ref: transactionRef.trim() || null,
+          p_order_note: orderNote.trim() || null,
           p_items: group.items.map((item) => ({
             product_id: item.product.id,
             quantity: item.quantity,
@@ -500,6 +506,24 @@ export function CheckoutForm() {
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="orderNote" className="text-sm font-bold text-slate-700">
+                Précisions pour Rivendy{" "}
+                <span className="font-medium text-slate-400">(facultatif)</span>
+              </Label>
+              <textarea
+                id="orderNote"
+                value={orderNote}
+                onChange={(e) => setOrderNote(e.target.value.slice(0, 500))}
+                rows={3}
+                maxLength={500}
+                placeholder="Ordonnance, taille souhaitée, point de repère pour la livraison…"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm
+                           text-slate-900 placeholder:text-slate-400 focus:border-[#00C4B4]
+                           focus:outline-none focus:ring-1 focus:ring-[#00C4B4]"
+              />
             </div>
           </div>
         </section>

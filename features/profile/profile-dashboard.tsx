@@ -41,6 +41,9 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
   completed:                     { label: "Terminée ✓",       color: "bg-green-100 text-green-700" },
   cancelled:                     { label: "Annulée",          color: "bg-red-100 text-red-600" },
   pending:                       { label: "En attente",       color: "bg-amber-100 text-amber-700" },
+  confirmed:                     { label: "Confirmée",        color: "bg-blue-100 text-blue-700" },
+  in_delivery:                   { label: "En livraison",     color: "bg-cyan-100 text-cyan-700" },
+  disputed:                      { label: "Litige en cours",  color: "bg-orange-100 text-orange-700" },
   shipped:                       { label: "Expédiée",         color: "bg-sky-100 text-sky-700" },
   delivered:                     { label: "Livrée ✓",         color: "bg-[#E0F2F1] text-[#009688]" },
 };

@@ -21,12 +21,38 @@ export const CATEGORIES = [
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 
-/** Catégories publiables par un vendeur (formulaire web). Pharmacie et Hôtels
- * sont gérées exclusivement par l'agence Rivendy via le dashboard (modèle
- * abonnement, champs métier dédiés) — jamais par un vendeur, ni app ni web. */
+/**
+ * Catégories réservées à Rivendy : publiées depuis le dashboard UNIQUEMENT.
+ *
+ * ⚠️ Miroir de `kRivendyManagedCategories`
+ * (`rivendy_app/lib/core/constants/product_categories.dart`). Les deux listes
+ * doivent rester identiques — c'est la même règle métier, appliquée sur deux
+ * clients.
+ *
+ * `alimentation` (libellée « Supermarché » ici) manquait : le site laissait
+ * donc un vendeur publier en Alimentation, catégorie à **0 % de commission**
+ * réservée aux approvisionnements Rivendy, alors que l'app le lui interdit
+ * depuis le 2026-08-23. C'est exactement la dérive que la source unique côté
+ * app avait été créée pour empêcher — elle s'était rejouée côté web.
+ *
+ * « Réservée » vise la SAISIE, pas l'affichage : ces catégories restent
+ * visibles partout côté acheteur (accueil, recherche, filtres, sitemap).
+ */
+export const RIVENDY_MANAGED_CATEGORY_IDS = [
+  "alimentation",
+  "hotel",
+  "pharmacie",
+] as const;
+
+/** Catégories publiables par un vendeur (formulaires web : article et boutique). */
 export const VENDOR_CATEGORIES = CATEGORIES.filter(
-  (c) => c.id !== "pharmacie" && c.id !== "hotel",
+  (c) => !RIVENDY_MANAGED_CATEGORY_IDS.includes(c.id as (typeof RIVENDY_MANAGED_CATEGORY_IDS)[number]),
 );
+
+/** Une catégorie est-elle réservée à Rivendy ? Garde-fou de soumission. */
+export function isRivendyManagedCategory(id: string): boolean {
+  return (RIVENDY_MANAGED_CATEGORY_IDS as readonly string[]).includes(id);
+}
 
 /** Subcategories per main category — mirrors Flutter _subcategoriesMap */
 export const SUBCATEGORIES: Partial<Record<CategoryId, string[]>> = {
@@ -202,6 +228,14 @@ export type OrderStatus =
   | "completed"
   | "cancelled"
   | "pending"
+  // Valeurs du CHECK `orders_status_check` qui manquaient : l'acheteur voyait
+  // alors le code technique brut, et le suivi n'activait aucune étape — une
+  // commande EN LIVRAISON ou EN LITIGE paraissait non traitée.
+  | "confirmed"
+  | "in_delivery"
+  | "disputed"
+  // Statuts historiques : plus posés depuis le cycle logistique de mai 2026,
+  // mais présents sur d'anciennes commandes.
   | "shipped"
   | "delivered";
 

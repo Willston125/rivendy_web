@@ -38,6 +38,11 @@ const DELIVERY_STATUS: Record<OrderStatus, StatusConfig> = {
   completed:                     { label: "Terminée ✓",      bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
   cancelled:                     { label: "Annulée",          bg: "bg-red-50",      text: "text-red-600",     icon: <XCircle className="h-3 w-3" /> },
   pending:                       { label: "En attente",       bg: "bg-amber-50",    text: "text-amber-700",   icon: <Clock className="h-3 w-3" /> },
+  confirmed:                     { label: "Confirmée",        bg: "bg-blue-50",     text: "text-blue-700",    icon: <CheckCircle2 className="h-3 w-3" /> },
+  in_delivery:                   { label: "En livraison 🛵",  bg: "bg-cyan-50",     text: "text-cyan-700",    icon: <Truck className="h-3 w-3" /> },
+  // Le suivi est suspendu tant que Rivendy n'a pas tranché : l'acheteur doit
+  // voir que son dossier est ouvert, pas « En attente ».
+  disputed:                      { label: "Litige en cours",  bg: "bg-orange-50",   text: "text-orange-700",  icon: <XCircle className="h-3 w-3" /> },
   shipped:                       { label: "Expédiée",         bg: "bg-sky-50",      text: "text-sky-700",     icon: <Truck className="h-3 w-3" /> },
   delivered:                     { label: "Livrée ✓",         bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
 };
@@ -45,12 +50,13 @@ const DELIVERY_STATUS: Record<OrderStatus, StatusConfig> = {
 /* ── Étapes livraison (stepper) ─────────────────────────────────── */
 const STEPS: { statuses: OrderStatus[]; label: string }[] = [
   { statuses: ["pending_whatsapp", "pending"],                   label: "Reçue" },
-  { statuses: ["confirmed_by_customer_service"],                  label: "Confirmée" },
+  { statuses: ["confirmed_by_customer_service", "confirmed"],      label: "Confirmée" },
   { statuses: ["payment_received_cash"],                         label: "Payée" },
   { statuses: ["assigned_to_delivery", "accepted_by_agent"],      label: "Préparation" },
   { statuses: [
       "picked_up",
       "en_route",
+      "in_delivery",
       "arrived",
       "code_generated",
       "awaiting_customer_confirmation",

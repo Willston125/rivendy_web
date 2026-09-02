@@ -11,7 +11,12 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { uploadProductPhotos } from "@/services/image-upload";
-import { VENDOR_CATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
+import {
+  VENDOR_CATEGORIES,
+  isRivendyManagedCategory,
+  type CategoryId,
+  type Product,
+} from "@/types/rivendy";
 import { formatMoney } from "@/lib/utils/format";
 import { breakdown, getCommissionRate, referenceRate } from "@/lib/utils/commission";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -99,9 +104,11 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) return;
-    // Garde-fou (défense en profondeur) : Pharmacie et Hôtels sont réservées à
-    // l'agence Rivendy (dashboard) — jamais publiables par un vendeur.
-    if (category === "pharmacie" || category === "hotel") {
+    // Garde-fou (défense en profondeur) : les catégories Rivendy ne sont
+    // jamais publiables par un vendeur. Le test énumérait les identifiants à
+    // la main et avait oublié `alimentation` — on interroge désormais la
+    // source unique, qui ne peut plus diverger du menu déroulant.
+    if (isRivendyManagedCategory(category)) {
       setError("Cette catégorie est réservée à Rivendy et ne peut pas être publiée depuis ce formulaire.");
       return;
     }

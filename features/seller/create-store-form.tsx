@@ -19,7 +19,11 @@ import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
 import { breakdown, referenceRate } from "@/lib/utils/commission";
 import { uploadProductPhotos } from "@/services/image-upload";
-import { CATEGORIES, type CategoryId } from "@/types/rivendy";
+import {
+  VENDOR_CATEGORIES,
+  isRivendyManagedCategory,
+  type CategoryId,
+} from "@/types/rivendy";
 
 // ── Constantes ─────────────────────────────────────────────
 const MIN_PRODUCTS = 6;
@@ -137,6 +141,20 @@ export function CreateStoreForm() {
   // ── Publication ────────────────────────────────────────────
   async function publish() {
     if (!user) return;
+
+    // Garde-fou de soumission (défense en profondeur) : même si un menu
+    // déroulant était un jour repeuplé avec la liste complète, aucune
+    // catégorie réservée à Rivendy ne part en base depuis ce formulaire.
+    const reserved = productsWithPhoto.find((p) => isRivendyManagedCategory(p.category));
+    if (reserved) {
+      setPublishError(
+        `« ${reserved.title || "Un article"} » utilise une catégorie réservée à `
+        + `Rivendy. Choisissez une autre catégorie pour cet article.`,
+      );
+      setStep(2);
+      return;
+    }
+
     setPublishing(true);
     setPublishError(null);
     setPublishedCount(0);
@@ -384,7 +402,11 @@ export function CreateStoreForm() {
             onChange={(e) => updateProduct(globalIdx, { category: e.target.value as CategoryId })}
             className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#007168] focus:ring-2 focus:ring-[#009688]/20"
           >
-            {CATEGORIES.map((c) => (
+            {/* VENDOR_CATEGORIES, jamais CATEGORIES : la création de boutique
+                en lot proposait la liste COMPLÈTE, donc Alimentation,
+                Pharmacie et Hôtels — les trois catégories réservées à
+                Rivendy. */}
+            {VENDOR_CATEGORIES.map((c) => (
               <option key={c.id} value={c.id}>{c.label}</option>
             ))}
           </select>
