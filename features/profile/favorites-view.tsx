@@ -61,7 +61,7 @@ function FavoritesEmpty() {
 export function FavoritesView() {
   const { user } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 

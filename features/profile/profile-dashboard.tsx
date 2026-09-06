@@ -80,7 +80,7 @@ interface FollowedStore {
 export function ProfileDashboard() {
   const { user, profile, signOut } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
 
   const [orders,    setOrders]    = useState<AppOrder[]>([]);
   const [favorites, setFavorites] = useState<Product[]>([]);

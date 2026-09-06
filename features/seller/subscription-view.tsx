@@ -132,7 +132,7 @@ const PLANS: Plan[] = [
 export function SubscriptionView() {
   const { user, profile } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("certified");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
@@ -154,8 +154,6 @@ export function SubscriptionView() {
 
   const visiblePlans = PLANS.filter((plan) => plan.tier === selectedTier);
 
-  const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
-
   function copyReference() {
     navigator.clipboard.writeText(reference);
     setCopied(true);
@@ -163,7 +161,9 @@ export function SubscriptionView() {
   }
 
   async function handlePaid(plan: Plan) {
-    if (!user) return;
+    if (!user || !country) return;
+    // Jamais de numéro en dur — source unique : le pays actif.
+    const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
     setSubmitting(true);
 
     try {
@@ -171,12 +171,12 @@ export function SubscriptionView() {
         seller_id: user.id,
         plan: plan.dbPlan,
         tier: plan.tier,
-        price_paid: priceForMarket(plan, country?.id),
+        price_paid: priceForMarket(plan, country.id),
         duration_days: plan.durationDays,
         status: "pending",
         // Parité subscription_screen.dart — l'id de la méthode choisie.
         payment_method: selectedMethod.id,
-        country_id: country?.id,
+        country_id: country.id,
         payment_reference: reference,
       };
       await supabase.from("seller_subscriptions").insert(payload);
@@ -184,7 +184,7 @@ export function SubscriptionView() {
       // non-blocking
     }
 
-    const formattedPrice = formatMoney(priceForMarket(plan, country?.id), country);
+    const formattedPrice = formatMoney(priceForMarket(plan, country.id), country);
     const msg = encodeURIComponent(
       `Bonjour Rivendy, j'ai effectué le paiement pour mon abonnement Vendeur ${tierLabel(plan.tier)}.\n\n` +
         `• Formule : ${tierLabel(plan.tier)}\n` +
