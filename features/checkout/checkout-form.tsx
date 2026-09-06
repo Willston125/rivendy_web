@@ -460,7 +460,7 @@ export function CheckoutForm() {
               deliveryMode === "pickup" ? "mt-4 max-h-16 opacity-100" : "max-h-0 opacity-0"
             }`}
           >
-            <div className="flex items-center gap-2 rounded-xl border border-[#6A5ACD]/25 bg-[#6A5ACD]/07 p-3">
+            <div className="flex items-center gap-2 rounded-xl border border-[#6A5ACD]/25 bg-[#6A5ACD]/[0.07] p-3">
               <Store className="h-4 w-4 shrink-0 text-[#6A5ACD]" />
               <p className="text-sm font-bold text-[#6A5ACD]">
                 Retrait personnel chez le vendeur — coordonnées envoyées par Rivendy

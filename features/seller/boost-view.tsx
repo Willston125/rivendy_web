@@ -115,7 +115,7 @@ const CREDIT_ERRORS: Record<string, string> = {
 export function BoostView({ product }: { product: Product }) {
   const { user } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
   const [selectedTier, setSelectedTier] = useState<BoostTier | null>(null);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -192,9 +192,6 @@ export function BoostView({ product }: { product: Product }) {
   const isCash = selectedMethod.id === "cash";
 
   const reference = `BOOST-${product.id.slice(0, 8).toUpperCase()}-${selectedTier?.id.toUpperCase() ?? ""}`;
-  // Jamais de numéro en dur — source unique : le pays actif.
-  const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
-
   function copyReference() {
     navigator.clipboard.writeText(reference);
     setCopied(true);
@@ -202,7 +199,9 @@ export function BoostView({ product }: { product: Product }) {
   }
 
   async function handlePaid(tier: BoostTier) {
-    if (!user) return;
+    if (!user || !country) return;
+    // Jamais de numéro en dur — source unique : le pays actif.
+    const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
     setSubmitting(true);
 
     try {
@@ -210,12 +209,12 @@ export function BoostView({ product }: { product: Product }) {
         product_id: product.id,
         seller_id: user.id,
         plan: tier.id,
-        price_paid: priceForMarket(tier, country?.id),
+        price_paid: priceForMarket(tier, country.id),
         duration_days: tier.durationDays,
         status: "pending",
         // Parité subscription : l'id de la méthode choisie (waafi_dj, cash…).
         payment_method: selectedMethod.id,
-        country_id: country?.id,
+        country_id: country.id,
         payment_reference: reference,
       };
       await supabase.from("boost_purchases").insert(payload);

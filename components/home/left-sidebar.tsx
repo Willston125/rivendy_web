@@ -55,7 +55,7 @@ export function LeftSidebar({
 }) {
   const { profile, user } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
   const [balanceVisible, setBalanceVisible] = useState(true);
 
   const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Invité";

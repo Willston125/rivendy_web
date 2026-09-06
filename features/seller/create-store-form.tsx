@@ -78,7 +78,7 @@ type Step = 0 | 1 | 2 | 3;
 export function CreateStoreForm() {
   const { user } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(0);

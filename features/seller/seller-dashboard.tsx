@@ -87,7 +87,7 @@ function Metric({ icon: Icon, label, value, accent = false }: {
 export function SellerDashboard() {
   const { user, profile, refreshProfile } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);
@@ -199,13 +199,13 @@ export function SellerDashboard() {
   }
 
   async function requestPayout() {
-    if (!user) return;
+    if (!user || !country) return;
     const amount = Number(withdrawAmount || earnings);
     if (!amount) return notify("Indique un montant de retrait.", "err");
 
     const { error } = await supabase.from("payout_requests").insert({
-      seller_id: user.id, country_id: country?.id, amount,
-      currency_code: country?.currency_code, method: "whatsapp",
+      seller_id: user.id, country_id: country.id, amount,
+      currency_code: country.currency_code, method: "whatsapp",
       phone_number: profile?.whatsapp_number || country.whatsapp_number,
       status: "pending_director",
       notes: `Demande web - ${delivered.length} commande(s) livrée(s)`,

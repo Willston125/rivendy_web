@@ -210,7 +210,7 @@ function OrderCard({
   onCancelled,
 }: {
   order: AppOrder;
-  country: Country;
+  country: Country | null;
   userId: string;
   onCancelled: (orderId: string) => void;
 }) {
@@ -348,7 +348,7 @@ function OrderCard({
 export function OrdersView() {
   const { user } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
   const [orders, setOrders]   = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");

@@ -42,7 +42,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
   const countryNullable = useCountryOrDefault();
-  const country = countryNullable as any;
+  const country = countryNullable;
 
   const [title, setTitle]               = useState(product?.title ?? "");
   const [description, setDescription]   = useState(product?.description ?? "");
