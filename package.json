@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:categories": "node scripts/check-category-governance.mjs",
-    "check": "npm run typecheck && npm run check:categories"
+    "check": "npm run typecheck && npm run check:categories && npm run check:classes",
+    "check:classes": "node scripts/check-dead-classes.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
