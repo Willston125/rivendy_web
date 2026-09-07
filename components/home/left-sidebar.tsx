@@ -22,8 +22,9 @@ import {
   BedDouble,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
@@ -57,6 +58,39 @@ export function LeftSidebar({
   const countryNullable = useCountryOrDefault();
   const country = countryNullable;
   const [balanceVisible, setBalanceVisible] = useState(true);
+
+  /* ── Solde portefeuille ───────────────────────────────────────────
+     Lu dans `wallets`, jamais inventé. `null` = solde encore inconnu
+     (chargement ou échec réseau) : on affiche « — » plutôt qu'un 0 qui
+     ferait croire à un vendeur qu'il n'a rien gagné. Aucune ligne
+     `wallets` = 0 réel, même sémantique que l'espace vendeur
+     (features/seller/seller-dashboard.tsx). */
+  const userId = user?.id;
+  const [balance, setBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setBalance(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("wallets")
+          .select("balance")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (cancelled) return;
+        setBalance(data && data.balance != null ? Number(data.balance) : 0);
+      } catch {
+        if (!cancelled) setBalance(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Invité";
   const isCertified = profile?.is_certified ?? false;
@@ -113,7 +147,11 @@ export function LeftSidebar({
                   </button>
                 </div>
                 <p className="mt-0.5 text-lg font-extrabold text-slate-900">
-                  {balanceVisible ? formatMoney(12450, country) : "••••••"}
+                  {!balanceVisible
+                    ? "••••••"
+                    : balance === null
+                      ? "—"
+                      : formatMoney(balance, country)}
                 </p>
               </div>
 
