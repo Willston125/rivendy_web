@@ -23,7 +23,12 @@ import { firstPhoto, formatMoney } from "@/lib/utils/format";
 export function RightSidebar() {
   const { items, totalAmount, removeItem } = useCart();
   const countryNullable = useCountryOrDefault();
-  if (!countryNullable) return null;
+  // Colonne vide plutôt que `null` pendant la résolution du marché — même
+  // raison que dans left-sidebar.tsx : la grille de l'accueil a des pistes
+  // fixes, une colonne absente décale toutes les autres.
+  if (!countryNullable) {
+    return <aside className="hidden w-[300px] lg:flex" aria-hidden="true" />;
+  }
   const country = countryNullable;
 
   const previewItems = items.slice(0, 3);
