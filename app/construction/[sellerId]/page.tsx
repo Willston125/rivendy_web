@@ -14,6 +14,7 @@ import {
 } from "@/services/public-data";
 import { CONSTRUCTION_MATERIALS, constructionMaterialLabel } from "@/features/products/construction-listings";
 import type { Product } from "@/types/rivendy";
+import { storeBannerOf } from "@/lib/utils/store-banner";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -86,7 +87,7 @@ export default async function ConstructionCatalogPage({
     if (specialties.length >= 3) break;
   }
 
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = storeBannerOf(seller);
   const sections = buildSections(active);
 
   return (

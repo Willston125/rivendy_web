@@ -17,6 +17,7 @@ import {
   isRestaurantOpen,
 } from "@/features/products/restaurant-grouping";
 import type { Product } from "@/types/rivendy";
+import { storeBannerOf } from "@/lib/utils/store-banner";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -95,7 +96,7 @@ export default async function RestaurantMenuPage({
   const isOpen = hours.length > 0 && isRestaurantOpen(hours);
   const rating = Number(trust.score ?? 0);
 
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = storeBannerOf(seller);
   const subtitle = [type, cuisine].filter(Boolean).join(" · ");
   const sections = buildSections(active);
 

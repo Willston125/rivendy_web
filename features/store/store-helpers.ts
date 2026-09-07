@@ -1,4 +1,5 @@
 import type { Product, Profile } from "@/types/rivendy";
+import { storeBannerOf } from "@/lib/utils/store-banner";
 
 /** Sélection vedette sans nouvelle donnée : boostés → nouveautés (<14j) → premiers actifs. */
 export function pickFeatured(active: Product[], max = 8): Product[] {
@@ -28,7 +29,7 @@ export function storeCompleteness(
   missing: { label: string; href: string }[];
 } {
   const checks: { ok: boolean; label: string; href: string }[] = [
-    { ok: !!(seller.store_banner_url_web || seller.store_banner_url), label: "Ajouter une couverture", href: "" },
+    { ok: !!storeBannerOf(seller), label: "Ajouter une couverture", href: "" },
     { ok: !!seller.avatar_url, label: "Ajouter une photo de profil", href: "" },
     { ok: !!seller.store_description, label: "Ajouter une description", href: "/seller" },
     { ok: !!seller.country_id, label: "Renseigner votre pays", href: "/seller" },

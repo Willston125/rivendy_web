@@ -7,6 +7,7 @@ import { ShareButton } from "@/components/ui/share-button";
 import { StoreCoverEditButton, StoreAvatarEditButton } from "@/features/store/store-image-editor";
 import { StoreHeroCta } from "@/features/store/store-hero-cta";
 import { distinctCategories } from "@/features/store/store-helpers";
+import { storeBannerOf } from "@/lib/utils/store-banner";
 
 interface TrustSummary {
   score: number;
@@ -62,7 +63,7 @@ export function StoreHero({
   shareUrl: string;
 }) {
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = storeBannerOf(seller);
   const cats = distinctCategories(products).slice(0, 4);
   const sales = seller.total_sales ?? 0;
 

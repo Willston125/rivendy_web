@@ -17,9 +17,18 @@ import { ImageCropperModal } from "@/features/store/image-cropper-modal";
 
 // Upload direct du blob recadré. Buckets/chemins identiques à l'app
 // (image_upload_service.dart) pour que les policies RLS Storage s'appliquent.
-//   avatar     → bucket "avatars",  colonne avatar_url (partagé app+web)
-//   couverture → bucket "banners",  colonne store_banner_url_WEB (web-only :
-//                la couverture de l'app store_banner_url n'est jamais modifiée)
+//   avatar     → bucket "avatars",  colonne avatar_url (partagée app + web)
+//   couverture → bucket "banners",  colonnes store_banner_url ET
+//                store_banner_url_web, écrites ENSEMBLE.
+//
+// ⚠️ Corrigé le 2026-09-07. Avant, cet éditeur n'écrivait que
+// `store_banner_url_web` et laissait `store_banner_url` (celle de l'app)
+// intacte, pendant que le site lisait `_web` en premier : une couverture
+// choisie une seule fois ici gelait pour toujours l'affichage du site, et
+// toutes les couvertures posées ensuite depuis l'application restaient
+// invisibles. Symétriquement, celle posée ici n'atteignait jamais l'app.
+// Une boutique = une couverture : on écrit les deux colonnes, et la
+// précédence de lecture vit dans lib/utils/store-banner.ts.
 async function uploadCropped(
   userId: string,
   blob: Blob,
@@ -27,7 +36,6 @@ async function uploadCropped(
 ): Promise<boolean> {
   try {
     const bucket = kind === "avatar" ? "avatars" : "banners";
-    const column = kind === "avatar" ? "avatar_url" : "store_banner_url_web";
     const path = `${userId}/${userId}_${Date.now()}.jpg`;
     const { error: upErr } = await supabase.storage
       .from(bucket)
@@ -37,10 +45,29 @@ async function uploadCropped(
       return false;
     }
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    const { error: dbErr } = await supabase
+
+    const patch: Record<string, string> =
+      kind === "avatar"
+        ? { avatar_url: data.publicUrl }
+        : {
+            store_banner_url: data.publicUrl,      // colonne de l'app
+            store_banner_url_web: data.publicUrl,  // colonne historique du site
+          };
+
+    let { error: dbErr } = await supabase
       .from("profiles")
-      .update({ [column]: data.publicUrl, updated_at: new Date().toISOString() })
+      .update({ ...patch, updated_at: new Date().toISOString() })
       .eq("id", userId);
+
+    // Repli si `store_banner_url_web` n'existe pas dans cet environnement
+    // (même précaution que getSellerProfile dans services/public-data.ts).
+    if (dbErr && kind === "banner" && /store_banner_url_web/.test(dbErr.message)) {
+      ({ error: dbErr } = await supabase
+        .from("profiles")
+        .update({ store_banner_url: data.publicUrl, updated_at: new Date().toISOString() })
+        .eq("id", userId));
+    }
+
     if (dbErr) console.error("[store-image] update profil échoué:", dbErr.message);
     return !dbErr;
   } catch (e) {

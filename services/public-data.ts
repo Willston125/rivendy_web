@@ -1,4 +1,5 @@
 import { createAnonServerClient } from "@/lib/supabase/server";
+import { storeBannerOf } from "@/lib/utils/store-banner";
 import {
   DEFAULT_COUNTRY_ID,
   type Advertisement,
@@ -436,7 +437,7 @@ export async function getStoreRatingsFor(
 }
 
 /** Bannières de boutique d'un lot de vendeurs (seller_id → URL non vide).
- *  Préfère la bannière web dédiée (store_banner_url_web) si présente. */
+ *  Précédence dans lib/utils/store-banner.ts — l'application fait foi. */
 export async function getStoreBannersFor(
   sellerIds: string[],
 ): Promise<Record<string, string>> {
@@ -450,8 +451,7 @@ export async function getStoreBannersFor(
   if (error || !data) return {};
   const out: Record<string, string> = {};
   for (const row of data) {
-    const url = String(row.store_banner_url_web ?? "").trim() ||
-      String(row.store_banner_url ?? "").trim();
+    const url = storeBannerOf(row);
     if (url) out[String(row.id)] = url;
   }
   return out;
