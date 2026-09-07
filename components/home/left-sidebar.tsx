@@ -95,7 +95,14 @@ export function LeftSidebar({
   const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Invité";
   const isCertified = profile?.is_certified ?? false;
 
-  if (!country) return null;
+  // Marché encore en cours de résolution : on rend une colonne VIDE plutôt que
+  // `null`. La grille de l'accueil déclare des pistes de largeur fixe
+  // (`xl:grid-cols-[260px_minmax(0,1fr)_300px]`, app/page.tsx) — si cette barre
+  // disparaît du DOM, la colonne principale glisse dans la piste de 260 px et
+  // toute la page s'affiche comprimée jusqu'à l'arrivée du marché.
+  // Les classes de visibilité sont reprises à l'identique : sous `xl`, `hidden`
+  // retire l'élément de la grille, ce qui est bien le comportement voulu.
+  if (!country) return <aside className="hidden xl:block" aria-hidden="true" />;
 
   return (
     <aside className="hidden space-y-4 xl:block">
