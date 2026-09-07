@@ -32,11 +32,21 @@ export type BannerSource = {
   store_banner_url_web?: string | null;
 };
 
-/** Couverture à afficher, ou `""` si la boutique n'en a aucune. */
+/**
+ * Couverture à afficher, ou `""` si la boutique n'en a aucune.
+ *
+ * Écarte la chaîne littérale « null » et tout ce qui ne commence pas par
+ * `http` : c'est le piège consigné dans PROTECTED_ZONES pour les URL audio,
+ * et il vaut ici aussi. `next/image` n'accepte que l'hôte Storage déclaré
+ * dans next.config.ts ; une valeur hors format ferait planter le rendu au
+ * lieu d'afficher le dégradé de repli.
+ */
 export function storeBannerOf(row: BannerSource | null | undefined): string {
   if (!row) return "";
-  return (
-    String(row.store_banner_url ?? "").trim() ||
-    String(row.store_banner_url_web ?? "").trim()
-  );
+  const usable = (v: string | null | undefined): string => {
+    const s = String(v ?? "").trim();
+    if (!s || s === "null" || s === "undefined") return "";
+    return s.startsWith("http") ? s : "";
+  };
+  return usable(row.store_banner_url) || usable(row.store_banner_url_web);
 }
