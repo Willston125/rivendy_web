@@ -15,12 +15,10 @@ import { useCart } from "@/features/cart/cart-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 
-/* ── Statistiques Rivendy (statiques pour l'instant) ─────────── */
-const STATS = [
-  { value: "5 842",   label: "Produits en ligne" },
-  { value: "1 296",   label: "Boutiques actives" },
-  { value: "24 350+", label: "Clients satisfaits" },
-];
+/* Les compteurs vitrine (« 5 842 produits en ligne », « 24 350+ clients
+   satisfaits ») ont été retirés le 2026-09-07 : ils étaient codés en dur et
+   démentis par la page elle-même. Ne pas les réintroduire sans les brancher
+   sur de vrais comptages. */
 
 export function RightSidebar() {
   const { items, totalAmount, removeItem } = useCart();
@@ -188,20 +186,6 @@ export function RightSidebar() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════
-          STATISTIQUES RIVENDY
-      ══════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-3 gap-2">
-        {STATS.map(({ value, label }) => (
-          <div key={label} className="flex flex-col items-center rounded-2xl bg-white py-3 shadow-sm border border-slate-100">
-            <p className="text-base font-black text-[#009688]">{value}</p>
-            <p className="mt-0.5 text-center text-[9px] font-semibold leading-tight text-slate-400">
-              {label}
-            </p>
-          </div>
-        ))}
       </div>
 
     </aside>
