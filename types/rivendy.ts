@@ -42,17 +42,18 @@ export const RIVENDY_MANAGED_CATEGORY_IDS = [
   "alimentation",
   "hotel",
   "pharmacie",
-] as const;
+] as const satisfies readonly CategoryId[];
 
-/** Catégories publiables par un vendeur (formulaires web : article et boutique). */
-export const VENDOR_CATEGORIES = CATEGORIES.filter(
-  (c) => !RIVENDY_MANAGED_CATEGORY_IDS.includes(c.id as (typeof RIVENDY_MANAGED_CATEGORY_IDS)[number]),
-);
+const RIVENDY_MANAGED_CATEGORY_SET = new Set<string>(RIVENDY_MANAGED_CATEGORY_IDS);
 
-/** Une catégorie est-elle réservée à Rivendy ? Garde-fou de soumission. */
-export function isRivendyManagedCategory(id: string): boolean {
-  return (RIVENDY_MANAGED_CATEGORY_IDS as readonly string[]).includes(id);
+export function isRivendyManagedCategory(category: string): boolean {
+  return RIVENDY_MANAGED_CATEGORY_SET.has(category);
 }
+
+/** Catégories publiables par un vendeur (formulaires web). */
+export const VENDOR_CATEGORIES = CATEGORIES.filter(
+  (category) => !isRivendyManagedCategory(category.id),
+);
 
 /** Subcategories per main category — mirrors Flutter _subcategoriesMap */
 export const SUBCATEGORIES: Partial<Record<CategoryId, string[]>> = {

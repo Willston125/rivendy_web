@@ -9,7 +9,7 @@ import { ProductGrid } from "@/features/products/product-grid";
 import { ProductComments } from "@/features/products/product-comments";
 import { ProductRatingInput } from "@/features/products/product-rating-input";
 import { ProductViewTracker } from "@/features/products/product-view-tracker";
-import { categoryLabel, formatMoney, isBoosted, isProductVisible } from "@/lib/utils/format";
+import { categoryLabel, formatMoney, isBoosted, isProductPublished } from "@/lib/utils/format";
 import { getCountry, getProductById, getSimilarProducts } from "@/services/public-data";
 
 export async function generateMetadata(
@@ -47,7 +47,9 @@ export async function generateMetadata(
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProductById(id);
-  if (!product || !isProductVisible(product)) notFound();
+  // Un produit publié mais épuisé conserve sa fiche et ses liens partagés.
+  // Les actions d'achat sont neutralisées dans ProductActions.
+  if (!product || !isProductPublished(product)) notFound();
 
   const [country, similar] = await Promise.all([
     getCountry(product.seller_country_id || "DJ"),

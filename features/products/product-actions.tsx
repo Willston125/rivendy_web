@@ -45,6 +45,28 @@ export function ProductActions({ product }: { product: Product }) {
     );
   }
 
+  if (Number(product.stock_quantity ?? 0) <= 0) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          Ce produit est actuellement épuisé. Il ne peut plus être ajouté au panier.
+        </div>
+        <div className="flex gap-2">
+          <FavoriteButton
+            productId={product.id}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
+          />
+          <ShareButton
+            title={product.title}
+            text={`Regarde ${product.title} sur Rivendy !`}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+          />
+        </div>
+        <ReportButton targetId={product.id} />
+      </div>
+    );
+  }
+
   // Location / Hôtel : pas de panier — demande traitée par l'agence Rivendy
   // (parité app). Une chambre d'hôtel n'est jamais "achetée" directement.
   const isRental = product.category === "location";

@@ -55,8 +55,7 @@ export function LeftSidebar({
   countryId: string;
 }) {
   const { profile, user } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [balanceVisible, setBalanceVisible] = useState(true);
 
   /* ── Solde portefeuille ───────────────────────────────────────────

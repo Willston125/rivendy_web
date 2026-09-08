@@ -41,8 +41,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export function ProductForm({ product }: { product?: EditableProduct }) {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
 
   const [title, setTitle]               = useState(product?.title ?? "");
   const [description, setDescription]   = useState(product?.description ?? "");
@@ -112,6 +111,14 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       setError("Cette catégorie est réservée à Rivendy et ne peut pas être publiée depuis ce formulaire.");
       return;
     }
+    if (!country?.id) {
+      setError("Sélectionne ton marché avant de publier.");
+      return;
+    }
+    if (!Number.isFinite(numericSellerPrice) || numericSellerPrice <= 0) {
+      setError("Saisis un prix vendeur strictement positif.");
+      return;
+    }
     setLoading(true);
     setError("");
     setSuccess("");
@@ -127,13 +134,15 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       const rate = isFood ? 0 : await getCommissionRate(category, country?.id);
       const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate);
 
-      await supabase.from("profiles").upsert({
+      const { error: profileError } = await supabase.from("profiles").upsert({
         id: user.id,
         full_name: profile?.full_name || user.user_metadata?.full_name || "Utilisateur Rivendy",
         whatsapp_number: profile?.whatsapp_number || user.user_metadata?.whatsapp_number || "",
-        country_id: country?.id,
+        country_id: country.id,
+        active_market_country_id: country.id,
         updated_at: new Date().toISOString(),
       });
+      if (profileError) throw profileError;
 
       // Variantes (vêtements) : tailles + couleurs en CSV, format lu par
       // Product.availableSizes / availableColors côté app.
@@ -146,18 +155,15 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           }
         : {};
 
-      const payload = {
+      const productDetails = {
         seller_id:        user.id,
         // country_id EXIGÉ par la policy RLS d'insertion (products_insert_own_market :
         // le produit doit porter le marché du vendeur). Sans lui, l'INSERT est
         // rejeté par la RLS — c'était la cause du « Publication impossible » (2026-07-17).
         // En édition, on ne déplace pas le produit de marché : on garde sa valeur.
-        country_id:       product?.id ? (product.country_id ?? country?.id) : country?.id,
+        country_id:       product?.id ? (product.country_id ?? country.id) : country.id,
         title:            title.trim(),
         description:      description.trim(),
-        seller_price:     numericSellerPrice,
-        commission_amount: commissionAmount,
-        price:            displayPrice,
         category,
         size:             isFood ? "" : (showVariants ? csv(variantSizes).split(",")[0] ?? "" : size.trim()),
         condition:        isFood ? "Neuf" : condition,
@@ -171,11 +177,33 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       };
 
       if (product?.id) {
-        const { error: updateError } = await supabase.from("products").update(payload).eq("id", product.id);
+        // Le prix ne passe jamais par un UPDATE direct : la RPC recalcule les
+        // trois montants ensemble après l'enregistrement de la catégorie.
+        const { error: updateError } = await supabase
+          .from("products")
+          .update(productDetails)
+          .eq("id", product.id);
         if (updateError) throw updateError;
+
+        const { data: priceResult, error: priceError } = await supabase.rpc(
+          "seller_update_product_price",
+          { p_product_id: product.id, p_seller_price: numericSellerPrice },
+        );
+        if (priceError) throw priceError;
+        const result = priceResult as { success?: boolean; error?: string } | null;
+        if (!result?.success) {
+          throw new Error(result?.error || "Le prix n'a pas pu être mis à jour.");
+        }
         setSuccess("Produit mis à jour avec succès ✓");
       } else {
-        const { error: insertError } = await supabase.from("products").insert(payload);
+        // Le trigger Supabase recalcule ces montants. Les valeurs client ne
+        // servent qu'à conserver la compatibilité pendant le déploiement.
+        const { error: insertError } = await supabase.from("products").insert({
+          ...productDetails,
+          seller_price: numericSellerPrice,
+          commission_amount: commissionAmount,
+          price: displayPrice,
+        });
         if (insertError) throw insertError;
         setSuccess("Produit envoyé en modération. Il sera visible après validation par notre équipe.");
       }

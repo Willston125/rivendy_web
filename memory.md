@@ -4,7 +4,7 @@
 Rivendy est une plateforme de marketplace (Mise en relation Acheteurs/Vendeurs) opérant de façon multi-marchés (Comores, Djibouti, etc.), disposant d'une application mobile (Flutter) et d'une version web (Next.js). L'objectif est d'avoir une **parité parfaite** entre les fonctionnalités de l'App mobile et du Site Web.
 
 ## Technologies
-- **Frontend** : Next.js 15 (App Router), React, Tailwind CSS, Lucide React
+- **Frontend** : Next.js 16.2.10 (App Router), React 19, Tailwind CSS, Lucide React
 - **Backend / BDD** : Supabase (PostgreSQL, Authentification, Storage)
 - **Déploiement** : Vercel (Front) & GitHub (Code source)
 
@@ -89,4 +89,31 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 3. **Paiement Mobile** : Intégration ou renforcement des API de paiement mobile local (Djibouti, Comores) si nécessaire à l'avenir.
 4. **Parité vidéo restante** : badge vidéo sur les cartes produit, stories vidéo dans `story-viewer.tsx`.
 
-*Dernière mise à jour : 22 Août 2026 (stabilisation post-audit : paiements par marché, crédits boost, wallet, plan D)*
+## Sécurisation post-audit du 2026-09-08
+
+- **Produits vendeurs** : création normale et création en lot envoyées en
+  `pending`. Le marché actif est persisté avant l'insertion ; le prix vendeur
+  est positif et Supabase recalcule la commission et le prix affiché.
+- **Édition du prix** : passage obligatoire par
+  `seller_update_product_price()` ; un échec RPC ne peut plus produire de faux
+  message de réussite.
+- **Catégories Rivendy** : `alimentation`, `hotel` et `pharmacie` sont retirées
+  des formulaires vendeurs via `RIVENDY_MANAGED_CATEGORY_IDS`, avec contrôle de
+  non-régression dans `npm run check`.
+- **Commentaires** : likes et signalements passent par les RPC dédiées ; l'état
+  des likes est relu depuis Supabase, et le client ne modifie plus directement
+  les compteurs.
+- **Stock nul** : la fiche produit reste accessible en état « Épuisé », sans
+  possibilité d'achat, au lieu de renvoyer une 404.
+- **Accessibilité/sécurité HTTP** : modal marché avec sémantique dialog et focus
+  confiné, formulaires d'authentification nommés, cibles mobiles de 44 px,
+  `unsafe-eval` limité au développement.
+- **Validation** : `npm run check` réussi le 2026-09-08 — TypeScript et ESLint
+  sans erreur, contrôles catégories/sécurité verts ; 33 avertissements non
+  bloquants restent à traiter séparément.
+- **Backend partagé** : les migrations propriétaires sont dans
+  `rivendy_dashboard/supabase/migrations/20260908_product_insert_hardening.sql`
+  et `20260908_product_comments_hardening.sql`. Leur exécution en production a
+  été confirmée par le propriétaire le 2026-09-08.
+
+*Dernière mise à jour : 8 septembre 2026 (durcissement produits, commissions, catégories, commentaires et accessibilité)*

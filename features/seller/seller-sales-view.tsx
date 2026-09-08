@@ -85,8 +85,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 
 export function SellerSalesView() {
   const { user, profile } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);

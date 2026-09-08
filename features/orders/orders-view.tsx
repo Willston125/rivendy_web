@@ -347,8 +347,7 @@ function OrderCard({
 /* ── Vue principale ─────────────────────────────────────────────── */
 export function OrdersView() {
   const { user } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [orders, setOrders]   = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");
@@ -478,7 +477,7 @@ export function OrdersView() {
       </div>
 
       {/* Contenu */}
-      {loading ? (
+      {loading || !country ? (
         <OrdersSkeleton />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center">

@@ -86,8 +86,7 @@ function Metric({ icon: Icon, label, value, accent = false }: {
 /* ── Vue principale ─────────────────────────────────────────────── */
 export function SellerDashboard() {
   const { user, profile, refreshProfile } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);

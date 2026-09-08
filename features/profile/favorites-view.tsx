@@ -60,8 +60,7 @@ function FavoritesEmpty() {
 /* ── Composant principal ─────────────────────────────────────────── */
 export function FavoritesView() {
   const { user } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -37,7 +37,7 @@ export function LoginForm() {
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="phone">Numero WhatsApp</Label>
-        <Input id="phone" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+253 77 14 53 06" required />
+        <Input id="phone" name="tel" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+253 77 14 53 06" required />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -46,7 +46,7 @@ export function LoginForm() {
             Mot de passe oublié ?
           </Link>
         </div>
-        <Input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        <Input id="password" name="current-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
       </div>
       {error && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
       <Button type="submit" className="w-full" disabled={loading}>

@@ -16,8 +16,12 @@ export function firstPhoto(product?: Pick<Product, "photos"> | null) {
   return product?.photos?.find(Boolean) || "/brand/rivendy-logo-square.png";
 }
 
+export function isProductPublished(product: Pick<Product, "status">) {
+  return ["active", "boosted"].includes(product.status);
+}
+
 export function isProductVisible(product: Pick<Product, "status" | "stock_quantity">) {
-  return ["active", "boosted"].includes(product.status) && Number(product.stock_quantity ?? 0) > 0;
+  return isProductPublished(product) && Number(product.stock_quantity ?? 0) > 0;
 }
 
 export function isBoosted(product: Pick<Product, "status" | "boost_expires_at">) {
