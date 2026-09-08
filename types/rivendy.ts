@@ -127,8 +127,9 @@ export interface Profile {
   store_description: string;
   avatar_url: string;
   store_banner_url: string;
-  /** Couverture spécifique au site web (cadrage large). Ignorée par l'app. */
-  store_banner_url_web?: string | null;
+  cover_video_uid?: string | null;
+  cover_video_status?: string | null;
+  cover_video_thumbnail_url?: string | null;
   voice_note_url: string | null;
   is_certified: boolean;
   total_sales: number;

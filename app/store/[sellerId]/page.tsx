@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 import { StoreRatings } from "@/features/store/store-ratings";
 import { PrintCatalog } from "@/features/store/print-catalog";
-import { UnavailableProducts } from "@/features/store/unavailable-products";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import {
   getCountry,
@@ -44,7 +43,7 @@ export async function generateMetadata({
 
   const name = seller.store_name || seller.full_name || "Boutique Rivendy";
   const country = await getCountry(seller.country_id || "DJ");
-  const bannerUrl = seller.store_banner_url_web || seller.store_banner_url || seller.avatar_url;
+  const bannerUrl = seller.cover_video_thumbnail_url || seller.store_banner_url || seller.avatar_url;
 
   return {
     title: `${name} — Rivendy`,
@@ -74,7 +73,7 @@ export default async function StorePage({
 
   // Étape 2 : tout le reste en parallèle, y compris getCountry
   const [products, trust, followCountRes, country] = await Promise.all([
-    getSellerPublicProducts(sellerId, true),
+    getSellerPublicProducts(sellerId, seller.country_id),
     getStoreTrustSummary(sellerId),
     createAnonServerClient()
       .from("store_follows")
@@ -88,10 +87,6 @@ export default async function StorePage({
   const activeProducts = products.filter(
     (p) => p.status === "active" || p.status === "boosted",
   );
-  const unavailable = products.filter(
-    (p) => p.status === "sold" || p.status === "epuise",
-  );
-
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
 
   /* Date membre */
@@ -166,7 +161,7 @@ export default async function StorePage({
                     </span>
                   )}
                 </h2>
-                <PrintCatalog seller={seller} products={products} country={country} />
+                <PrintCatalog seller={seller} products={products} country={country} storeUrl={shareUrl} />
               </div>
 
               {activeProducts.length > 0 ? (
@@ -181,8 +176,6 @@ export default async function StorePage({
                 </div>
               )}
 
-              {/* Produits archivés (collapsible, client component) */}
-              <UnavailableProducts products={unavailable} />
             </section>
           </div>
 

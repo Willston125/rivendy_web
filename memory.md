@@ -116,4 +116,21 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   et `20260908_product_comments_hardening.sql`. Leur exécution en production a
   été confirmée par le propriétaire le 2026-09-08.
 
-*Dernière mise à jour : 8 septembre 2026 (durcissement produits, commissions, catégories, commentaires et accessibilité)*
+## Parité boutique App/Web du 2026-09-09
+
+- **Source de couverture unique** : l'app Flutter et le site lisent et écrivent
+  désormais `profiles.store_banner_url`. La colonne historique
+  `store_banner_url_web` ne doit plus être utilisée par le code client.
+- **Catalogue unique** : les boutiques web lisent `visible_products`, comme
+  Flutter, avec le même filtre `seller_id`, le même marché et les règles serveur
+  communes pour statuts, suppressions et précommandes. Les produits vendus ou
+  épuisés ne sont plus injectés dans la vitrine publique web.
+- **Vidéo de couverture** : le site reprend la vidéo prête des vendeurs
+  certifiés lorsque ses colonnes sont lisibles publiquement, avec repli sûr sur
+  la photo partagée si Supabase les refuse.
+- **Catalogue imprimable** : l'URL du QR code est fournie par le serveur afin
+  d'éviter le décalage d'hydratation entre `rivendy.com` et l'origine locale.
+- **Validation** : `npm run check` réussi (0 erreur, 33 avertissements
+  préexistants), boutique réelle contrôlée localement avec réponse HTTP 200.
+
+*Dernière mise à jour : 9 septembre 2026 (parité boutique App/Web)*

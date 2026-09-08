@@ -24,9 +24,10 @@ interface PrintCatalogProps {
     status: string;
   }>;
   country: Country;
+  storeUrl: string;
 }
 
-export function PrintCatalog({ seller, products, country }: PrintCatalogProps) {
+export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatalogProps) {
   const [printing, setPrinting] = useState(false);
 
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
@@ -43,11 +44,8 @@ export function PrintCatalog({ seller, products, country }: PrintCatalogProps) {
     }, 500);
   };
 
-  // URL de la boutique pour le QR Code
-  const storeUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/store/${seller.id}`
-    : `https://www.rivendy.com/store/${seller.id}`;
-  
+  // URL injectée par la page serveur : identique au premier rendu client,
+  // donc aucun décalage d'hydratation dans le QR code.
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(storeUrl)}`;
 
   return (
