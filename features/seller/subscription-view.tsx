@@ -131,8 +131,7 @@ const PLANS: Plan[] = [
 
 export function SubscriptionView() {
   const { user, profile } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("certified");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);

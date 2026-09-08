@@ -20,8 +20,7 @@ export function CartView() {
     setItemVariant,
   } = useCart();
   const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
 
   // ── Panier vide ────────────────────────────────────────────────────────────
   if (!totalItems) {

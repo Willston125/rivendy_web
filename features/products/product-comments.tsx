@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { MessageCircle, Heart, Trash2, AlertTriangle, Send } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -29,10 +30,8 @@ interface ProductCommentsProps {
 
 export function ProductComments({
   productId,
-  sellerId,
-  productTitle,
-  productImage,
 }: ProductCommentsProps) {
+  const router = useRouter();
   const { user, profile } = useAuth();
   const [comments, setComments] = useState<ProductComment[]>([]);
   const [text, setText] = useState("");
@@ -40,25 +39,28 @@ export function ProductComments({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Stocke localement les commentaires likés par l'utilisateur dans cette session
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(`liked_comments_${productId}`);
-      if (stored) {
-        try {
-          setLikedCommentIds(JSON.parse(stored));
-        } catch (_) {}
-      }
+    if (!user) {
+      setLikedCommentIds([]);
+      return;
     }
-  }, [productId]);
+
+    let cancelled = false;
+    supabase.rpc("get_product_comment_likes", { p_product_id: productId })
+      .then(({ data, error }) => {
+        if (!cancelled && !error) {
+          setLikedCommentIds((data ?? []).map(String));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, user]);
 
   const saveLikes = (ids: string[]) => {
     setLikedCommentIds(ids);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`liked_comments_${productId}`, JSON.stringify(ids));
-    }
   };
 
   /* ── Formattage de la date à la "timeAgo" ─────────────────────── */
@@ -143,34 +145,8 @@ export function ProductComments({
       if (data) {
         setComments((prev) => [data as ProductComment, ...prev]);
         setText("");
-
-        // Incrémenter le compteur de commentaires du produit
-        const { data: prod } = await supabase
-          .from("products")
-          .select("comments_count")
-          .eq("id", productId)
-          .maybeSingle();
-        const currentCount = prod?.comments_count ?? 0;
-        await supabase
-          .from("products")
-          .update({ comments_count: currentCount + 1 })
-          .eq("id", productId);
-
-        // Envoyer une notification au vendeur
-        if (sellerId !== user.id) {
-          const shortTitle = productTitle.length > 40 ? `${productTitle.substring(0, 40)}…` : productTitle;
-          await supabase.from("app_notifications").insert({
-            user_id: sellerId,
-            type: "new_comment",
-            title: "💬 Nouveau commentaire",
-            body: `${displayName} a commenté votre article "${shortTitle}".`,
-            product_id: productId,
-            product_image: productImage,
-            is_read: false,
-          });
-        }
       }
-    } catch (err) {
+    } catch {
       setErrorMsg("Erreur lors de la publication du commentaire. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
@@ -179,10 +155,19 @@ export function ProductComments({
 
   /* ── Liker un commentaire ────────────────────────────────────── */
   const handleLike = async (comment: ProductComment) => {
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
+
     const isLiked = likedCommentIds.includes(comment.id);
     const newLikesCount = isLiked
       ? Math.max(0, comment.likes_count - 1)
       : comment.likes_count + 1;
+    const previousLikedIds = likedCommentIds;
+    const nextLikedIds = isLiked
+      ? likedCommentIds.filter((id) => id !== comment.id)
+      : [...likedCommentIds, comment.id];
 
     // Mise à jour de l'état local immédiatement
     setComments((prev) =>
@@ -190,31 +175,53 @@ export function ProductComments({
     );
 
     // Sauvegarde de l'état de like local
-    if (isLiked) {
-      saveLikes(likedCommentIds.filter((id) => id !== comment.id));
-    } else {
-      saveLikes([...likedCommentIds, comment.id]);
+    saveLikes(nextLikedIds);
+
+    const { data, error } = await supabase.rpc("set_product_comment_like", {
+      p_comment_id: comment.id,
+      p_liked: !isLiked,
+    });
+
+    if (error) {
+      saveLikes(previousLikedIds);
+      setComments((prev) =>
+        prev.map((item) => (item.id === comment.id ? comment : item)),
+      );
+      setErrorMsg("Le like n'a pas pu être enregistré.");
+      return;
     }
 
-    // Mise à jour en base de données
-    await supabase
-      .from("product_comments")
-      .update({ likes_count: newLikesCount })
-      .eq("id", comment.id);
+    const authoritativeCount = Number(data);
+    if (Number.isFinite(authoritativeCount)) {
+      setComments((prev) =>
+        prev.map((item) =>
+          item.id === comment.id
+            ? { ...item, likes_count: authoritativeCount }
+            : item,
+        ),
+      );
+    }
   };
 
   /* ── Signaler un commentaire ─────────────────────────────────── */
   const handleFlag = async (commentId: string) => {
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
     if (!confirm("Voulez-vous vraiment signaler ce commentaire pour contenu inapproprié ?")) {
       return;
     }
 
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    const { error } = await supabase.rpc("report_product_comment", {
+      p_comment_id: commentId,
+    });
+    if (error) {
+      setErrorMsg("Le signalement n'a pas pu être enregistré.");
+      return;
+    }
 
-    await supabase
-      .from("product_comments")
-      .update({ is_flagged: true })
-      .eq("id", commentId);
+    setComments((prev) => prev.filter((comment) => comment.id !== commentId));
   };
 
   /* ── Supprimer un commentaire ────────────────────────────────── */
@@ -223,25 +230,16 @@ export function ProductComments({
       return;
     }
 
-    setComments((prev) => prev.filter((c) => c.id !== comment.id));
-
     try {
-      await supabase.from("product_comments").delete().eq("id", comment.id);
-
-      // Décrémenter le compteur de commentaires du produit
-      const { data: prod } = await supabase
-        .from("products")
-        .select("comments_count")
-        .eq("id", productId)
-        .maybeSingle();
-      const currentCount = prod?.comments_count ?? 0;
-      if (currentCount > 0) {
-        await supabase
-          .from("products")
-          .update({ comments_count: currentCount - 1 })
-          .eq("id", productId);
-      }
-    } catch (_) {}
+      const { error } = await supabase
+        .from("product_comments")
+        .delete()
+        .eq("id", comment.id);
+      if (error) throw error;
+      setComments((prev) => prev.filter((item) => item.id !== comment.id));
+    } catch {
+      setErrorMsg("Le commentaire n'a pas pu être supprimé.");
+    }
   };
 
   return (

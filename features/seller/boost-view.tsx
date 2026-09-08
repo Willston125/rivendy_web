@@ -114,8 +114,7 @@ const CREDIT_ERRORS: Record<string, string> = {
 
 export function BoostView({ product }: { product: Product }) {
   const { user } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [selectedTier, setSelectedTier] = useState<BoostTier | null>(null);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);

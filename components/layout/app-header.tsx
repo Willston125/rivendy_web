@@ -101,6 +101,9 @@ export function AppHeader() {
         <form onSubmit={onSearch} className="relative hidden flex-1 md:block lg:max-w-xl xl:max-w-2xl">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
           <input
+            type="search"
+            name="q"
+            aria-label="Rechercher sur Rivendy"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher un produit, une boutique..."
@@ -165,7 +168,7 @@ export function AppHeader() {
           {/* Favoris */}
           <Link
             href="/favorites"
-            className="hidden h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 md:flex"
+            className="hidden h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 md:flex"
             aria-label="Favoris"
           >
             <Heart className="h-[20px] w-[20px]" />
@@ -174,7 +177,7 @@ export function AppHeader() {
           {/* Panier */}
           <Link
             href="/cart"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
             aria-label="Panier"
           >
             <ShoppingCart className="h-[20px] w-[20px]" />
@@ -188,7 +191,7 @@ export function AppHeader() {
           {/* Messages */}
           <Link
             href="/help"
-            className="hidden h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 md:flex"
+            className="hidden h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 md:flex"
             aria-label="Messages"
           >
             <MessageCircle className="h-[20px] w-[20px]" />
@@ -202,7 +205,7 @@ export function AppHeader() {
                 setNotifOpen((v) => !v);
                 setProfileMenuOpen(false);
               }}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
               aria-label="Notifications"
             >
               <Bell className="h-[20px] w-[20px]" />
@@ -385,8 +388,10 @@ export function AppHeader() {
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Menu"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 md:hidden"
+            aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-navigation"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 md:hidden"
           >
             {menuOpen
               ? <X className="h-5 w-5" />
@@ -401,6 +406,9 @@ export function AppHeader() {
         <form onSubmit={onSearch} className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
+            type="search"
+            name="q"
+            aria-label="Rechercher sur Rivendy"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher sur Rivendy..."
@@ -411,7 +419,7 @@ export function AppHeader() {
 
       {/* ── Menu mobile déroulant ──────────────────────────────────── */}
       {menuOpen && (
-        <div className="border-t border-slate-100 bg-white px-4 pb-4 pt-3 md:hidden">
+        <div id="mobile-navigation" className="border-t border-slate-100 bg-white px-4 pb-4 pt-3 md:hidden">
 
           {/* Bouton Vendre — CTA proéminent */}
           <Link

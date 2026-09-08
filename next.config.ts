@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const SUPABASE_HOST = "https://eiifosnczbgymcbhycwe.supabase.co";
+const isDevelopment = process.env.NODE_ENV === "development";
+const scriptSources = [
+  "script-src 'self' 'unsafe-inline'",
+  ...(isDevelopment ? ["'unsafe-eval'"] : []),
+].join(" ");
 
 // Content-Security-Policy en mode REPORT-ONLY (RIV-008). Ne bloque RIEN : le
 // navigateur signale seulement les violations dans la console. C'est l'étape
@@ -12,7 +17,7 @@ const cspReportOnly = [
   "default-src 'self'",
   `img-src 'self' data: blob: ${SUPABASE_HOST}`,
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  scriptSources,
   "font-src 'self' data:",
   `connect-src 'self' ${SUPABASE_HOST} wss://eiifosnczbgymcbhycwe.supabase.co`,
   "frame-ancestors 'self'",

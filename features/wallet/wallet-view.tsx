@@ -37,8 +37,7 @@ interface WalletTransaction {
 
 export function WalletView() {
   const { user, profile } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -118,7 +117,7 @@ export function WalletView() {
 
   // ── Demande de retrait via WhatsApp ────────────────────────
   async function requestWithdrawal() {
-    if (!user || !canWithdraw || !country) return;
+    if (!user || !country || !canWithdraw) return;
     setWithdrawLoading(true);
     setMessage("");
 

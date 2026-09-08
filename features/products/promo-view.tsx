@@ -8,8 +8,7 @@ import { supabase } from "@/lib/supabase/client";
 import type { Product } from "@/types/rivendy";
 
 export function PromoView() {
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -77,8 +77,7 @@ type Step = 0 | 1 | 2 | 3;
 // ── Composant principal ─────────────────────────────────────
 export function CreateStoreForm() {
   const { user } = useAuth();
-  const countryNullable = useCountryOrDefault();
-  const country = countryNullable;
+  const country = useCountryOrDefault();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(0);
@@ -86,7 +85,6 @@ export function CreateStoreForm() {
     Array.from({ length: MIN_PRODUCTS }, emptyProduct),
   );
   const [currentProductIndex, setCurrentProductIndex] = useState(0);
-  const [publishing, setPublishing] = useState(false);
   const [publishedCount, setPublishedCount] = useState(0);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishDone, setPublishDone] = useState(false);
@@ -141,6 +139,10 @@ export function CreateStoreForm() {
   // ── Publication ────────────────────────────────────────────
   async function publish() {
     if (!user) return;
+    if (!country?.id) {
+      setPublishError("Sélectionnez votre marché avant de publier.");
+      return;
+    }
 
     // Garde-fou de soumission (défense en profondeur) : même si un menu
     // déroulant était un jour repeuplé avec la liste complète, aucune
@@ -155,19 +157,32 @@ export function CreateStoreForm() {
       return;
     }
 
-    setPublishing(true);
     setPublishError(null);
     setPublishedCount(0);
     setStep(3);
 
     try {
+      // Le marché est un invariant RLS, pas seulement un état d'interface.
+      // On attend sa persistance avant les uploads et l'INSERT atomique.
+      const { error: marketError } = await supabase
+        .from("profiles")
+        .update({ active_market_country_id: country.id })
+        .eq("id", user.id);
+      if (marketError) throw marketError;
+
       const withPhoto = productsWithPhoto;
+      const rows = [];
+
       for (const p of withPhoto) {
+        const rawPrice = Number(p.price);
+        if (!Number.isFinite(rawPrice) || rawPrice <= 0) {
+          throw new Error(`Le prix de « ${p.title.trim() || "Article"} » est invalide.`);
+        }
+
         const urls = await uploadProductPhotos(user.id, [p.file!]);
-        const rawPrice = parseFloat(p.price) || 0;
         const { commissionAmount, displayPrice } = calcCommission(rawPrice, p.category);
 
-        await supabase.from("products").insert({
+        rows.push({
           seller_id: user.id,
           title: p.title.trim(),
           description: p.description.trim() || p.title.trim(),
@@ -175,22 +190,32 @@ export function CreateStoreForm() {
           seller_price: rawPrice,
           commission_amount: commissionAmount,
           category: p.category,
-          condition: ["restaurant", "alimentation"].includes(p.category) ? "Neuf" : p.condition,
-          country_id: country?.id,
+          condition: p.category === "restaurant" ? "Neuf" : p.condition,
+          country_id: country.id,
           photos: urls,
-          status: "active",
+          status: "pending",
           stock_quantity: 1,
           product_type: "standard",
           size: "",
         });
 
-        setPublishedCount((n) => n + 1);
       }
+
+      // Un INSERT multi-lignes est atomique côté Postgres : si une ligne est
+      // refusée, aucun produit du lot n'est créé.
+      const { error: insertError } = await supabase.from("products").insert(rows);
+      if (insertError) throw insertError;
+
+      setPublishedCount(rows.length);
       setPublishDone(true);
     } catch (err) {
-      setPublishError(err instanceof Error ? err.message : "Erreur lors de la publication.");
-    } finally {
-      setPublishing(false);
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Erreur lors de la publication.";
+      setPublishError(message);
     }
   }
 
@@ -412,7 +437,7 @@ export function CreateStoreForm() {
           </select>
         </FormField>
 
-        {!["restaurant", "alimentation"].includes(current.category) && (
+        {current.category !== "restaurant" && (
           <FormField label="État">
             <select
               value={current.condition}
@@ -454,7 +479,7 @@ export function CreateStoreForm() {
         {/* Info */}
         <div className="flex items-center gap-2 rounded-2xl bg-[#00C4B4]/10 px-4 py-3 text-sm font-bold text-[#00C4B4]">
           <CheckCircle className="h-4 w-4 shrink-0" />
-          {wp.length} article{wp.length > 1 ? "s" : ""} prêt{wp.length > 1 ? "s" : ""} à être publié{wp.length > 1 ? "s" : ""}
+          {wp.length} article{wp.length > 1 ? "s" : ""} prêt{wp.length > 1 ? "s" : ""} à être envoyé{wp.length > 1 ? "s" : ""} en modération
         </div>
 
         {/* Liste récap */}
@@ -511,7 +536,7 @@ export function CreateStoreForm() {
           <div>
             <h2 className="text-2xl font-black text-[#1A1A1A]">Votre magasin est ouvert ! 🎉</h2>
             <p className="mt-2 text-sm text-slate-500">
-              {publishedCount} article{publishedCount > 1 ? "s" : ""} mis en vente avec succès.
+              {publishedCount} article{publishedCount > 1 ? "s" : ""} envoyé{publishedCount > 1 ? "s" : ""} en modération avec succès.
             </p>
           </div>
           <button
@@ -548,7 +573,7 @@ export function CreateStoreForm() {
         <CloudUpload className="h-14 w-14 text-[#6A5ACD]" />
         <div>
           <h2 className="text-xl font-black text-[#1A1A1A]">Publication en cours…</h2>
-          <p className="mt-1 text-sm text-slate-500">{publishedCount} / {total} articles publiés</p>
+          <p className="mt-1 text-sm text-slate-500">{publishedCount} / {total} articles envoyés en modération</p>
         </div>
         {/* Barre de progression */}
         <div className="w-full max-w-xs overflow-hidden rounded-full bg-slate-200">

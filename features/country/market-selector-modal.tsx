@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Globe, CheckCircle2 } from "lucide-react";
 import { useCountry } from "@/features/country/country-provider";
@@ -62,6 +62,55 @@ export function MarketSelectorModal() {
   const [pending, setPending] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!needsMarketSelection) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const dialog = dialogRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog?.focus();
+
+    function keepFocusInside(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), select:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", keepFocusInside);
+    return () => {
+      document.removeEventListener("keydown", keepFocusInside);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [needsMarketSelection]);
 
   if (!needsMarketSelection) return null;
 
@@ -85,7 +134,16 @@ export function MarketSelectorModal() {
   return (
     // Backdrop plein écran — z-50 pour passer au-dessus du header (z-40)
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md sm:rounded-3xl rounded-t-3xl bg-white overflow-hidden shadow-2xl">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="market-dialog-title"
+        aria-describedby="market-dialog-description"
+        aria-busy={loading || retrying}
+        tabIndex={-1}
+        className="w-full max-w-md sm:rounded-3xl rounded-t-3xl bg-white overflow-hidden shadow-2xl outline-none"
+      >
 
         {/* En-tête */}
         <div className="px-6 pt-6 pb-4 border-b border-slate-100">
@@ -97,8 +155,8 @@ export function MarketSelectorModal() {
               <Globe className="h-5 w-5 text-[#007168]" />
             </div>
             <div>
-              <p className="text-[17px] font-black text-slate-950">Choisissez votre marché</p>
-              <p className="text-xs text-slate-400">Rivendy est disponible dans {countries.length} pays</p>
+              <h2 id="market-dialog-title" className="text-[17px] font-black text-slate-950">Choisissez votre marché</h2>
+              <p id="market-dialog-description" className="text-xs text-slate-400">Rivendy est disponible dans {countries.length} pays</p>
             </div>
           </div>
         </div>
