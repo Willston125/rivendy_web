@@ -82,18 +82,41 @@ export function ProfileInfoForm() {
 
     setError("");
     setSaving(true);
-    const { error: err } = await supabase.from("profiles").update({
-      full_name: fullName.trim(),
-      whatsapp_number: phone.trim(),
-      real_email: email.trim(),
-      avatar_url: avatarUrl,
-      store_name: storeName.trim() || null,
-      store_description: storeDescription.trim() || null,
-      facebook_url: facebook.trim() || null,
-      instagram_url: instagram.trim() || null,
-      tiktok_url: tiktok.trim() || null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", user.id);
+
+    /* N'envoyer QUE les colonnes réellement modifiées.
+       Corrigé le 2026-09-07 : ce formulaire réécrivait les NEUF colonnes à
+       chaque enregistrement, avec les valeurs chargées à l'ouverture de la
+       page. Changer un numéro de téléphone ici renvoyait donc aussi
+       `avatar_url`, `full_name` et `store_description` — et écrasait en
+       silence ce qui venait d'être modifié depuis l'application. Un
+       formulaire n'écrit pas ce qu'il n'a pas édité. */
+    const candidates: { col: string; next: string | null; prev: string }[] = [
+      { col: "full_name",         next: fullName.trim(),                 prev: profile?.full_name ?? "" },
+      { col: "whatsapp_number",   next: phone.trim(),                    prev: profile?.whatsapp_number ?? "" },
+      { col: "real_email",        next: email.trim(),                    prev: profile?.real_email ?? "" },
+      { col: "avatar_url",        next: avatarUrl,                       prev: profile?.avatar_url ?? "" },
+      { col: "store_name",        next: storeName.trim() || null,        prev: profile?.store_name ?? "" },
+      { col: "store_description", next: storeDescription.trim() || null, prev: profile?.store_description ?? "" },
+      { col: "facebook_url",      next: facebook.trim() || null,         prev: profile?.facebook_url ?? "" },
+      { col: "instagram_url",     next: instagram.trim() || null,        prev: profile?.instagram_url ?? "" },
+      { col: "tiktok_url",        next: tiktok.trim() || null,           prev: profile?.tiktok_url ?? "" },
+    ];
+    const patch: Record<string, string | null> = {};
+    for (const { col, next, prev } of candidates) {
+      if ((next ?? "") !== prev) patch[col] = next;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      setSaving(false);
+      setMessage("Aucune modification à enregistrer.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+
+    const { error: err } = await supabase
+      .from("profiles")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
 
     setSaving(false);
     if (err) return setError(err.message);
