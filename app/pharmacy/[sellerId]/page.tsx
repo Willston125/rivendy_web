@@ -91,7 +91,7 @@ export default async function PharmacyCatalogPage({
   if (!seller) notFound();
 
   const [products, trust, country] = await Promise.all([
-    getSellerPublicProducts(sellerId, false),
+    getSellerPublicProducts(sellerId, seller.country_id),
     getStoreTrustSummary(sellerId),
     getCountry(seller.country_id || "DJ"),
   ]);
@@ -111,7 +111,7 @@ export default async function PharmacyCatalogPage({
   const isOpen = hours.length > 0 && isRestaurantOpen(hours);
   const rating = Number(trust.score ?? 0);
 
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = seller.store_banner_url;
   const sections = buildSections(active);
 
   return (

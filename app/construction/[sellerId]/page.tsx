@@ -67,7 +67,7 @@ export default async function ConstructionCatalogPage({
   if (!seller) notFound();
 
   const [products, trust, country] = await Promise.all([
-    getSellerPublicProducts(sellerId, false),
+    getSellerPublicProducts(sellerId, seller.country_id),
     getStoreTrustSummary(sellerId),
     getCountry(seller.country_id || "DJ"),
   ]);
@@ -86,7 +86,7 @@ export default async function ConstructionCatalogPage({
     if (specialties.length >= 3) break;
   }
 
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = seller.store_banner_url;
   const sections = buildSections(active);
 
   return (

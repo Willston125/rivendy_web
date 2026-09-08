@@ -274,20 +274,24 @@ export async function getSimilarProducts(product: Product, limit = 8) {
 
 export async function getSellerProfile(sellerId: string) {
   const supabase = createAnonServerClient();
-  const baseCols =
+  const publicCols =
     "id, full_name, store_name, store_description, avatar_url, store_banner_url, voice_note_url, is_certified, total_sales, country_id, created_at";
 
-  // Tente avec la colonne web ; fallback si la migration n'est pas encore appliquée
+  // Les colonnes vidéo ne sont pas encore exposées au rôle public sur toutes
+  // les installations. Leur refus ne doit jamais rendre la boutique entière
+  // introuvable : on retombe sur le contrat commun image + identité.
   let { data, error } = await supabase
     .from("profiles")
-    .select(`${baseCols}, store_banner_url_web`)
+    .select(
+      `${publicCols}, cover_video_uid, cover_video_status, cover_video_thumbnail_url`,
+    )
     .eq("id", sellerId)
     .maybeSingle();
 
   if (error) {
     ({ data, error } = await supabase
       .from("profiles")
-      .select(baseCols)
+      .select(publicCols)
       .eq("id", sellerId)
       .maybeSingle());
   }
@@ -296,18 +300,17 @@ export async function getSellerProfile(sellerId: string) {
   return data as Profile;
 }
 
-export async function getSellerPublicProducts(sellerId: string, includeSold = false) {
+/** Catalogue d'une boutique, sur le même contrat public que Flutter.
+ *  La vue applique les statuts, suppressions et règles de précommande. */
+export async function getSellerPublicProducts(sellerId: string, countryId?: string) {
   const supabase = createAnonServerClient();
   let query = supabase
-    .from("products")
-    .select("*, profiles!seller_id(full_name, store_name, avatar_url, is_certified, country_id)")
+    .from("visible_products")
+    .select("*")
     .eq("seller_id", sellerId)
-    .eq("is_deleted", false)
     .order("created_at", { ascending: false });
 
-  query = includeSold
-    ? query.in("status", ["active", "boosted", "sold", "epuise"])
-    : query.in("status", ["active", "boosted"]);
+  if (countryId) query = query.eq("country_id", countryId);
 
   const { data, error } = await query;
   if (error || !data) return [];
@@ -436,7 +439,7 @@ export async function getStoreRatingsFor(
 }
 
 /** Bannières de boutique d'un lot de vendeurs (seller_id → URL non vide).
- *  Préfère la bannière web dédiée (store_banner_url_web) si présente. */
+ *  Source partagée avec l'application Flutter. */
 export async function getStoreBannersFor(
   sellerIds: string[],
 ): Promise<Record<string, string>> {
@@ -445,13 +448,12 @@ export async function getStoreBannersFor(
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, store_banner_url, store_banner_url_web")
+    .select("id, store_banner_url")
     .in("id", ids);
   if (error || !data) return {};
   const out: Record<string, string> = {};
   for (const row of data) {
-    const url = String(row.store_banner_url_web ?? "").trim() ||
-      String(row.store_banner_url ?? "").trim();
+    const url = String(row.store_banner_url ?? "").trim();
     if (url) out[String(row.id)] = url;
   }
   return out;

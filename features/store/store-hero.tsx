@@ -7,6 +7,7 @@ import { ShareButton } from "@/components/ui/share-button";
 import { StoreCoverEditButton, StoreAvatarEditButton } from "@/features/store/store-image-editor";
 import { StoreHeroCta } from "@/features/store/store-hero-cta";
 import { distinctCategories } from "@/features/store/store-helpers";
+import { ProductVideoPlayer } from "@/features/products/product-video-player";
 
 interface TrustSummary {
   score: number;
@@ -62,7 +63,10 @@ export function StoreHero({
   shareUrl: string;
 }) {
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = seller.store_banner_url;
+  const hasReadyCoverVideo = Boolean(
+    seller.is_certified && seller.cover_video_uid && seller.cover_video_status === "ready",
+  );
   const cats = distinctCategories(products).slice(0, 4);
   const sales = seller.total_sales ?? 0;
 
@@ -70,14 +74,20 @@ export function StoreHero({
     <section className="relative overflow-hidden rounded-3xl border border-slate-100 shadow-sm lg:h-[440px]">
       {/* ── Bannière — pleine largeur, visible jusque derrière l'avatar (desktop) ──── */}
       <div className="relative h-56 sm:h-72 lg:absolute lg:inset-0 lg:h-full">
-        {bannerSrc ? (
+        {hasReadyCoverVideo ? (
+          <ProductVideoPlayer
+            uid={seller.cover_video_uid!}
+            thumbnail={seller.cover_video_thumbnail_url || bannerSrc}
+            title={sellerName}
+          />
+        ) : bannerSrc ? (
           <Image src={bannerSrc} alt="" fill sizes="100vw" priority className="object-cover" />
         ) : (
           <div className="absolute inset-0 bg-[linear-gradient(135deg,#009688_0%,#004D40_100%)]" />
         )}
         {/* Voile clair à gauche pour la lisibilité du texte — la photo reste visible partout, y compris derrière l'avatar */}
-        <div className="absolute inset-0 hidden bg-gradient-to-r from-white from-[38%] via-white/75 via-[58%] to-white/0 lg:block" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent lg:hidden" />
+        <div className="pointer-events-none absolute inset-0 hidden bg-gradient-to-r from-white from-[38%] via-white/75 via-[58%] to-white/0 lg:block" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent lg:hidden" />
         <StoreCoverEditButton sellerId={seller.id} />
 
         {/* Carte stats flottante — ancrée au coin bas-droit de la bannière (mobile et desktop) */}

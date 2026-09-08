@@ -51,7 +51,7 @@ export default async function HotelDetailPage({
   if (!seller) notFound();
 
   const [products, trust, country] = await Promise.all([
-    getSellerPublicProducts(sellerId, false),
+    getSellerPublicProducts(sellerId, seller.country_id),
     getStoreTrustSummary(sellerId),
     getCountry(seller.country_id || "DJ"),
   ]);
@@ -62,7 +62,7 @@ export default async function HotelDetailPage({
 
   const name = seller.store_name || seller.full_name || "Hôtel Rivendy";
   const rating = Number(trust.score ?? 0);
-  const bannerSrc = seller.store_banner_url_web || seller.store_banner_url;
+  const bannerSrc = seller.store_banner_url;
 
   let locality = "";
   const amenities: string[] = [];
