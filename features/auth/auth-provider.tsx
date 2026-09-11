@@ -99,6 +99,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfileFor]);
 
   const signInWithPhone = useCallback(async (phone: string, password: string) => {
+    // Purge D'ABORD toute session locale, sans toucher au serveur.
+    // Sans cela, un jeton déjà révoqué côté serveur (réinitialisation du mot
+    // de passe, déconnexion depuis un autre appareil) bloque la connexion :
+    // le client tente de rafraîchir ce jeton mort, le serveur refuse, et
+    // `signInWithPassword` attend derrière un rafraîchissement qui n'aboutira
+    // jamais — le bouton reste sur « Connexion… » indéfiniment.
+    // `scope: 'local'` ne fait AUCUN appel réseau : il ne peut pas échouer
+    // pour la raison même qu'on essaie de contourner.
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* rien à purger */
+    }
+    setSession(null);
+    setProfile(null);
+
     const email = syntheticEmailFromPhone(phone);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
@@ -151,9 +167,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    // L'état local est vidé D'ABORD, et le jeton retiré du navigateur QUOI
+    // QU'IL ARRIVE. L'ancien code attendait la réponse du serveur avant de
+    // nettoyer : quand la session avait déjà été révoquée côté serveur
+    // (réinitialisation du mot de passe, autre appareil), l'appel échouait et
+    // le jeton mort RESTAIT — l'utilisateur était bloqué « connecté », sans
+    // pouvoir ni agir ni se déconnecter.
+    // Se déconnecter ne doit jamais dépendre du réseau.
     setSession(null);
     setProfile(null);
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* session déjà morte côté serveur — le nettoyage local suffit */
+    }
+    // Filet : `scope: 'local'` ne fait aucun appel réseau et garantit que le
+    // jeton a bien quitté le stockage du navigateur, même si l'appel global
+    // ci-dessus a échoué avant d'y arriver.
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* déjà vide */
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(

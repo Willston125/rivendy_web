@@ -11,7 +11,10 @@ import { useAuth } from "@/features/auth/auth-provider";
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/profile";
+  // Après connexion on rentre à l'ACCUEIL, pas sur le profil (décision
+  // propriétaire, 2026-09-11). `next` n'est suivi que s'il a été posé par
+  // une page qui exigeait d'être connecté.
+  const next = params.get("next") || "/";
   const { signInWithPhone } = useAuth();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
