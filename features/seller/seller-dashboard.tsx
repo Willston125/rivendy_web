@@ -22,7 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ProductStatusBadge } from "@/features/products/product-status-badge";
 import { supabase } from "@/lib/supabase/client";
-import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { cn } from "@/lib/utils/cn";
@@ -202,19 +202,27 @@ export function SellerDashboard() {
     const amount = Number(withdrawAmount || earnings);
     if (!amount) return notify("Indique un montant de retrait.", "err");
 
+    // `phone_number` est la destination du RETRAIT : le dashboard l'affiche
+    // à l'opérateur comme le numéro à créditer. Il ne peut donc jamais être
+    // celui de l'agence — sans numéro de vendeur, mieux vaut laisser vide et
+    // que l'opérateur le réclame, plutôt que d'afficher un numéro faux.
     const { error } = await supabase.from("payout_requests").insert({
       seller_id: user.id, country_id: country.id, amount,
-      currency_code: country.currency_code, method: "whatsapp",
-      phone_number: profile?.whatsapp_number || country.whatsapp_number,
+      currency_code: country.currency_code, method: "mobile_money",
+      phone_number: profile?.whatsapp_number || null,
       status: "pending_director",
       notes: `Demande web - ${delivered.length} commande(s) livrée(s)`,
     });
 
-    notify(error ? error.message : "Demande de retrait envoyée ✓", error ? "err" : "ok");
-
-    const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
-    const text = `Demande de retrait Rivendy Web\nVendeur: ${profile?.full_name || user.email}\nMontant: ${formatMoney(amount, country)}\nCommandes livrées: ${delivered.length}`;
-    if (whatsapp) window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    // La demande vit dans le dashboard (Finances → Retraits), plus sur
+    // WhatsApp. L'ouverture qui suivait était redondante — et pouvait laisser
+    // croire la demande transmise alors que l'INSERT venait d'échouer.
+    notify(
+      error
+        ? `Demande de retrait non enregistrée : ${error.message}`
+        : "Demande de retrait enregistrée ✓ — l'équipe Rivendy la traite.",
+      error ? "err" : "ok",
+    );
   }
 
   if (loading) return <DashboardSkeleton />;

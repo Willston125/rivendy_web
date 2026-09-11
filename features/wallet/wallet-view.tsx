@@ -115,45 +115,49 @@ export function WalletView() {
   const MIN_WITHDRAW = country?.id === "KM" ? 5000 : 2000;
   const canWithdraw = confirmedEarnings >= MIN_WITHDRAW;
 
-  // ── Demande de retrait via WhatsApp ────────────────────────
+  // ── Demande de retrait — elle vit dans le DASHBOARD ────────
+  // Deux défauts corrigés le 2026-09-11, tous deux silencieux :
+  //
+  // 1. l'erreur de l'INSERT était JETÉE (`.then(() => null, () => null)`),
+  //    puis « Demande de retrait envoyée ✅ » s'affichait quoi qu'il arrive.
+  //    Une demande pouvait disparaître sans que le vendeur le sache, et sans
+  //    laisser la moindre trace dans le dashboard ;
+  // 2. `phone_number` recevait le numéro de l'AGENCE. Or le dashboard
+  //    l'affiche à l'opérateur comme la destination du virement (Finances →
+  //    Retraits) : il y lisait le numéro de Rivendy au lieu de celui du
+  //    vendeur.
   async function requestWithdrawal() {
     if (!user || !country || !canWithdraw) return;
     setWithdrawLoading(true);
     setMessage("");
 
-    const amountStr = formatMoney(confirmedEarnings, country);
-    const name = profile?.full_name || profile?.store_name || user.email || "Vendeur";
-    const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
-
-    // Enregistrer dans Supabase
-    await supabase.from("payout_requests").insert({
+    const { error } = await supabase.from("payout_requests").insert({
       seller_id: user.id,
       country_id: country.id,
       amount: confirmedEarnings,
       currency_code: country.currency_code,
-      method: "whatsapp",
-      phone_number: country.whatsapp_number,
+      method: "mobile_money",
+      // Le numéro du VENDEUR, jamais celui de l'agence. À défaut NULL :
+      // mieux vaut que l'opérateur le réclame qu'un numéro faux.
+      phone_number: profile?.whatsapp_number || null,
       notes: `Demande web — ${deliveredOrders.length} commande(s) livrée(s)`,
       status: "pending_director",
-    }).then(() => null, () => null);
+    });
 
-    // Ouvrir WhatsApp
-    const text =
-      `💰 DEMANDE DE RETRAIT — Rivendy\n\n` +
-      `👤 Vendeur : ${name}\n` +
-      `💵 Montant : ${amountStr}\n` +
-      `📦 Commandes confirmées : ${deliveredOrders.length}\n\n` +
-      `Merci de traiter ce retrait.`;
-
-    if (whatsapp) {
-      window.open(
-        `https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}`,
-        "_blank",
-        "noopener,noreferrer",
-      );
-    }
-    setMessage("Demande de retrait envoyée ✅ — L'équipe Rivendy vous contactera sous 24h.");
     setWithdrawLoading(false);
+
+    if (error) {
+      setMessage(
+        "Votre demande de retrait n'a pas pu être enregistrée. Réessayez, " +
+          "ou contactez Rivendy depuis Aide & Support.",
+      );
+      return;
+    }
+
+    setMessage(
+      `Demande de retrait de ${formatMoney(confirmedEarnings, country)} enregistrée ✅ — ` +
+        "l'équipe Rivendy la traite et vous contactera.",
+    );
   }
 
   if (loading) {

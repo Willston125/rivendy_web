@@ -5,7 +5,7 @@ import { Zap, CheckCircle2, Copy, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
-import { firstPhoto, formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { BoostPurchaseInput, Product } from "@/types/rivendy";
@@ -197,41 +197,52 @@ export function BoostView({ product }: { product: Product }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // La demande part dans le DASHBOARD, plus sur WhatsApp (parité
+  // boost_screen.dart, 2026-09-10) : l'INSERT en `pending` déclenche
+  // `notify_admins_new_boost`, qui prévient les admins habilités du marché.
   async function handlePaid(tier: BoostTier) {
     if (!user || !country) return;
-    // Jamais de numéro en dur — source unique : le pays actif.
-    const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
     setSubmitting(true);
+    setCreditMessage(null);
 
-    try {
-      const payload: BoostPurchaseInput = {
-        product_id: product.id,
-        seller_id: user.id,
-        plan: tier.id,
-        price_paid: priceForMarket(tier, country.id),
-        duration_days: tier.durationDays,
-        status: "pending",
-        // Parité subscription : l'id de la méthode choisie (waafi_dj, cash…).
-        payment_method: selectedMethod.id,
-        country_id: country.id,
-        payment_reference: reference,
-      };
-      await supabase.from("boost_purchases").insert(payload);
-    } catch (_) {
-      // non-blocking
+    const payload: BoostPurchaseInput = {
+      product_id: product.id,
+      seller_id: user.id,
+      plan: tier.id,
+      price_paid: priceForMarket(tier, country.id),
+      duration_days: tier.durationDays,
+      status: "pending",
+      // Parité subscription : l'id de la méthode choisie (waafi_dj, cash…).
+      payment_method: selectedMethod.id,
+      country_id: country.id,
+      payment_reference: reference,
+    };
+    const { error } = await supabase.from("boost_purchases").insert(payload);
+
+    setSubmitting(false);
+
+    if (error) {
+      // L'enregistrement est désormais le SEUL canal. L'ancien code
+      // enveloppait l'insert dans un try/catch qui n'attrapait RIEN —
+      // `insert()` ne lève pas d'exception, il renvoie `{ error }` — puis
+      // ouvrait WhatsApp quoi qu'il arrive : le vendeur repartait convaincu
+      // que sa demande était transmise.
+      setCreditMessage({
+        ok: false,
+        text: `Votre demande n'a pas pu être enregistrée. Réessayez, ou signalez la référence ${reference} depuis Aide & Support.`,
+      });
+      return;
     }
 
-    const msg = encodeURIComponent(
-      `Bonjour Rivendy ⚡\n\n` +
-        `J'ai payé pour le boost *${tier.name}* (${tier.durationDays} jours) pour mon article :\n` +
-        `📦 *ID:* ${product.id}\n` +
-        `📝 *Titre:* ${product.title}\n\n` +
-        `🔢 *Référence:* ${reference}\n\n` +
-        `Merci de valider mon boost !`
-    );
-    window.open(`https://wa.me/${whatsapp}?text=${msg}`, "_blank");
     setSelectedTier(null);
-    setSubmitting(false);
+    // La référence doit rester LISIBLE : c'est WhatsApp qui en tenait lieu
+    // d'archive. Le serveur en pose aussi une trace dans les notifications.
+    setCreditMessage({
+      ok: true,
+      text: isCash
+        ? `Demande de boost ${tier.name} enregistrée sous la référence ${reference}. L'équipe Rivendy vous contactera pour convenir du règlement en espèces.`
+        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Le boost ${tier.name} démarre après vérification.`,
+    });
   }
 
   if (!country) return null;

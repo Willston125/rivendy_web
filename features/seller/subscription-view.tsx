@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BadgeCheck, Copy, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
-import { formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { SellerSubscriptionInput } from "@/types/rivendy";
@@ -137,6 +137,8 @@ export function SubscriptionView() {
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [resultat, setResultat] =
+    useState<{ ok: boolean; text: string } | null>(null);
 
   // Jamais de numéro en dur — miroir de mobile_money_data.dart (parité app).
   const paymentMethods = getMobileMoneyForCountry(country?.id ?? "");
@@ -159,44 +161,53 @@ export function SubscriptionView() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // La demande part dans le DASHBOARD, plus sur WhatsApp (parité
+  // subscription_screen.dart, 2026-09-10) : l'INSERT en `pending` déclenche
+  // `notify_admins_new_subscription`, qui prévient les admins habilités du
+  // marché. Aucun numéro d'agence n'intervient plus dans ce parcours.
   async function handlePaid(plan: Plan) {
     if (!user || !country) return;
-    // Jamais de numéro en dur — source unique : le pays actif.
-    const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
     setSubmitting(true);
+    setResultat(null);
 
-    try {
-      const payload: SellerSubscriptionInput = {
-        seller_id: user.id,
-        plan: plan.dbPlan,
-        tier: plan.tier,
-        price_paid: priceForMarket(plan, country.id),
-        duration_days: plan.durationDays,
-        status: "pending",
-        // Parité subscription_screen.dart — l'id de la méthode choisie.
-        payment_method: selectedMethod.id,
-        country_id: country.id,
-        payment_reference: reference,
-      };
-      await supabase.from("seller_subscriptions").insert(payload);
-    } catch (_) {
-      // non-blocking
+    const payload: SellerSubscriptionInput = {
+      seller_id: user.id,
+      plan: plan.dbPlan,
+      tier: plan.tier,
+      price_paid: priceForMarket(plan, country.id),
+      duration_days: plan.durationDays,
+      status: "pending",
+      // Parité subscription_screen.dart — l'id de la méthode choisie.
+      payment_method: selectedMethod.id,
+      country_id: country.id,
+      payment_reference: reference,
+    };
+    const { error } = await supabase.from("seller_subscriptions").insert(payload);
+
+    setSubmitting(false);
+
+    if (error) {
+      // L'enregistrement est désormais le SEUL canal : s'il échoue, personne
+      // n'est prévenu. L'ancien code enveloppait l'insert dans un try/catch
+      // qui n'attrapait RIEN — `insert()` ne lève pas d'exception, il renvoie
+      // `{ error }` — puis ouvrait WhatsApp quoi qu'il arrive : le vendeur
+      // repartait convaincu que sa demande était transmise.
+      setResultat({
+        ok: false,
+        text: `Votre demande n'a pas pu être enregistrée. Réessayez, ou signalez la référence ${reference} depuis Aide & Support.`,
+      });
+      return;
     }
 
-    const formattedPrice = formatMoney(priceForMarket(plan, country.id), country);
-    const msg = encodeURIComponent(
-      `Bonjour Rivendy, j'ai effectué le paiement pour mon abonnement Vendeur ${tierLabel(plan.tier)}.\n\n` +
-        `• Formule : ${tierLabel(plan.tier)}\n` +
-        `• Plan : ${plan.label} (${plan.durationLabel})\n` +
-        `• Montant : ${formattedPrice}\n` +
-        `• Mode de paiement : ${selectedMethod.name}\n` +
-        `• Référence : ${reference}\n` +
-        `• Nom : ${userName}\n\n` +
-        `Merci de valider mon badge. 🙏`
-    );
-    window.open(`https://wa.me/${whatsapp}?text=${msg}`, "_blank");
     setSelectedPlan(null);
-    setSubmitting(false);
+    // La référence doit rester LISIBLE : c'est WhatsApp qui en tenait lieu
+    // d'archive. Le serveur en pose aussi une trace dans les notifications.
+    setResultat({
+      ok: true,
+      text: isCash
+        ? `Demande enregistrée sous la référence ${reference}. L'équipe Rivendy vous contactera pour convenir du règlement en espèces.`
+        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Votre badge ${tierLabel(plan.tier)} sera activé après vérification.`,
+    });
   }
 
   if (!country) return null;
@@ -220,6 +231,26 @@ export function SubscriptionView() {
           et sur CHAQUE produit que vous publiez
         </div>
       </div>
+
+      {/* Résultat de la demande — remplace l'ouverture WhatsApp, qui servait
+          jusqu'ici de seule confirmation ET d'archive de la référence. */}
+      {resultat && (
+        <div
+          role="status"
+          className={`mb-6 rounded-2xl border p-4 text-sm leading-relaxed ${
+            resultat.ok
+              ? "border-[#009688]/30 bg-[#E0F2F1] text-[#00544D]"
+              : "border-red-200 bg-red-50 text-red-800"
+          }`}
+        >
+          {resultat.text}
+          {resultat.ok && (
+            <span className="mt-2 block text-xs text-[#00695C]">
+              Vous retrouverez cette demande dans vos notifications.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Badge preview */}
       <div className="mb-6">
