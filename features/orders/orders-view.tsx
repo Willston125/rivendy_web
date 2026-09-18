@@ -20,9 +20,12 @@
  * `admin_cancel_order()` le fait, et elle est réservée à `service_role`
  * depuis le 2026-09-04 : le dashboard l’appelle, aucun client ne le peut.
  *
- * L’app ne propose aucun bouton d’annulation non plus — le site est désormais
- * aligné. Une vraie demande d’annulation côté acheteur suppose une table
- * dédiée et un écran dashboard (§1.6) : décision propriétaire en attente.
+ * Depuis le 2026-09-18, l’acheteur ne « annule » plus : il DEMANDE. La RPC
+ * `request_order_cancellation()` (SECURITY DEFINER, owner
+ * 20260918_request_order_cancellation.sql) dépose la demande dans
+ * `order_cancellation_requests`, et Rivendy tranche depuis le dashboard
+ * (Commandes → Demandes d’annulation), où « accepter » appelle
+ * `admin_cancel_order`. Aucun WhatsApp dans la boucle.
  */
 
 import Link from "next/link";
@@ -227,15 +230,32 @@ function DeliveryCodeBanner({ orderId, userId }: { orderId: string, userId: stri
   );
 }
 
+/* ── Demande d’annulation ──────────────────────────── */
+// Miroir des refus de `request_order_cancellation()`, eux-mêmes alignés sur
+// ceux d’`admin_cancel_order` : inutile de mettre en file une demande que la
+// RPC d’annulation rejettera.
+const CANCEL_ERRORS: Record<string, string> = {
+  not_authenticated:       "Reconnectez-vous pour demander l’annulation.",
+  order_not_found:         "Commande introuvable.",
+  already_cancelled:       "Cette commande est déjà annulée.",
+  order_completed:         "Cette commande est terminée : elle ne s’annule plus.",
+  order_already_delivered: "Cette commande vous a été livrée. En cas de problème, ouvrez un litige auprès du support.",
+  funds_already_released:  "Le paiement a déjà été versé au vendeur. Contactez le support.",
+};
+
 /* ── Carte commande ─────────────────────────────────────────────── */
 function OrderCard({
   order,
   country,
   userId,
+  hasPendingRequest,
+  onRequested,
 }: {
   order: AppOrder;
   country: Country | null;
   userId: string;
+  hasPendingRequest: boolean;
+  onRequested: (orderId: string) => void;
 }) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
   const shortRef = order.id.split("-")[0].toUpperCase();
@@ -247,6 +267,43 @@ function OrderCard({
   const isAwaitingCode = ["arrived", "code_generated", "awaiting_customer_confirmation"].includes(order.status);
   // Commande encore en attente de l'appel de confirmation Rivendy.
   const isPendingReview = ["pending", "pending_whatsapp"].includes(order.status);
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState("");
+
+  /**
+   * Demande d’annulation. L’écran n’écrit RIEN sur `orders` ni sur
+   * `order_cancellation_requests` : les deux sont fermées en écriture au
+   * client. La RPC est le seul chemin, et elle vérifie que l’appelant est
+   * bien l’acheteur.
+   */
+  async function requestCancellation() {
+    if (asking || hasPendingRequest) return;
+    const reason = window.prompt(
+      "Pourquoi souhaitez-vous annuler cette commande ? (facultatif)",
+      "",
+    );
+    if (reason === null) return;   // Annuler la boîte = ne rien demander
+
+    setAsking(true);
+    setAskError("");
+    try {
+      const { data, error } = await supabase.rpc("request_order_cancellation", {
+        p_order_id: order.id,
+        p_reason: reason.trim() || null,
+      });
+      const res = (data ?? {}) as { success?: boolean; error?: string };
+      if (error || !res.success) {
+        const code = res.error ?? "";
+        setAskError(CANCEL_ERRORS[code] || error?.message || "Demande impossible pour le moment.");
+        return;
+      }
+      onRequested(order.id);
+    } catch {
+      setAskError("Réseau indisponible — réessayez.");
+    } finally {
+      setAsking(false);
+    }
+  }
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
@@ -291,10 +348,32 @@ function OrderCard({
         </div>
 
         {isPendingReview && (
-          <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            Un conseiller Rivendy va confirmer cette commande. Pour la modifier
-            ou l’annuler, indiquez-le-lui lors de cet appel : le suivi et
-            l’annulation sont pris en charge par Rivendy.
+          hasPendingRequest ? (
+            <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+              Demande d’annulation envoyée. Rivendy la traite et vous répond ;
+              la commande reste active tant qu’elle n’est pas annulée.
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={requestCancellation}
+                disabled={asking}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                {asking ? "Envoi…" : "Demander l’annulation"}
+              </button>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+                Rivendy vérifie puis annule la commande. Vous recevez une
+                notification dès que c’est fait.
+              </p>
+            </>
+          )
+        )}
+        {askError && (
+          <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] leading-relaxed text-red-700">
+            {askError}
           </p>
         )}
       </div>
@@ -352,6 +431,11 @@ export function OrdersView() {
   const [orders, setOrders]   = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");
+  // Commandes pour lesquelles une demande d’annulation est déjà en attente.
+  // Chargé une fois pour toute la liste plutôt qu’une requête par carte.
+  // `order_cancellation_requests` est en lecture seule pour l’acheteur (RLS
+  // `ocr_select_own_or_staff`) : il ne voit que ses propres demandes.
+  const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set());
 
 
   const load = useCallback(async () => {
@@ -367,6 +451,15 @@ export function OrdersView() {
         ((data ?? []) as Array<Record<string, unknown>>).map(
           (row) => ({ ...row, items: row.order_items }) as AppOrder,
         ),
+      );
+
+      const { data: reqs } = await supabase
+        .from("order_cancellation_requests")
+        .select("order_id")
+        .eq("buyer_id", user.id)
+        .eq("status", "pending");
+      setPendingRequests(
+        new Set(((reqs ?? []) as Array<{ order_id: string }>).map((r) => r.order_id)),
       );
     } catch {
       // ne pas bloquer l'UI
@@ -495,6 +588,10 @@ export function OrdersView() {
               order={order}
               country={country}
               userId={user?.id || ""}
+              hasPendingRequest={pendingRequests.has(order.id)}
+              onRequested={(orderId) =>
+                setPendingRequests((prev) => new Set(prev).add(orderId))
+              }
             />
           ))}
         </div>
