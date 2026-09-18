@@ -1,5 +1,30 @@
 "use client";
 
+/**
+ * Mes commandes (acheteur).
+ *
+ * ⚠️ Cet écran est en LECTURE SEULE sur `orders`. Le bouton
+ * « Annuler la commande » qui vivait ici faisait un
+ * `update({ status: "cancelled" })` direct depuis le client : il n’a jamais
+ * rien annulé. `trg_a_guard_order_writes` (BEFORE UPDATE, owner
+ * `20260902_orders_write_guard.sql`) restaure `status` pour tout écrivain
+ * client (`current_user` ∈ authenticated/anon) — la ligne repart avec son
+ * ancien statut, et la policy `buyer_cancel_own_pending_order`, dont le
+ * WITH CHECK exige `status = 'cancelled'`, refuse alors la ligne restaurée.
+ * Le clic ne produisait donc aucun effet et aucun message.
+ *
+ * Même si l’UPDATE passait, il ne ferait RIEN de ce qu’une annulation
+ * exige : restituer le stock réservé à la création, rouvrir l’article
+ * passé `epuise`, relâcher le livreur, clore l’assignation, neutraliser le
+ * code de livraison et passer `financial_status` à `refunded`. Seule
+ * `admin_cancel_order()` le fait, et elle est réservée à `service_role`
+ * depuis le 2026-09-04 : le dashboard l’appelle, aucun client ne le peut.
+ *
+ * L’app ne propose aucun bouton d’annulation non plus — le site est désormais
+ * aligné. Une vraie demande d’annulation côté acheteur suppose une table
+ * dédiée et un écran dashboard (§1.6) : décision propriétaire en attente.
+ */
+
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -207,12 +232,10 @@ function OrderCard({
   order,
   country,
   userId,
-  onCancelled,
 }: {
   order: AppOrder;
   country: Country | null;
   userId: string;
-  onCancelled: (orderId: string) => void;
 }) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
   const shortRef = order.id.split("-")[0].toUpperCase();
@@ -222,26 +245,8 @@ function OrderCard({
   const isActive    = !["delivered", "delivered_by_rider", "delivered_confirmed", "completed", "cancelled"].includes(order.status);
   const curStep     = stepIndex(order.status);
   const isAwaitingCode = ["arrived", "code_generated", "awaiting_customer_confirmation"].includes(order.status);
-  // Parité RLS `buyer_cancel_own_pending_order` : l'acheteur peut annuler
-  // uniquement tant que la commande est encore en attente.
-  const canCancel = ["pending", "pending_whatsapp"].includes(order.status);
-  const [cancelling, setCancelling] = useState(false);
-
-  async function cancelOrder() {
-    if (!canCancel || cancelling) return;
-    const ok = window.confirm("Annuler cette commande ? Cette action est définitive.");
-    if (!ok) return;
-    setCancelling(true);
-    try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "cancelled" })
-        .eq("id", order.id);
-      if (!error) onCancelled(order.id);
-    } finally {
-      setCancelling(false);
-    }
-  }
+  // Commande encore en attente de l'appel de confirmation Rivendy.
+  const isPendingReview = ["pending", "pending_whatsapp"].includes(order.status);
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
@@ -285,16 +290,12 @@ function OrderCard({
           )}
         </div>
 
-        {canCancel && (
-          <button
-            type="button"
-            onClick={cancelOrder}
-            disabled={cancelling}
-            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
-          >
-            <XCircle className="h-3.5 w-3.5" />
-            {cancelling ? "Annulation…" : "Annuler la commande"}
-          </button>
+        {isPendingReview && (
+          <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+            Un conseiller Rivendy va confirmer cette commande. Pour la modifier
+            ou l’annuler, indiquez-le-lui lors de cet appel : le suivi et
+            l’annulation sont pris en charge par Rivendy.
+          </p>
         )}
       </div>
 
@@ -494,9 +495,6 @@ export function OrdersView() {
               order={order}
               country={country}
               userId={user?.id || ""}
-              onCancelled={(orderId) =>
-                setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o)))
-              }
             />
           ))}
         </div>
