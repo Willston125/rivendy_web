@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Pin,
   Clock,
+  ShieldAlert,
 } from "lucide-react";
 import { useNotifications } from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
@@ -44,15 +45,34 @@ export function NotificationsView() {
     return date.toLocaleDateString("fr-FR");
   };
 
+  // Destination d'une notification, ou null quand elle n'en a pas.
+  // Sert AUSSI à l'affichage : une carte sans destination ne doit pas se
+  // présenter comme cliquable (le clic ne ferait que la marquer comme lue).
+  const destinationFor = (n: AppNotification): string | null => {
+    switch (n.type) {
+      case "new_order":
+        return "/wallet";
+      case "review_request":
+      case "order_placed":
+      case "delivery_code":
+        return "/orders";
+      case "new_product":
+      case "new_comment":
+      case "product_approved":
+      case "product_rejected":
+        // product_id peut être NULL : sans lui, il n'y a aucune fiche à ouvrir
+        return n.product_id ? `/products/${n.product_id}` : null;
+      default:
+        // "security" et les types inconnus n'ont volontairement pas de destination
+        return null;
+    }
+  };
+
   const handleNotificationTap = async (n: AppNotification) => {
     await markRead(n.id);
-    const isDeliveryCode = n.type === "delivery_code";
-    const isOrderPlaced = n.type === "order_placed";
-
-    if (isDeliveryCode || isOrderPlaced) {
-      router.push("/orders");
-    } else if (n.type === "new_comment" && n.product_id) {
-      router.push(`/products/${n.product_id}`);
+    const destination = destinationFor(n);
+    if (destination) {
+      router.push(destination);
     }
   };
 
@@ -102,14 +122,17 @@ export function NotificationsView() {
             const isDeliveryCode = n.type === "delivery_code";
             const isOrderPlaced = n.type === "order_placed";
             const isComment = n.type === "new_comment";
+            const isSecurity = n.type === "security";
             const code = extractCode(n.body);
+            const destination = destinationFor(n);
 
             return (
               <div
                 key={n.id}
                 onClick={() => handleNotificationTap(n)}
                 className={cn(
-                  "relative flex cursor-pointer gap-4 rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md",
+                  "relative flex gap-4 rounded-2xl border bg-white p-4 shadow-sm transition",
+                  destination && "cursor-pointer hover:shadow-md",
                   !n.is_read
                     ? isDeliveryCode
                       ? "border-amber-200 bg-amber-50/20"
@@ -132,6 +155,10 @@ export function NotificationsView() {
                   ) : isComment ? (
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E0F2F1] text-[#009688]">
                       <MessageCircle className="h-5.5 w-5.5" />
+                    </span>
+                  ) : isSecurity ? (
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                      <ShieldAlert className="h-5.5 w-5.5" />
                     </span>
                   ) : (
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
@@ -182,15 +209,15 @@ export function NotificationsView() {
                       <Clock className="h-3 w-3" />
                       {formatTimeAgo(n.created_at)}
                     </span>
-                    {(isDeliveryCode || isOrderPlaced) && (
+                    {/* Le libellé suit la destination réelle : pas d'invitation
+                        à cliquer sur une carte qui ne mène nulle part. */}
+                    {destination && (
                       <span className="flex items-center text-[#009688]">
-                        Voir ma commande
-                        <ChevronRight className="h-3 w-3" />
-                      </span>
-                    )}
-                    {isComment && (
-                      <span className="flex items-center text-[#009688]">
-                        Voir le produit
+                        {destination === "/wallet"
+                          ? "Voir mon portefeuille"
+                          : destination === "/orders"
+                          ? "Voir ma commande"
+                          : "Voir le produit"}
                         <ChevronRight className="h-3 w-3" />
                       </span>
                     )}

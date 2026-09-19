@@ -466,17 +466,10 @@ function CommentsPanel({
         .from("products")
         .update({ comments_count: (prod?.comments_count ?? 0) + 1 })
         .eq("id", productId);
-      if (sellerId && sellerId !== user.id) {
-        await supabase.from("app_notifications").insert({
-          user_id: sellerId,
-          type: "new_comment",
-          title: "💬 Nouveau commentaire",
-          body: `${authorName} a commenté votre article.`,
-          product_id: productId,
-          product_image: productImage,
-          is_read: false,
-        });
-      }
+      // Aucune notification insérée ici : un client ne peut pas écrire dans
+      // app_notifications pour un TIERS (policy auth.uid() = user_id depuis le
+      // 2026-09-02). L'insert était refusé en silence. Le vendeur est prévenu
+      // par le trigger serveur notify_seller_new_comment.
     }
   }
 
