@@ -11,7 +11,8 @@
     "check:categories": "node scripts/check-category-governance.mjs",
     "check:security": "node scripts/check-security-contracts.mjs",
     "check:classes": "node scripts/check-dead-classes.mjs",
-    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes"
+    "check:commission": "node scripts/check-commission-grid.mjs",
+    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

@@ -38,14 +38,18 @@ const CONDITIONS = ["Comme neuf","Très bon état","Bon état","Satisfaisant","N
 // (Location/Restaurant) se voyait facturer 5 % alors qu'elle doit être à 0 %.
 // Le taux vient désormais de la grille de référence, catégorie par catégorie
 // (audit AUDIT_COMMISSIONS_CATEGORIES_2026-07-25.md, §C10).
-function calcCommission(price: number, category: string) {
+// 2026-10-02 : le MONTANT suit la grille par prix (seuils par marché) ; le
+// taux de la catégorie ne dit plus que si elle est exonérée (0).
+function calcCommission(price: number, category: string, countryId: string | null | undefined) {
   const rate = referenceRate(category);
-  const { commission, displayPrice } = breakdown(price, rate);
+  const { commission, displayPrice, effectiveRate } = breakdown(price, rate, countryId);
   return {
     sellerPrice: price,
     commissionAmount: commission,
     displayPrice,
-    rateLabel: `${Math.round(rate * 100)} %`,
+    rateLabel: commission > 0
+      ? `${(effectiveRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`
+      : "0 %",
   };
 }
 
@@ -180,7 +184,7 @@ export function CreateStoreForm() {
         }
 
         const urls = await uploadProductPhotos(user.id, [p.file!]);
-        const { commissionAmount, displayPrice } = calcCommission(rawPrice, p.category);
+        const { commissionAmount, displayPrice } = calcCommission(rawPrice, p.category, country?.id);
 
         rows.push({
           seller_id: user.id,
@@ -349,7 +353,7 @@ export function CreateStoreForm() {
     const current = wp[currentProductIndex] ?? null;
     if (!current) return null;
     const globalIdx = products.indexOf(current);
-    const commission = current.price ? calcCommission(parseFloat(current.price) || 0, current.category) : null;
+    const commission = current.price ? calcCommission(parseFloat(current.price) || 0, current.category, country?.id) : null;
 
     return (
       <div className="flex flex-col gap-5">
@@ -485,7 +489,7 @@ export function CreateStoreForm() {
         {/* Liste récap */}
         <div className="space-y-3">
           {wp.map((p, i) => {
-            const commission = p.price ? calcCommission(parseFloat(p.price) || 0, p.category) : null;
+            const commission = p.price ? calcCommission(parseFloat(p.price) || 0, p.category, country?.id) : null;
             return (
               <div key={i} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
                 {p.preview && (

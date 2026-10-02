@@ -39,6 +39,14 @@ supprimées de cette table le 2026-07-05 : les utiliser ne renvoie rien.
 de la grille. Modifier un taux ici seulement crée une divergence invisible entre
 le web, l'app et le dashboard. Voir `../rivendy_app/PROTECTED_ZONES.md` §1.4.
 
+**Depuis le 2026-10-02, le MONTANT suit la grille par prix** : `PRICE_TIERS` +
+`commissionForSellerPrice()` (6 / 8 / 10 % par portion, seuils et pas
+d'arrondi par marché, calcul en entiers identique à la fonction SQL
+`commission_amount_for`). `REFERENCE_GRID` ne dit plus que si une catégorie
+est exonérée (0). `scripts/check-commission-grid.mjs`, lancé par
+`npm run check`, échoue si `PRICE_TIERS` s'écarte du tableau validé — ne pas
+le contourner.
+
 **Invariant :** `price = seller_price + commission_amount`. La commission
 s'AJOUTE au prix vendeur, elle ne s'en déduit jamais.
 

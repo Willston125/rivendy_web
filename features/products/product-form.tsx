@@ -82,9 +82,14 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     return () => { cancelled = true; };
   }, [category, country?.id]);
 
-  const preview             = breakdown(numericSellerPrice, isFood ? 0 : effectiveRate);
+  // Grille par prix (2026-10-02) : seuils et arrondi dépendent du marché.
+  const preview             = breakdown(numericSellerPrice, isFood ? 0 : effectiveRate, country?.id);
   const estimatedCommission = preview.commission;
   const estimatedDisplay    = preview.displayPrice;
+  // Taux EFFECTIF : par portion et arrondi au pas, il n'est plus un chiffre rond.
+  const rateLabel = estimatedCommission > 0
+    ? `${(preview.effectiveRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`
+    : effectiveRate > 0 ? "6 à 10 %" : "0 %";
 
   function onFilesChange(nextFiles: FileList | null) {
     if (!nextFiles) return;
@@ -132,7 +137,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       // peut l'avoir changé pendant la saisie. Même fonction que l'aperçu →
       // aucune divergence possible entre ce qui est montré et ce qui est écrit.
       const rate = isFood ? 0 : await getCommissionRate(category, country?.id);
-      const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate);
+      const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate, country?.id);
 
       const { error: profileError } = await supabase.from("profiles").upsert({
         id: user.id,
@@ -305,7 +310,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
               </div>
               <div className="flex justify-between">
                 <span>
-                  Commission Rivendy ({isFood ? "incluse" : `${Math.round(effectiveRate * 100)} %`})
+                  Commission Rivendy ({isFood ? "incluse" : rateLabel})
                 </span>
                 <span className="font-bold">+ {formatMoney(estimatedCommission, country)}</span>
               </div>

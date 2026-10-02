@@ -100,7 +100,11 @@ export function ReportModal({ targetId, type, isOpen, onClose }: ReportModalProp
         }));
       }
 
-      if (error) throw error;
+      // 23505 = ce compte a déjà signalé : depuis le 2026-10-02, la base
+      // n'accepte qu'UN signalement par personne (index uq_product_reports_reporter
+      // / uq_seller_reporter), ce qui empêche un seul compte de fabriquer le
+      // seuil de masquage automatique. L'intention est déjà enregistrée.
+      if (error && (error as { code?: string }).code !== "23505") throw error;
 
       setSuccess(true);
       setAlreadyReported(true);
