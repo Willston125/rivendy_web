@@ -51,22 +51,25 @@ import { cn } from "@/lib/utils/cn";
 type StatusConfig = { label: string; bg: string; text: string; icon: React.ReactNode };
 
 const DELIVERY_STATUS: Record<OrderStatus, StatusConfig> = {
-  pending_whatsapp:              { label: "En attente",      bg: "bg-amber-50",    text: "text-amber-700",   icon: <Clock className="h-3 w-3" /> },
-  confirmed_by_customer_service: { label: "Confirmée",       bg: "bg-blue-50",     text: "text-blue-700",    icon: <CheckCircle2 className="h-3 w-3" /> },
+  // Parcours de réception (2026-10-02) : mêmes mots que l'app et que les
+  // notifications — « en cours de validation » → « validée » → « en cours de
+  // livraison » → « livrée, à confirmer » → « réception confirmée ».
+  pending_whatsapp:              { label: "En cours de validation", bg: "bg-amber-50", text: "text-amber-700", icon: <Clock className="h-3 w-3" /> },
+  confirmed_by_customer_service: { label: "Validée",         bg: "bg-blue-50",     text: "text-blue-700",    icon: <CheckCircle2 className="h-3 w-3" /> },
   payment_received_cash:         { label: "Paiement reçu",   bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
-  assigned_to_delivery:          { label: "Livreur assigné", bg: "bg-indigo-50",   text: "text-indigo-700",  icon: <Package className="h-3 w-3" /> },
+  assigned_to_delivery:          { label: "En cours de livraison", bg: "bg-indigo-50", text: "text-indigo-700", icon: <Package className="h-3 w-3" /> },
   accepted_by_agent:             { label: "Pris en charge",  bg: "bg-indigo-50",   text: "text-indigo-700",  icon: <Package className="h-3 w-3" /> },
   picked_up:                     { label: "Récupérée",       bg: "bg-violet-50",   text: "text-violet-700",  icon: <Package className="h-3 w-3" /> },
   en_route:                      { label: "En route 🛵",     bg: "bg-cyan-50",     text: "text-cyan-700",    icon: <Truck className="h-3 w-3" /> },
   arrived:                       { label: "Livreur arrivé",  bg: "bg-amber-50",    text: "text-amber-800",   icon: <Clock className="h-3 w-3" /> },
   code_generated:                { label: "Code envoyé 🔑",  bg: "bg-amber-50",    text: "text-amber-800",   icon: <Clock className="h-3 w-3" /> },
   awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50",   text: "text-amber-800",   icon: <Truck className="h-3 w-3" /> },
-  delivered_by_rider:            { label: "Livrée ✓",        bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
-  delivered_confirmed:           { label: "Livrée ✓",        bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
+  delivered_by_rider:            { label: "Livrée — à confirmer", bg: "bg-amber-50", text: "text-amber-800", icon: <Package className="h-3 w-3" /> },
+  delivered_confirmed:           { label: "Réception confirmée ✓", bg: "bg-[#E0F2F1]", text: "text-[#009688]", icon: <CheckCircle2 className="h-3 w-3" /> },
   completed:                     { label: "Terminée ✓",      bg: "bg-[#E0F2F1]",   text: "text-[#009688]",   icon: <CheckCircle2 className="h-3 w-3" /> },
   cancelled:                     { label: "Annulée",          bg: "bg-red-50",      text: "text-red-600",     icon: <XCircle className="h-3 w-3" /> },
-  pending:                       { label: "En attente",       bg: "bg-amber-50",    text: "text-amber-700",   icon: <Clock className="h-3 w-3" /> },
-  confirmed:                     { label: "Confirmée",        bg: "bg-blue-50",     text: "text-blue-700",    icon: <CheckCircle2 className="h-3 w-3" /> },
+  pending:                       { label: "En cours de validation", bg: "bg-amber-50", text: "text-amber-700", icon: <Clock className="h-3 w-3" /> },
+  confirmed:                     { label: "Validée",          bg: "bg-blue-50",     text: "text-blue-700",    icon: <CheckCircle2 className="h-3 w-3" /> },
   in_delivery:                   { label: "En livraison 🛵",  bg: "bg-cyan-50",     text: "text-cyan-700",    icon: <Truck className="h-3 w-3" /> },
   // Le suivi est suspendu tant que Rivendy n'a pas tranché : l'acheteur doit
   // voir que son dossier est ouvert, pas « En attente ».
@@ -243,6 +246,18 @@ const CANCEL_ERRORS: Record<string, string> = {
   funds_already_released:  "Le paiement a déjà été versé au vendeur. Contactez le support.",
 };
 
+/* ── Réception (parcours du 2026-10-02) ────────────── */
+// Le livreur marque la commande « livrée », l'acheteur confirme la réception —
+// c'est elle qui paie le vendeur (24 h sans réponse = confirmation
+// automatique). Miroir des messages de l'app (OrderReceiptService) : les deux
+// clients disent la même chose pour la même cause.
+const RECEIPT_ERRORS: Record<string, string> = {
+  not_authenticated:          "Reconnectez-vous puis réessayez.",
+  order_not_found:            "Commande introuvable.",
+  not_your_order:             "Cette commande n’est pas la vôtre.",
+  order_not_awaiting_receipt: "Cette commande n’attend plus de confirmation — actualisez la page.",
+};
+
 /* ── Carte commande ─────────────────────────────────────────────── */
 function OrderCard({
   order,
@@ -250,12 +265,15 @@ function OrderCard({
   userId,
   hasPendingRequest,
   onRequested,
+  onChanged,
 }: {
   order: AppOrder;
   country: Country | null;
   userId: string;
   hasPendingRequest: boolean;
   onRequested: (orderId: string) => void;
+  /** Relit la liste après une confirmation ou un signalement. */
+  onChanged: () => void;
 }) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
   const shortRef = order.id.split("-")[0].toUpperCase();
@@ -269,6 +287,53 @@ function OrderCard({
   const isPendingReview = ["pending", "pending_whatsapp"].includes(order.status);
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState("");
+  const isAwaitingReceipt = order.status === "delivered_by_rider";
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptError, setReceiptError] = useState("");
+
+  /**
+   * Réception : rien n’est écrit sur `orders` (lecture seule, §1.12). Deux RPC
+   * SECURITY DEFINER vérifient que l’appelant est l’acheteur
+   * (20261002_order_receipt_3_rpc.sql).
+   */
+  async function receiptRpc(rpc: string, params: Record<string, unknown>) {
+    setReceiptBusy(true);
+    setReceiptError("");
+    try {
+      const { data, error } = await supabase.rpc(rpc, params);
+      const res = (data ?? {}) as { success?: boolean; error?: string };
+      if (error || !res.success) {
+        setReceiptError(RECEIPT_ERRORS[res.error ?? ""] || "Action impossible pour le moment. Réessayez.");
+        return;
+      }
+      onChanged();
+    } catch {
+      setReceiptError("Réseau indisponible — réessayez.");
+    } finally {
+      setReceiptBusy(false);
+    }
+  }
+
+  function confirmReceipt() {
+    if (receiptBusy) return;
+    if (!window.confirm(
+      "Vous avez reçu votre commande ?\n\nConfirmez seulement si le colis est entre vos mains et conforme. Le vendeur sera alors payé.",
+    )) return;
+    void receiptRpc("buyer_confirm_receipt", { p_order_id: order.id });
+  }
+
+  function reportProblem() {
+    if (receiptBusy) return;
+    const reason = window.prompt(
+      "Que s’est-il passé ? (colis non reçu, article abîmé, différent…)\nRivendy examine votre commande et vous recontacte. Le vendeur n’est pas payé tant que le problème n’est pas réglé.",
+      "",
+    );
+    if (reason === null) return;   // Annuler la boîte = ne rien signaler
+    void receiptRpc("buyer_report_delivery_problem", {
+      p_order_id: order.id,
+      p_reason: reason.trim() || null,
+    });
+  }
 
   /**
    * Demande d’annulation. L’écran n’écrit RIEN sur `orders` ni sur
@@ -375,6 +440,39 @@ function OrderCard({
           <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] leading-relaxed text-red-700">
             {askError}
           </p>
+        )}
+
+        {isAwaitingReceipt && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-black text-amber-900">
+              📦 Le livreur indique vous avoir remis cette commande.
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+              L’avez-vous bien reçue ? Sans réponse sous 24 h, la réception est
+              confirmée automatiquement.
+            </p>
+            <button
+              type="button"
+              onClick={confirmReceipt}
+              disabled={receiptBusy}
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#009688] py-2.5 text-xs font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {receiptBusy ? "Envoi…" : "Oui, je l’ai reçue"}
+            </button>
+            <button
+              type="button"
+              onClick={reportProblem}
+              disabled={receiptBusy}
+              className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white py-2 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+            >
+              <XCircle className="h-3.5 w-3.5" />
+              Signaler un problème
+            </button>
+            {receiptError && (
+              <p className="mt-2 text-[11px] leading-relaxed text-red-700">{receiptError}</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -589,6 +687,7 @@ export function OrdersView() {
               country={country}
               userId={user?.id || ""}
               hasPendingRequest={pendingRequests.has(order.id)}
+              onChanged={load}
               onRequested={(orderId) =>
                 setPendingRequests((prev) => new Set(prev).add(orderId))
               }
