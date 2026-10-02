@@ -23,6 +23,7 @@ import { useCart } from "@/features/cart/cart-provider";
 import { useCountry } from "@/features/country/country-provider";
 
 import { firstPhoto, formatMoney, orderId } from "@/lib/utils/format";
+import { orderFailureMessage } from "@/lib/utils/order-errors";
 import {
   formatKmf,
   fullAddressLabel,
@@ -227,6 +228,8 @@ export function CheckoutForm() {
         total_commission: number;
         total_seller_amount: number;
         error?: string;
+        /** Article en cause sur `product_not_available`. */
+        product_id?: string;
       };
 
       // 🛵 Livraison multi-vendeurs — même règle que l'app Flutter :
@@ -278,11 +281,14 @@ export function CheckoutForm() {
           ...snapshot,
         });
 
-        if (rpcError) throw rpcError;
+        // Les codes de la RPC sont traduits ici, une seule fois : le `catch`
+        // plus bas affiche le message tel quel.
+        if (rpcError) throw new Error(orderFailureMessage(rpcError.message));
 
         const resultObj = rpcResult as SecureOrderResult | null;
         if (!resultObj || resultObj.success === false) {
-          throw new Error(resultObj?.error || "Une erreur est survenue lors de la création de la commande.");
+          const missing = group.items.find((item) => item.product.id === resultObj?.product_id);
+          throw new Error(orderFailureMessage(resultObj?.error, missing?.product.title));
         }
 
         orderIds.push(id);
