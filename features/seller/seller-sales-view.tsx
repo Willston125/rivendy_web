@@ -157,12 +157,21 @@ export function SellerSalesView() {
   async function deleteProduct(id: string) {
     if (!confirm("Voulez-vous vraiment supprimer cet article ? Cette action est irréversible.")) return;
     setDeleting(id);
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    // 2026-10-03 : un vrai DELETE est réservé aux admins (policy
+    // products_delete_admin_only) — pour un vendeur il ne supprimait RIEN, sans
+    // erreur, et l'article revenait au rechargement. Suppression « douce »,
+    // même geste que l'app et le dashboard, et vérification qu'une ligne a
+    // réellement été modifiée.
+    const { data, error } = await supabase
+      .from("products")
+      .update({ status: "deleted", is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id");
     setDeleting(null);
-    if (!error) {
+    if (!error && data && data.length > 0) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
     } else {
-      alert("Erreur lors de la suppression.");
+      alert("Suppression impossible : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
     }
   }
 
