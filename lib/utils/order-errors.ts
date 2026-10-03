@@ -51,6 +51,10 @@ export function orderFailureMessage(raw: string | null | undefined, productTitle
       return "Adresse de livraison invalide — resélectionnez votre localité puis réessayez.";
     case "empty_items":
       return "Votre panier est vide.";
+    case "foreign_market":
+      // 2026-10-03 : la base refuse les produits d'un autre marché que celui
+      // de création du compte (20261003_orders_home_market_only.sql).
+      return "Votre commande contient des articles d'un autre pays que celui de votre compte : Rivendy ne prend pas encore ces commandes. Retirez-les du panier, ou passez par « Sur commande » pour acheter des produits d'un autre pays.";
   }
 
   const suffix = code ? ` (code : ${code.slice(0, 80)})` : "";

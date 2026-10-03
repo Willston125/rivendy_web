@@ -24,6 +24,7 @@ import { useCountry } from "@/features/country/country-provider";
 
 import { firstPhoto, formatMoney, orderId } from "@/lib/utils/format";
 import { orderFailureMessage } from "@/lib/utils/order-errors";
+import { useForeignMarketGuard } from "@/features/checkout/foreign-market-order";
 import {
   formatKmf,
   fullAddressLabel,
@@ -58,6 +59,7 @@ export function CheckoutForm() {
   const { country: countryOrNull, paymentMethods, needsMarketSelection } = useCountry();
   // country est alias de countryOrNull — utilise optional chaining partout
   const country = countryOrNull;
+  const marketGuard = useForeignMarketGuard();
 
 
   // Infos acheteur
@@ -176,6 +178,9 @@ export function CheckoutForm() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isFormValid || !groups.length) return;
+    // 🌍 2026-10-03 : pas de commande hors du marché d'origine du compte — le
+    // panier peut avoir été rempli sur un autre marché (la base l'impose aussi).
+    if (!(await marketGuard.allows(groups.flatMap((g) => g.items.map((i) => i.product.country_id))))) return;
     setLoading(true);
     setError("");
 
@@ -666,6 +671,7 @@ export function CheckoutForm() {
           </p>
         )}
       </aside>
+      {marketGuard.dialog}
     </form>
   );
 }

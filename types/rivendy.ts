@@ -144,6 +144,8 @@ export interface Profile {
 export interface Product {
   id: string;
   seller_id: string;
+  /** Marché de l'article (products.country_id) — présent avec select("*"). */
+  country_id?: string | null;
   title: string;
   description: string;
   price: number;

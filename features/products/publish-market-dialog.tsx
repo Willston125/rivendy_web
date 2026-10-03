@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { Globe } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DialogShell } from "@/components/ui/dialog-shell";
 import type { Country } from "@/types/rivendy";
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -32,11 +32,17 @@ export function needsHomeMarketReminder(
   return home !== "" && active !== "" && home !== active;
 }
 
+// Le marché d'origine ne change qu'à l'inscription : une lecture par compte
+// suffit (l'ajout au panier le consulte à chaque clic).
+const homeMarketCache = new Map<string, string>();
+
 /** Marché d'origine du compte, ou null s'il est illisible. */
 export async function fetchHomeMarketId(
   client: SupabaseClient,
   userId: string,
 ): Promise<string | null> {
+  const cached = homeMarketCache.get(userId);
+  if (cached) return cached;
   const { data, error } = await client
     .from("profiles")
     .select("default_market_country_id, country_id")
@@ -45,9 +51,10 @@ export async function fetchHomeMarketId(
   if (error || !data) return null;
   const row = data as { default_market_country_id?: string | null; country_id?: string | null };
   const dflt = (row.default_market_country_id ?? "").trim();
-  if (dflt) return dflt;
   const pays = (row.country_id ?? "").trim();
-  return pays || null;
+  const home = dflt || pays || null;
+  if (home) homeMarketCache.set(userId, home);
+  return home;
 }
 
 export function PublishMarketDialog({
@@ -63,98 +70,40 @@ export function PublishMarketDialog({
   onSwitchHome: () => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // Référence stable : le parent peut passer une fonction neuve à chaque
-  // rendu sans relancer l'effet (ce qui ferait sauter le focus).
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  // Focus confiné dans la fenêtre, Échap = fermer sans publier (même
-  // sémantique que la modale de marché).
-  useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const dialog = dialogRef.current;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog?.querySelector<HTMLElement>("button")?.focus();
-
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("button:not([disabled])"));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, []);
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="publish-market-title"
-        aria-describedby="publish-market-desc"
-        className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-xl sm:rounded-3xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center gap-3">
-          <Globe className="h-6 w-6 shrink-0 text-[#007168]" aria-hidden="true" />
-          <h2 id="publish-market-title" className="text-lg font-bold text-slate-900">
-            Tu n&apos;es pas sur ton marché
-          </h2>
-        </div>
-        <div id="publish-market-desc" className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
-          <p>
-            Tu es sur le marché <strong>{active.name}</strong>. Ton compte a été créé pour{" "}
-            <strong>{homeName}</strong>.
-          </p>
-          <p>
-            Si tu continues, l&apos;article sera publié sur le marché {active.name}, au prix indiqué en{" "}
-            {active.currency_symbol || active.currency_code}, pour les acheteurs de ce pays.
-          </p>
-        </div>
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onSwitchHome}
-            className="min-h-11 rounded-2xl px-4 text-sm font-semibold text-[#007168] hover:bg-[#007168]/10"
-          >
-            Revenir sur {homeName}
-          </button>
-          <button
-            type="button"
-            onClick={onPublishHere}
-            className="min-h-11 rounded-2xl bg-[#007168] px-4 text-sm font-semibold text-white hover:bg-[#005f57]"
-          >
-            Publier sur {active.name}
-          </button>
-        </div>
+    <DialogShell labelledBy="publish-market-title" describedBy="publish-market-desc" onClose={onClose}>
+      <div className="flex items-center gap-3">
+        <Globe className="h-6 w-6 shrink-0 text-[#007168]" aria-hidden="true" />
+        <h2 id="publish-market-title" className="text-lg font-bold text-slate-900">
+          Tu n&apos;es pas sur ton marché
+        </h2>
       </div>
-    </div>
+      <div id="publish-market-desc" className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
+        <p>
+          Tu es sur le marché <strong>{active.name}</strong>. Ton compte a été créé pour{" "}
+          <strong>{homeName}</strong>.
+        </p>
+        <p>
+          Si tu continues, l&apos;article sera publié sur le marché {active.name}, au prix indiqué en{" "}
+          {active.currency_symbol || active.currency_code}, pour les acheteurs de ce pays.
+        </p>
+      </div>
+      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onSwitchHome}
+          className="min-h-11 rounded-2xl px-4 text-sm font-semibold text-[#007168] hover:bg-[#007168]/10"
+        >
+          Revenir sur {homeName}
+        </button>
+        <button
+          type="button"
+          onClick={onPublishHere}
+          className="min-h-11 rounded-2xl bg-[#007168] px-4 text-sm font-semibold text-white hover:bg-[#005f57]"
+        >
+          Publier sur {active.name}
+        </button>
+      </div>
+    </DialogShell>
   );
 }

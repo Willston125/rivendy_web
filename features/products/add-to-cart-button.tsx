@@ -2,6 +2,7 @@
 
 import { Check, ShoppingBag } from "lucide-react";
 import { useCart } from "@/features/cart/cart-provider";
+import { useForeignMarketGuard } from "@/features/checkout/foreign-market-order";
 import { cn } from "@/lib/utils/cn";
 import type { Product } from "@/types/rivendy";
 
@@ -17,6 +18,8 @@ export function AddToCartButton({
   className?: string;
 }) {
   const { addItem, quantityOf } = useCart();
+  // 🌍 2026-10-03 : pas d'ajout au panier hors du marché d'origine du compte.
+  const marketGuard = useForeignMarketGuard();
   const qty = quantityOf(product.id);
   const inCart = qty > 0;
 
@@ -27,29 +30,34 @@ export function AddToCartButton({
   };
 
   return (
-    <button
-      type="button"
-      onClick={() => addItem(product)}
-      className={cn(
-        "inline-flex flex-1 items-center justify-center rounded-xl font-bold transition-all duration-200 active:scale-95",
-        sizeClasses[size],
-        inCart
-          ? "bg-[#25D366] text-white hover:bg-[#1da853]"
-          : "bg-[#009688] text-white hover:bg-[#00796B]",
-        className
-      )}
-    >
-      {inCart ? (
-        <>
-          <Check className="h-3.5 w-3.5 shrink-0" />
-          {qty > 1 ? `×${qty}` : label}
-        </>
-      ) : (
-        <>
-          <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
-          {label}
-        </>
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={async () => {
+          if (await marketGuard.allows([product.country_id])) addItem(product);
+        }}
+        className={cn(
+          "inline-flex flex-1 items-center justify-center rounded-xl font-bold transition-all duration-200 active:scale-95",
+          sizeClasses[size],
+          inCart
+            ? "bg-[#25D366] text-white hover:bg-[#1da853]"
+            : "bg-[#009688] text-white hover:bg-[#00796B]",
+          className
+        )}
+      >
+        {inCart ? (
+          <>
+            <Check className="h-3.5 w-3.5 shrink-0" />
+            {qty > 1 ? `×${qty}` : label}
+          </>
+        ) : (
+          <>
+            <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
+            {label}
+          </>
+        )}
+      </button>
+      {marketGuard.dialog}
+    </>
   );
 }
