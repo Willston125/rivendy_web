@@ -20,7 +20,12 @@ import {
 import { formatMoney } from "@/lib/utils/format";
 import { breakdown, getCommissionRate, referenceRate } from "@/lib/utils/commission";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
+import {
+  PublishMarketDialog,
+  fetchHomeMarketId,
+  needsHomeMarketReminder,
+} from "@/features/products/publish-market-dialog";
 
 type EditableProduct = Partial<Product> & { id?: string; country_id?: string | null };
 
@@ -42,6 +47,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
   const country = useCountryOrDefault();
+  const { countries, setCountryId } = useCountry();
 
   const [title, setTitle]               = useState(product?.title ?? "");
   const [description, setDescription]   = useState(product?.description ?? "");
@@ -58,6 +64,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [success, setSuccess]           = useState("");
+  const [notice, setNotice]             = useState("");
+  // Rappel du marché d'origine (2026-10-03) : fenêtre ouverte quand le
+  // vendeur publie hors du marché de création de son compte.
+  const [marketReminder, setMarketReminder] = useState<{ homeId: string; homeName: string } | null>(null);
 
   const previews           = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   const numericSellerPrice = Number(sellerPrice || 0);
@@ -124,9 +134,43 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       setError("Saisis un prix vendeur strictement positif.");
       return;
     }
+
+    // 🌍 Hors de son marché d'origine, publier doit être un CHOIX — jamais un
+    // oubli après une visite sur un autre marché. Création seulement :
+    // modifier un article ne change pas son marché. Avant tout envoi.
+    if (!product?.id) {
+      setLoading(true);
+      const homeId = await fetchHomeMarketId(supabase, user.id);
+      setLoading(false);
+      if (homeId && needsHomeMarketReminder(homeId, country.id)) {
+        setMarketReminder({
+          homeId,
+          homeName: countries.find((c) => c.id === homeId)?.name ?? homeId,
+        });
+        return;
+      }
+    }
+    await publish();
+  }
+
+  /** Choix « Revenir sur mon marché » : rien n'est publié, le vendeur
+   *  vérifie son prix dans la monnaie de son marché puis republie. */
+  async function switchToHomeMarket() {
+    const reminder = marketReminder;
+    setMarketReminder(null);
+    if (!reminder) return;
+    await setCountryId(reminder.homeId);
+    setError("");
+    setSuccess("");
+    setNotice(`Marché ${reminder.homeName} sélectionné : vérifie ton prix dans sa monnaie, puis publie.`);
+  }
+
+  async function publish() {
+    if (!user || !country?.id) return;
     setLoading(true);
     setError("");
     setSuccess("");
+    setNotice("");
 
     try {
       const uploaded = files.length ? await uploadProductPhotos(user.id, files) : [];
@@ -500,12 +544,30 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           {success}
         </div>
       )}
+      {notice && (
+        <div role="status" className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+          {notice}
+        </div>
+      )}
 
       {/* ── Bouton soumettre ─────────────────────────────────────── */}
       <Button type="submit" className="w-full" size="lg" disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {product?.id ? "Mettre à jour le produit" : "Envoyer en modération"}
       </Button>
+
+      {marketReminder && country && (
+        <PublishMarketDialog
+          active={country}
+          homeName={marketReminder.homeName}
+          onPublishHere={() => {
+            setMarketReminder(null);
+            void publish();
+          }}
+          onSwitchHome={() => void switchToHomeMarket()}
+          onClose={() => setMarketReminder(null)}
+        />
+      )}
     </form>
   );
 }

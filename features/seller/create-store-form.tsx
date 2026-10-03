@@ -15,7 +15,12 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
+import {
+  PublishMarketDialog,
+  fetchHomeMarketId,
+  needsHomeMarketReminder,
+} from "@/features/products/publish-market-dialog";
 import { formatMoney } from "@/lib/utils/format";
 import { breakdown, referenceRate } from "@/lib/utils/commission";
 import { uploadProductPhotos } from "@/services/image-upload";
@@ -82,6 +87,7 @@ type Step = 0 | 1 | 2 | 3;
 export function CreateStoreForm() {
   const { user } = useAuth();
   const country = useCountryOrDefault();
+  const { countries, setCountryId } = useCountry();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(0);
@@ -92,6 +98,9 @@ export function CreateStoreForm() {
   const [publishedCount, setPublishedCount] = useState(0);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishDone, setPublishDone] = useState(false);
+  const [notice, setNotice] = useState("");
+  // Rappel du marché d'origine (2026-10-03).
+  const [marketReminder, setMarketReminder] = useState<{ homeId: string; homeName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -161,6 +170,32 @@ export function CreateStoreForm() {
       return;
     }
 
+    // 🌍 Hors de son marché d'origine, ouvrir sa boutique doit être un CHOIX —
+    // jamais un oubli après une visite sur un autre marché. Avant tout envoi.
+    const homeId = await fetchHomeMarketId(supabase, user.id);
+    if (homeId && needsHomeMarketReminder(homeId, country.id)) {
+      setMarketReminder({
+        homeId,
+        homeName: countries.find((c) => c.id === homeId)?.name ?? homeId,
+      });
+      return;
+    }
+    await doPublish();
+  }
+
+  /** Choix « Revenir sur mon marché » : rien n'est publié, le vendeur
+   *  vérifie ses prix dans la monnaie de son marché puis relance. */
+  async function switchToHomeMarket() {
+    const reminder = marketReminder;
+    setMarketReminder(null);
+    if (!reminder) return;
+    await setCountryId(reminder.homeId);
+    setNotice(`Marché ${reminder.homeName} sélectionné : vérifiez vos prix dans sa monnaie, puis créez votre magasin.`);
+  }
+
+  async function doPublish() {
+    if (!user || !country?.id) return;
+    setNotice("");
     setPublishError(null);
     setPublishedCount(0);
     setStep(3);
@@ -480,6 +515,11 @@ export function CreateStoreForm() {
     const wp = productsWithPhoto;
     return (
       <div className="flex flex-col gap-4">
+        {notice && (
+          <div role="status" className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+            {notice}
+          </div>
+        )}
         {/* Info */}
         <div className="flex items-center gap-2 rounded-2xl bg-[#00C4B4]/10 px-4 py-3 text-sm font-bold text-[#00C4B4]">
           <CheckCircle className="h-4 w-4 shrink-0" />
@@ -632,6 +672,19 @@ export function CreateStoreForm() {
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}
+
+      {marketReminder && country && (
+        <PublishMarketDialog
+          active={country}
+          homeName={marketReminder.homeName}
+          onPublishHere={() => {
+            setMarketReminder(null);
+            void doPublish();
+          }}
+          onSwitchHome={() => void switchToHomeMarket()}
+          onClose={() => setMarketReminder(null)}
+        />
+      )}
     </div>
   );
 }
