@@ -45,6 +45,9 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  // Commentaires envoyés depuis la visionneuse, par article : le chiffre du
+  // bouton suit en local, rien n'est écrit en base (cf. CommentsPanel.submit).
+  const [postedComments, setPostedComments] = useState<Record<string, number>>({});
 
   const seller = stories[sellerIndex];
   const product: Product | undefined = seller?.products[productIndex];
@@ -249,7 +252,9 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
             <span className="grid h-12 w-12 place-items-center rounded-full bg-black/30 transition hover:bg-black/45">
               <MessageCircle className="h-6 w-6" />
             </span>
-            <span className="text-xs font-semibold drop-shadow">{product.comments_count}</span>
+            <span className="text-xs font-semibold drop-shadow">
+              {product.comments_count + (postedComments[product.id] ?? 0)}
+            </span>
           </button>
           <ShareStoryButton productId={product.id} />
         </div>
@@ -272,6 +277,12 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
             productId={product.id}
             productImage={photo}
             sellerId={seller.sellerId}
+            onPosted={() =>
+              setPostedComments((prev) => ({
+                ...prev,
+                [product.id]: (prev[product.id] ?? 0) + 1,
+              }))
+            }
             onClose={() => setCommentsOpen(false)}
           />
         )}
@@ -396,11 +407,14 @@ function CommentsPanel({
   productId,
   productImage,
   sellerId,
+  onPosted,
   onClose,
 }: {
   productId: string;
   productImage: string;
   sellerId: string;
+  /** Appelé après un envoi réussi — compteur local du bouton seulement. */
+  onPosted: () => void;
   onClose: () => void;
 }) {
   const { user, profile } = useAuth();
@@ -456,16 +470,12 @@ function CommentsPanel({
     if (!error && data) {
       setComments((prev) => [data as Comment, ...prev]);
       setText("");
-      // Incrémente le compteur produit (best-effort)
-      const { data: prod } = await supabase
-        .from("products")
-        .select("comments_count")
-        .eq("id", productId)
-        .maybeSingle();
-      await supabase
-        .from("products")
-        .update({ comments_count: (prod?.comments_count ?? 0) + 1 })
-        .eq("id", productId);
+      onPosted();
+      // Aucune écriture de products.comments_count ici (2026-10-03) : le trigger
+      // serveur trg_refresh_product_comments_count le recalcule à chaque
+      // commentaire. L'ancien +1 client était sans effet pour un acheteur (RLS,
+      // 0 ligne modifiée) et comptait un commentaire de trop quand le vendeur
+      // commentait son propre article.
       // Aucune notification insérée ici : un client ne peut pas écrire dans
       // app_notifications pour un TIERS (policy auth.uid() = user_id depuis le
       // 2026-09-02). L'insert était refusé en silence. Le vendeur est prévenu

@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { firstPhoto, formatMoney, isProductDeleted, isVisibleInCatalog } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
@@ -107,7 +107,10 @@ export function ProfileDashboard() {
         );
       }
 
-      /* Favoris */
+      /* Favoris — 2026-10-03 : la jointure lit `products` en direct, pas la
+         vue du catalogue. Même règle que visible_products et que les favoris
+         de l'app : un article supprimé, vendu, épuisé, refusé ou en attente
+         n'est plus affiché ni compté ici. */
       const { data: favRows } = await supabase
         .from("favorites")
         .select("products(*)")
@@ -116,16 +119,20 @@ export function ProfileDashboard() {
       setFavorites(
         ((favRows ?? []) as unknown as Array<{ products: Product | null }>)
           .map((r) => r.products)
-          .filter(Boolean) as Product[],
+          .filter((p): p is Product => !!p && isVisibleInCatalog(p)),
       );
 
-      /* Produits publiés */
+      /* Produits publiés — 2026-10-03 : hors articles supprimés (suppression
+         douce : la ligne reste, marquée is_deleted / deleted_at / status
+         'deleted'). Le compteur ne baissait jamais après une suppression. */
       const { data: prodRows } = await supabase
         .from("products")
         .select("*")
         .eq("seller_id", user.id)
+        .eq("is_deleted", false)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
-      setProducts((prodRows ?? []) as Product[]);
+      setProducts(((prodRows ?? []) as Product[]).filter((p) => !isProductDeleted(p)));
 
       /* Ratings pour trust */
       const { data: ratingRows } = await supabase

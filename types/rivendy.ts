@@ -173,6 +173,9 @@ export interface Product {
   likes_count: number;
   average_rating?: number | null;
   reject_reason?: string | null;
+  /** Suppression douce : la ligne reste, marquée is_deleted / deleted_at / status "deleted". */
+  is_deleted?: boolean | null;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
   seller_name?: string | null;

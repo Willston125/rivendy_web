@@ -391,13 +391,19 @@ export async function getStoryProducts(countryId = DEFAULT_COUNTRY_ID) {
   const supabase = createAnonServerClient();
   const nowIso = new Date().toISOString();
 
-  // Parity Flutter : is_deleted=false + story_expires_at > now + country_id sur le produit (pas le profil)
+  // Parity Flutter : story_expires_at > now + country_id sur le produit (pas le profil).
+  // 2026-10-03 : statuts, suppressions et précommandes = WHERE de visible_products,
+  // comme l'app depuis le 2026-10-02. 'pending'/'validated' montraient en story des
+  // articles jamais modérés ou masqués après signalements. On lit `products` et non
+  // la vue pour garder store_name dans le libellé de l'anneau.
   const { data, error } = await supabase
     .from("products")
     .select("*, profiles!seller_id(full_name, store_name, avatar_url, is_certified, country_id)")
     .eq("is_story", true)
     .eq("is_deleted", false)
-    .in("status", ["active", "boosted", "validated", "pending"])
+    .is("deleted_at", null)
+    .in("status", ["active", "boosted"])
+    .or("product_type.is.null,product_type.neq.preorder,show_in_catalog.eq.true")
     .gt("story_expires_at", nowIso)
     .eq("country_id", countryId)
     .order("created_at", { ascending: false })

@@ -7,6 +7,7 @@ import { ProductGrid } from "@/features/products/product-grid";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
+import { isVisibleInCatalog } from "@/lib/utils/format";
 import type { Product } from "@/types/rivendy";
 
 /* ── Squelette de chargement ─────────────────────────────────────── */
@@ -73,10 +74,17 @@ export function FavoritesView() {
         .select("products(*)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+      // La jointure lit `products` en direct, pas la vue du catalogue : on
+      // applique la MÊME règle qu'elle, comme l'app (favorite_service.dart).
+      // Jusqu'au 2026-10-03, un article supprimé, refusé ou en attente
+      // restait affiché comme en vente, « Ajouter au panier » compris, et un
+      // article vendu restait listé (ProductCard le grisait déjà). Il
+      // disparaît désormais ; la ligne `favorites` reste et il revient s'il
+      // est remis en vente.
       setProducts(
         ((data ?? []) as unknown as Array<{ products: Product | null }>)
           .map((row) => row.products)
-          .filter(Boolean) as Product[],
+          .filter((p): p is Product => !!p && isVisibleInCatalog(p)),
       );
       setLoading(false);
     }

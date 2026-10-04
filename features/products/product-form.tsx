@@ -68,6 +68,21 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   // Rappel du marché d'origine (2026-10-03) : fenêtre ouverte quand le
   // vendeur publie hors du marché de création de son compte.
   const [marketReminder, setMarketReminder] = useState<{ homeId: string; homeName: string } | null>(null);
+  // Édition depuis un autre marché que celui de l'article (2026-10-03) :
+  // l'enregistrement est refusé et ce marché est proposé.
+  const [articleMarket, setArticleMarket] = useState<{ id: string; name: string } | null>(null);
+  // Montants enregistrés de l'article (2026-10-03). Même règle que l'app : la
+  // RPC de prix ne repasse que si le prix vendeur (au centime près) ou la
+  // catégorie changent — un article publié avant la grille du 2026-10-02 garde
+  // ainsi ses montants tant que son prix ne bouge pas (PROTECTED_ZONES §1.4).
+  // Même repli que le champ prix ; relevés après chaque retarification, pour
+  // qu'un retour à l'ancien prix compte aussi comme un changement.
+  const [savedPricing, setSavedPricing] = useState(() => ({
+    sellerPrice: Number(product?.seller_price || product?.price || 0),
+    category:    product?.category ?? "",
+    commission:  Number(product?.commission_amount ?? 0),
+    price:       Number(product?.price ?? 0),
+  }));
 
   const previews           = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   const numericSellerPrice = Number(sellerPrice || 0);
@@ -75,6 +90,9 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const showVariants       = ["femme", "homme", "bebeEnfants"].includes(category);
   const totalPhotos        = existingPhotos.length + files.length;
   const canAddMore         = totalPhotos < MAX_PHOTOS;
+  const pricingChanged     =
+    Math.round(numericSellerPrice * 100) !== Math.round(savedPricing.sellerPrice * 100)
+    || category !== savedPricing.category;
 
   /* ── Aperçu commission ──────────────────────────────────────────
    * Taux réel de la catégorie (lu en base dès qu'il a répondu, sinon grille
@@ -93,7 +111,16 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   }, [category, country?.id]);
 
   // Grille par prix (2026-10-02) : seuils et arrondi dépendent du marché.
-  const preview             = breakdown(numericSellerPrice, isFood ? 0 : effectiveRate, country?.id);
+  // 2026-10-03 : en édition, sans changement de prix ni de catégorie, rien
+  // n'est recalculé — l'aperçu montre alors les montants enregistrés, pas
+  // ceux de la grille du jour.
+  const preview = product?.id && !pricingChanged
+    ? {
+        commission:    savedPricing.commission,
+        displayPrice:  savedPricing.price,
+        effectiveRate: savedPricing.sellerPrice > 0 ? savedPricing.commission / savedPricing.sellerPrice : 0,
+      }
+    : breakdown(numericSellerPrice, isFood ? 0 : effectiveRate, country?.id);
   const estimatedCommission = preview.commission;
   const estimatedDisplay    = preview.displayPrice;
   // Taux EFFECTIF : par portion et arrondi au pas, il n'est plus un chiffre rond.
@@ -118,6 +145,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) return;
+    setArticleMarket(null);
     // Garde-fou (défense en profondeur) : les catégories Rivendy ne sont
     // jamais publiables par un vendeur. Le test énumérait les identifiants à
     // la main et avait oublié `alimentation` — on interroge désormais la
@@ -132,6 +160,21 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     }
     if (!Number.isFinite(numericSellerPrice) || numericSellerPrice <= 0) {
       setError("Saisis un prix vendeur strictement positif.");
+      return;
+    }
+
+    // 🌍 Un article se modifie depuis SON marché (2026-10-03) : la policy
+    // products_update_own exige country_id = marché actif, et un UPDATE refusé
+    // ne modifie aucune ligne, sans erreur. On s'arrête avant tout envoi
+    // (photos comprises) et on propose ce marché — jamais de bascule
+    // silencieuse du marché du vendeur.
+    const articleCountryId = product?.id ? (product.country_id ?? null) : null;
+    if (articleCountryId && articleCountryId !== country.id) {
+      const articleCountry = countries.find((c) => c.id === articleCountryId);
+      setSuccess("");
+      setNotice("");
+      setError(`Cet article est publié sur le marché ${articleCountry?.name ?? articleCountryId}. Passe sur ce marché pour le modifier.`);
+      setArticleMarket(articleCountry ? { id: articleCountry.id, name: articleCountry.name } : null);
       return;
     }
 
@@ -163,6 +206,18 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     setError("");
     setSuccess("");
     setNotice(`Marché ${reminder.homeName} sélectionné : vérifie ton prix dans sa monnaie, puis publie.`);
+  }
+
+  /** Choix « Passer sur le marché de l'article » (édition) : rien n'est
+   *  enregistré, le vendeur vérifie son prix dans sa monnaie puis met à jour. */
+  async function switchToArticleMarket() {
+    const target = articleMarket;
+    setArticleMarket(null);
+    if (!target) return;
+    await setCountryId(target.id);
+    setError("");
+    setSuccess("");
+    setNotice(`Marché ${target.name} sélectionné : vérifie ton prix dans sa monnaie, puis mets à jour le produit.`);
   }
 
   async function publish() {
@@ -204,6 +259,13 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           }
         : {};
 
+      // Annonce refusée : la modifier la RENVOIE en modération, comme dans
+      // l'app (edit_product_screen.dart). Elle restait « rejected », hors de
+      // la file du dashboard, qui ne lit que « pending » (2026-10-03). Le
+      // motif est effacé : il ne vaut que pour « rejected ».
+      const resubmit = product?.status === "rejected";
+      const editedStatus = resubmit ? "pending" : product?.status || "pending";
+
       const productDetails = {
         seller_id:        user.id,
         // country_id EXIGÉ par la policy RLS d'insertion (products_insert_own_market :
@@ -217,7 +279,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         size:             isFood ? "" : (showVariants ? csv(variantSizes).split(",")[0] ?? "" : size.trim()),
         condition:        isFood ? "Neuf" : condition,
         photos,
-        status:           product?.id ? product.status || "pending" : "pending",
+        status:           product?.id ? editedStatus : "pending",
+        ...(resubmit ? { reject_reason: null } : {}),
         stock_quantity:   Number(stock || 1),
         product_type:     isFood ? "food_package" : "standard",
         package_contents: isFood ? packageContents.trim() : "",
@@ -228,22 +291,48 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       if (product?.id) {
         // Le prix ne passe jamais par un UPDATE direct : la RPC recalcule les
         // trois montants ensemble après l'enregistrement de la catégorie.
-        const { error: updateError } = await supabase
+        // 2026-10-03 : un UPDATE refusé par la RLS (article d'un autre marché
+        // que le marché actif) ne modifie AUCUNE ligne, sans erreur — seule la
+        // RPC de prix aboutissait et l'écran annonçait un succès. On vérifie
+        // qu'une ligne a réellement été modifiée AVANT de toucher au prix.
+        const { data: updated, error: updateError } = await supabase
           .from("products")
           .update(productDetails)
-          .eq("id", product.id);
+          .eq("id", product.id)
+          .select("id");
         if (updateError) throw updateError;
-
-        const { data: priceResult, error: priceError } = await supabase.rpc(
-          "seller_update_product_price",
-          { p_product_id: product.id, p_seller_price: numericSellerPrice },
-        );
-        if (priceError) throw priceError;
-        const result = priceResult as { success?: boolean; error?: string } | null;
-        if (!result?.success) {
-          throw new Error(result?.error || "Le prix n'a pas pu être mis à jour.");
+        if (!updated?.length) {
+          throw new Error("Modification non enregistrée : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
         }
-        setSuccess("Produit mis à jour avec succès ✓");
+        // Photos désormais rattachées à l'article : un nouvel essai ne les
+        // téléverse pas une seconde fois.
+        setExistingPhotos(photos);
+        setFiles([]);
+
+        // Retarification seulement si le prix vendeur ou la catégorie ont
+        // changé : corriger un titre ne déplace plus le prix acheteur.
+        if (pricingChanged) {
+          const { data: priceResult, error: priceError } = await supabase.rpc(
+            "seller_update_product_price",
+            { p_product_id: product.id, p_seller_price: numericSellerPrice },
+          );
+          const result = priceResult as
+            { success?: boolean; error?: string; commission_amount?: number; price?: number } | null;
+          if (priceError || !result || !result.success) {
+            // Le reste de l'article EST enregistré : le dire, plutôt qu'un échec global.
+            const cause = priceError?.message || result?.error;
+            throw new Error(`Modifications enregistrées${resubmit ? " et annonce renvoyée en validation" : ""}, mais le prix n'a pas pu être mis à jour${cause ? ` (${cause})` : ""}. Réessaie.`);
+          }
+          setSavedPricing({
+            sellerPrice: numericSellerPrice,
+            category,
+            commission:  Number(result.commission_amount ?? commissionAmount),
+            price:       Number(result.price ?? displayPrice),
+          });
+        }
+        setSuccess(resubmit
+          ? "Annonce modifiée et renvoyée en validation. Elle sera visible après validation par notre équipe."
+          : "Produit mis à jour avec succès ✓");
       } else {
         // Le trigger Supabase recalcule ces montants. Les valeurs client ne
         // servent qu'à conserver la compatibilité pendant le déploiement.
@@ -536,7 +625,12 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       {/* ── Messages retour ──────────────────────────────────────── */}
       {error && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {error}
+          <p>{error}</p>
+          {articleMarket && (
+            <Button type="button" className="mt-3" onClick={() => void switchToArticleMarket()}>
+              Passer sur {articleMarket.name}
+            </Button>
+          )}
         </div>
       )}
       {success && (

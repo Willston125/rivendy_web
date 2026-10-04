@@ -100,12 +100,17 @@ export function SellerDashboard() {
     if (!user) { setLoading(false); return; }
     setLoading(true);
     try {
+      // 2026-10-03 : hors articles supprimés. La suppression est « douce » (la
+      // ligne reste, marquée is_deleted / deleted_at / status 'deleted') et la
+      // RLS SELECT ne filtre pas le statut : l'article supprimé restait dans
+      // « Mes produits » (badge brut « deleted », lien Modifier) et dans
+      // « Produits publiés ».
       const [prodResp, orderResp, walletResp] = await Promise.all([
-        supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("products").select("*").eq("seller_id", user.id).eq("is_deleted", false).is("deleted_at", null).order("created_at", { ascending: false }),
         supabase.from("orders").select("*, order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false }).limit(50),
         supabase.from("wallets").select("balance").eq("user_id", user.id).maybeSingle(),
       ]);
-      setProducts((prodResp.data ?? []) as Product[]);
+      setProducts(((prodResp.data ?? []) as Product[]).filter((p) => p.status !== "deleted"));
       setOrders(
         ((orderResp.data ?? []) as Array<Record<string, unknown>>).map(
           (row) => ({ ...row, items: row.order_items }) as AppOrder,

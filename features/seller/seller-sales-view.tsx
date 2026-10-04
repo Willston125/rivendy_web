@@ -83,6 +83,15 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
   );
 }
 
+// Codes d'erreur de la RPC toggle_story — mêmes cas que l'app
+// (ToggleStoryResult.fromRpc, product_service.dart).
+const STORY_ERRORS: Record<string, string> = {
+  VIDEO_STORY_REQUIRES_SUB:
+    "Les stories vidéo sont réservées aux vendeurs Certifié et Pro. Abonne-toi pour les activer.",
+  FORBIDDEN: "Cet article ne t'appartient pas.",
+  NOT_FOUND: "Article introuvable : il a peut-être été supprimé.",
+};
+
 export function SellerSalesView() {
   const { user, profile } = useAuth();
   const country = useCountryOrDefault();
@@ -98,11 +107,16 @@ export function SellerSalesView() {
     if (!user) { setLoading(false); return; }
     setLoading(true);
     try {
+      // 2026-10-03 : hors articles supprimés. La suppression est « douce » (la
+      // ligne reste, marquée is_deleted / deleted_at / status 'deleted') et la
+      // RLS SELECT ne filtre pas le statut : sans ce filtre, l'article revenait
+      // au rechargement dans « Top produits par vues », et l'état vide d'un
+      // vendeur qui a tout supprimé n'apparaissait jamais.
       const [prodRes, orderRes] = await Promise.all([
-        supabase.from("products").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("products").select("*").eq("seller_id", user.id).eq("is_deleted", false).is("deleted_at", null).order("created_at", { ascending: false }),
         supabase.from("orders").select("*, items:order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false })
       ]);
-      setProducts((prodRes.data ?? []) as Product[]);
+      setProducts(((prodRes.data ?? []) as Product[]).filter((p) => p.status !== "deleted"));
       setOrders((orderRes.data ?? []) as AppOrder[]);
     } catch {
       // ne pas bloquer l'UI
@@ -149,9 +163,31 @@ export function SellerSalesView() {
   // ── Actions ────────────────────────────────────────────────
   async function markAsSold(productId: string) {
     setMarking(productId);
-    await supabase.from("products").update({ status: "sold" }).eq("id", productId);
-    await load();
+    // 2026-10-03 : l'erreur était ignorée et rien ne vérifiait que la ligne
+    // avait changé. Hors du marché ACTIF du vendeur, la RLS (products_update_own)
+    // ne modifie aucune ligne, SANS erreur : l'article restait « En ligne »,
+    // sans un mot. On n'annonce que ce que le serveur renvoie (ligne relue
+    // APRÈS les triggers) ; sold_at comme l'app.
+    const { data, error } = await supabase
+      .from("products")
+      .update({ status: "sold", sold_at: new Date().toISOString() })
+      .eq("id", productId)
+      .select("id, status, sold_at");
     setMarking(null);
+    const row = (data as Pick<Product, "id" | "status" | "sold_at">[] | null)?.[0];
+    if (!error && row?.status === "sold") {
+      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...row } : p)));
+    } else {
+      // Trois échecs distincts : erreur réseau/serveur ; aucune ligne revenue
+      // (RLS, hors marché actif) ; ligne revenue mais statut inchangé.
+      alert(
+        error
+          ? "Impossible de marquer l'article comme vendu. Vérifie ta connexion, puis réessaie."
+          : !row
+            ? "Impossible de marquer l'article comme vendu : vérifie que tu es sur le marché où il est publié, puis réessaie."
+            : "Le statut de l'article n'a pas changé. Réessaie dans un moment.",
+      );
+    }
   }
 
   async function deleteProduct(id: string) {
@@ -176,44 +212,55 @@ export function SellerSalesView() {
   }
 
   async function toggleStory(product: Product) {
-    setTogglingStory(product.id);
     const willBeStory = !product.is_story;
-    const isCertified = profile?.is_certified;
-    
-    // Si on active, on définit la durée selon certification
-    let expiresAt: Date | null = null;
-    if (willBeStory) {
-      expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + (isCertified ? 72 : 24));
-    }
-
-    const { error } = await supabase
-      .from("products")
-      .update({
-        is_story: willBeStory,
-        story_started_at: willBeStory ? new Date().toISOString() : null,
-        story_expires_at: willBeStory ? expiresAt?.toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", product.id);
-
-    setTogglingStory(null);
-    if (!error) {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === product.id
-            ? {
-                ...p,
-                is_story: willBeStory,
-                story_started_at: willBeStory ? new Date().toISOString() : undefined,
-                story_expires_at: willBeStory ? expiresAt?.toISOString() : undefined,
-              }
-            : p
-        )
+    // 2026-10-03 : une story n'est montrée aux acheteurs que pour un article
+    // en ligne (active / boosted, comme le rail de l'app et du site). La RPC
+    // accepte tout statut : l'écran annonçait donc une story que personne ne
+    // verrait. Retirer une story reste toujours possible.
+    if (willBeStory && product.status !== "active" && product.status !== "boosted") {
+      alert(
+        product.status === "pending"
+          ? "La story sera possible dès que Rivendy aura validé l'annonce."
+          : "Story impossible : seul un article en vente peut passer en story.",
       );
-    } else {
-      alert("Erreur lors du changement de story.");
+      return;
     }
+
+    setTogglingStory(product.id);
+    // 2026-10-03 : passage par la RPC toggle_story, comme l'app. L'UPDATE
+    // direct de is_story ne vérifiait aucune ligne : hors du marché actif, la
+    // RLS n'en modifiait aucune, sans erreur, et le bouton passait quand même
+    // à « Story ✓ ». Il contournait aussi les règles du serveur (story vidéo
+    // réservée aux formules Certifié/Pro, durée 24 h / 72 h selon l'abonnement
+    // actif). La RPC ne vérifie que la propriété : elle marche sur tous les
+    // marchés.
+    const { data, error } = await supabase.rpc("toggle_story", {
+      p_product_id: product.id,
+      p_activate: willBeStory,
+    });
+    setTogglingStory(null);
+    const res = (data ?? {}) as { ok?: boolean; hours?: number; error?: string };
+    if (error || res.ok !== true) {
+      alert(STORY_ERRORS[res.error ?? ""] || "Impossible de modifier la story, réessaie.");
+      return;
+    }
+
+    // « Story ✓ » seulement après l'accord du serveur, avec SA durée.
+    const startedAt = new Date();
+    const expiresAt = new Date(startedAt);
+    expiresAt.setHours(expiresAt.getHours() + (res.hours ?? 24));
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === product.id
+          ? {
+              ...p,
+              is_story: willBeStory,
+              story_started_at: willBeStory ? startedAt.toISOString() : null,
+              story_expires_at: willBeStory ? expiresAt.toISOString() : null,
+            }
+          : p
+      )
+    );
   }
 
   // ── Stats ──────────────────────────────────────────────────

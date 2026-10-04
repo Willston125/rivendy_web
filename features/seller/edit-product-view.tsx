@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ProductForm } from "@/features/products/product-form";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
+import { isProductDeleted } from "@/lib/utils/format";
 import type { Product } from "@/types/rivendy";
 
 export function EditProductView({ productId }: { productId: string }) {
@@ -22,7 +23,12 @@ export function EditProductView({ productId }: { productId: string }) {
           .eq("id", productId)
           .eq("seller_id", user.id)
           .maybeSingle();
-        setProduct((data as Product | null) ?? null);
+        const row = (data as Product | null) ?? null;
+        // Article supprimé (suppression douce, la ligne reste) : plus
+        // modifiable, même par URL directe. Le formulaire le renvoyait sinon
+        // tel quel et annonçait un succès sur un article invisible partout
+        // (2026-10-03).
+        setProduct(row && !isProductDeleted(row) ? row : null);
       } catch {
         setProduct(null);
       } finally {

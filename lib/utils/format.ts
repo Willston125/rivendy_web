@@ -24,6 +24,31 @@ export function isProductVisible(product: Pick<Product, "status" | "stock_quanti
   return isProductPublished(product) && Number(product.stock_quantity ?? 0) > 0;
 }
 
+/**
+ * Vrai si l'article serait renvoyé par la vue `visible_products`. À appliquer
+ * partout où le site lit `products` EN DIRECT (jointure `products(*)` des
+ * favoris…) au lieu de la vue — sinon un article supprimé, refusé ou en
+ * attente reste affiché.
+ * Jumeaux à garder identiques : le WHERE de la vue
+ * (rivendy_dashboard/supabase/migrations/20260908_visible_products_seller_columns.sql)
+ * et `isVisibleInCatalog` de l'app
+ * (rivendy_app/lib/features/products/logic/catalog_visibility.dart).
+ * Si la vue change, changer les trois.
+ */
+export function isVisibleInCatalog(
+  product: Pick<Product, "status" | "product_type" | "show_in_catalog" | "is_deleted" | "deleted_at">,
+) {
+  return isProductPublished(product)
+    && (product.product_type !== "preorder" || product.show_in_catalog === true)
+    && product.is_deleted !== true
+    && product.deleted_at == null;
+}
+
+/** Article supprimé (suppression douce) : ni affichable, ni modifiable. */
+export function isProductDeleted(product: Pick<Product, "status" | "is_deleted" | "deleted_at">) {
+  return product.status === "deleted" || product.is_deleted === true || product.deleted_at != null;
+}
+
 export function isBoosted(product: Pick<Product, "status" | "boost_expires_at">) {
   if (product.status !== "boosted") return false;
   if (!product.boost_expires_at) return true;
