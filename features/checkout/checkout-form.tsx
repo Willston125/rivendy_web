@@ -13,16 +13,17 @@ import {
   Truck,
   User,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
+import { CartNotice } from "@/features/cart/cart-notice";
 import { useCountry } from "@/features/country/country-provider";
 
-import { firstPhoto, formatMoney, orderId } from "@/lib/utils/format";
+import { firstPhoto, formatMoney, isOrderable, orderId } from "@/lib/utils/format";
 import { orderFailureMessage } from "@/lib/utils/order-errors";
 import { useForeignMarketGuard } from "@/features/checkout/foreign-market-order";
 import {
@@ -49,13 +50,16 @@ type CheckoutProductPatch = {
   photos: string[] | null;
   size: string | null;
   status: string;
+  stock_quantity: number | null;
+  is_deleted: boolean | null;
+  deleted_at: string | null;
 };
 
 // ── Composant principal ────────────────────────────────────────────────────
 export function CheckoutForm() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { groups, totalAmount, totalItems, sellerCount, clearCart } = useCart();
+  const { groups, totalAmount, totalItems, sellerCount, removeItem, revalidateCart } = useCart();
   const { country: countryOrNull, paymentMethods, needsMarketSelection } = useCountry();
   // country est alias de countryOrNull — utilise optional chaining partout
   const country = countryOrNull;
@@ -83,6 +87,14 @@ export function CheckoutForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdIds, setCreatedIds] = useState<string[]>([]);
+  // Commandes d'un ou plusieurs vendeurs en échec alors que d'autres ont été créées.
+  const [partialFailure, setPartialFailure] = useState("");
+
+  // Le checkout relit le panier en base dès son ouverture (2026-10-04) :
+  // un article supprimé, vendu ou épuisé en sort avant la saisie.
+  useEffect(() => {
+    void revalidateCart();
+  }, [revalidateCart]);
 
   // ── Computed ──────────────────────────────────────────────────────────────
 
@@ -191,7 +203,7 @@ export function CheckoutForm() {
       );
       const { data: productRows, error: productsError } = await supabase
         .from("products")
-        .select("id, seller_id, title, price, seller_price, commission_amount, photos, size, status")
+        .select("id, seller_id, title, price, seller_price, commission_amount, photos, size, status, stock_quantity, is_deleted, deleted_at")
         .in("id", productIds);
 
       if (productsError) throw productsError;
@@ -199,6 +211,29 @@ export function CheckoutForm() {
       const productMap = new Map(
         (productRows as CheckoutProductPatch[] | null | undefined)?.map((p) => [p.id, p]) ?? [],
       );
+
+      // 2026-10-04 — Rien n'est envoyé tant qu'un article ne peut plus être
+      // commandé (même règle que le verrou de la RPC, isOrderable). Chaque
+      // vendeur est une transaction séparée : découvrir l'article supprimé au
+      // 2e vendeur laissait la commande du 1er créée, et un nouvel essai la
+      // recréait en double. Le panier est revérifié (l'article en sort ou sa
+      // quantité est ramenée au stock) avant d'afficher le message.
+      const blocking = groups.flatMap((group) =>
+        group.items.flatMap((item) => {
+          const fresh = productMap.get(item.product.id);
+          if (fresh && isOrderable(fresh, item.quantity)) return [];
+          const title = `« ${fresh?.title || item.product.title} »`;
+          return fresh && isOrderable(fresh)
+            ? [`${title} : il n'en reste que ${Number(fresh.stock_quantity)}`]
+            : [`${title} n'est plus disponible`];
+        }),
+      );
+      if (blocking.length) {
+        await revalidateCart({ force: true });
+        throw new Error(
+          `${blocking.join(" ; ")}. Votre panier a été mis à jour : vérifiez-le puis validez de nouveau. Aucune commande n'a été envoyée.`,
+        );
+      }
 
       const checkoutGroups = groups.map((group) => ({
         ...group,
@@ -246,24 +281,32 @@ export function CheckoutForm() {
       //     delivery_fee_kmf vaudrait N fois ce que l'acheteur a payé.
       let deliveryFeeAssigned = false;
 
+      // Échec d'un vendeur alors que d'autres passent : même boucle que l'app
+      // (multi_order_checkout_sheet.dart, 2026-10-04). On note la PREMIÈRE
+      // cause et on continue ; seuls les articles réellement commandés
+      // quittent le panier. Avant, le premier échec levait une erreur : les
+      // commandes déjà créées restaient dans le panier, et un nouvel essai
+      // les recréait en double (chaque essai tire un nouvel orderId).
+      const orderedGroups: typeof checkoutGroups = [];
+      let firstFailure: string | null = null;
+      let failedCount = 0;
+
       for (const group of checkoutGroups) {
         const id = orderId();
 
         // Snapshot d'adresse : uniquement en mode livraison structurée.
         // Les clés absentes prennent la valeur par défaut de la RPC (NULL / 0),
         // ce qui couvre le retrait et les marchés non couverts.
-        const snapshot =
-          deliveryMode === "delivery" && usesStructuredAddress && deliveryAddress
-            ? {
-                ...orderSnapshotParams(deliveryAddress),
-                p_delivery_fee_kmf: deliveryFeeAssigned
-                  ? 0
-                  : deliveryAddress.deliveryFeeKmf,
-              }
-            : {};
-        if (deliveryMode === "delivery" && usesStructuredAddress && deliveryAddress) {
-          deliveryFeeAssigned = true;
-        }
+        const structuredAddress =
+          deliveryMode === "delivery" && usesStructuredAddress ? deliveryAddress : null;
+        const snapshot = structuredAddress
+          ? {
+              ...orderSnapshotParams(structuredAddress),
+              p_delivery_fee_kmf: deliveryFeeAssigned
+                ? 0
+                : structuredAddress.deliveryFeeKmf,
+            }
+          : {};
 
         // Appeler le RPC sécurisé pour créer la commande et les articles
         const { data: rpcResult, error: rpcError } = await supabase.rpc("secure_create_order", {
@@ -286,21 +329,37 @@ export function CheckoutForm() {
           ...snapshot,
         });
 
-        // Les codes de la RPC sont traduits ici, une seule fois : le `catch`
-        // plus bas affiche le message tel quel.
-        if (rpcError) throw new Error(orderFailureMessage(rpcError.message));
-
+        // Les codes de la RPC sont traduits ici, une seule fois.
         const resultObj = rpcResult as SecureOrderResult | null;
-        if (!resultObj || resultObj.success === false) {
+        if (rpcError || !resultObj || resultObj.success === false) {
           const missing = group.items.find((item) => item.product.id === resultObj?.product_id);
-          throw new Error(orderFailureMessage(resultObj?.error, missing?.product.title));
+          firstFailure ??= rpcError
+            ? orderFailureMessage(rpcError.message)
+            : orderFailureMessage(resultObj?.error, missing?.product.title);
+          failedCount++;
+          continue;
         }
 
+        // Le tarif n'est porté que par la PREMIÈRE commande réellement créée :
+        // posé avant l'appel, un premier vendeur en échec l'aurait fait perdre
+        // à toutes les autres.
+        if (structuredAddress) deliveryFeeAssigned = true;
         orderIds.push(id);
+        orderedGroups.push(group);
       }
 
+      // Aucune commande créée : panier conservé, l'acheteur peut réessayer.
+      if (!orderIds.length) throw new Error(firstFailure ?? "Commande impossible. Réessaie.");
+
+      for (const group of orderedGroups) {
+        for (const item of group.items) removeItem(item.product.id);
+      }
+      setPartialFailure(
+        failedCount
+          ? `${failedCount > 1 ? `${failedCount} commandes n'ont pas pu être créées` : "1 commande n'a pas pu être créée"} : ${firstFailure ?? "erreur inconnue."} Les articles concernés sont restés dans votre panier.`
+          : "",
+      );
       setCreatedIds(orderIds);
-      clearCart();
 
       // Dashboard-first (2026-08-30, parité app) : la commande existe dès que
       // secure_create_order réussit. Aucun WhatsApp n'est ouvert — elle arrive
@@ -329,6 +388,10 @@ export function CheckoutForm() {
   if (!totalItems && !createdIds.length) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
+        {/* Panier vidé par la revérification : dire pourquoi. */}
+        <div className="text-left">
+          <CartNotice />
+        </div>
         <h1 className="text-3xl font-black text-slate-950">Panier vide</h1>
         <p className="mt-3 text-sm text-slate-500">Ajoute des produits depuis le feed pour commander.</p>
         <Link
@@ -355,6 +418,17 @@ export function CheckoutForm() {
             ? `Vos ${createdIds.length} commandes ont bien été transmises à Rivendy. Notre équipe va les prendre en charge.`
             : "Votre commande a bien été transmise à Rivendy. Notre équipe va la prendre en charge."}
         </p>
+        {partialFailure && (
+          <div
+            role="status"
+            className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-sm font-semibold text-amber-800"
+          >
+            ⚠️ {partialFailure}
+            <Link href="/cart" className="mt-2 block font-black underline">
+              Voir mon panier
+            </Link>
+          </div>
+        )}
         <div className="mt-4 space-y-2">
           {createdIds.map((id) => (
             <p key={id} className="text-sm font-bold text-[#009688]">✅ {id}</p>
@@ -376,6 +450,7 @@ export function CheckoutForm() {
 
       {/* ── COLONNE GAUCHE ─────────────────────────────────────────────── */}
       <div className="space-y-5">
+        <CartNotice />
 
         {/* Résumé groupes vendeurs */}
         <section className="rounded-2xl bg-white p-5 shadow-sm">

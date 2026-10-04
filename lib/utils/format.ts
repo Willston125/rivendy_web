@@ -49,6 +49,23 @@ export function isProductDeleted(product: Pick<Product, "status" | "is_deleted" 
   return product.status === "deleted" || product.is_deleted === true || product.deleted_at != null;
 }
 
+/**
+ * Vrai si `quantity` exemplaires peuvent être commandés. Miroir du verrou de
+ * `secure_create_order` (rivendy_dashboard/supabase/migrations/
+ * 20261003_orders_home_market_only.sql : status active/boosted ET
+ * stock_quantity >= quantité), suppression douce exclue. Ne PAS utiliser
+ * `isVisibleInCatalog` ici : une précommande masquée du catalogue reste
+ * commandable.
+ */
+export function isOrderable(
+  product: Pick<Product, "status" | "is_deleted" | "deleted_at"> & { stock_quantity?: number | null },
+  quantity = 1,
+) {
+  return isProductPublished(product)
+    && Number(product.stock_quantity ?? 0) >= quantity
+    && !isProductDeleted(product);
+}
+
 export function isBoosted(product: Pick<Product, "status" | "boost_expires_at">) {
   if (product.status !== "boosted") return false;
   if (!product.boost_expires_at) return true;

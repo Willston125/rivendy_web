@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect } from "react";
 import { MessageCircle, Minus, Plus, ShoppingBag, Store, Trash2, MessageSquare } from "lucide-react";
 import { useCart } from "@/features/cart/cart-provider";
+import { CartNotice } from "@/features/cart/cart-notice";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 
@@ -18,14 +20,24 @@ export function CartView() {
     removeItem,
     clearCart,
     setItemVariant,
+    revalidateCart,
   } = useCart();
   const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const country = useCountryOrDefault();
+
+  // Ouvrir le panier relit ses articles en base : un article supprimé, vendu
+  // ou épuisé depuis son ajout en sort, avec un avis (2026-10-04).
+  useEffect(() => {
+    void revalidateCart();
+  }, [revalidateCart]);
 
   // ── Panier vide ────────────────────────────────────────────────────────────
   if (!totalItems) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
+        <div className="text-left">
+          <CartNotice />
+        </div>
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#F5F7FA]">
           <ShoppingBag className="h-9 w-9 text-slate-300" />
         </div>
@@ -65,6 +77,8 @@ export function CartView() {
             Vider le panier
           </button>
         </div>
+
+        <CartNotice />
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
 
