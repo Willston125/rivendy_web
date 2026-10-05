@@ -20,10 +20,12 @@ import {
   type ProductSort,
 } from "@/services/public-data";
 import { CatalogToolbar } from "@/features/products/catalog-toolbar";
-import { groupRestaurants, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL, RESTAURANT_TYPE_FILTERS } from "@/features/products/restaurant-grouping";
+import { groupRestaurants, isRestaurantOpen, RESTAURANT_FILTERS, RESTAURANT_FILTER_ALL, RESTAURANT_TYPE_FILTERS } from "@/features/products/restaurant-grouping";
 import { RestaurantHome } from "@/features/products/restaurant-home";
 import { groupPharmacies, PHARMACY_FILTERS, PHARMACY_FILTER_ALL } from "@/features/products/pharmacy-grouping";
 import { PharmacyEstablishmentCard } from "@/features/products/pharmacy-establishment-card";
+import { ProductCard } from "@/features/products/product-card";
+import { PersonnelCard } from "@/features/products/personnel-card";
 import { filterLocationByChip, presentLocationChips } from "@/features/products/location-listings";
 import { LocationHome } from "@/features/products/location-home";
 import { filterWeddingByChip, presentWeddingChips } from "@/features/products/wedding-listings";
@@ -42,6 +44,7 @@ import { ConstructionCompanyCard } from "@/features/products/construction-compan
 import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
 import { isBoosted } from "@/lib/utils/format";
+import { marketNow } from "@/lib/utils/market-time";
 
 export async function generateMetadata({
   searchParams,
@@ -85,6 +88,9 @@ type HomeSearchParams = Promise<{
   locType?: string;
   hotelType?: string;
   pharmaRayon?: string;
+  /** Pharmacie : bascules « Ordonnance » / « Livraison » (comme l'app). */
+  rx?: string;
+  livraison?: string;
   constrType?: string;
   wedType?: string;
   page?: string;
@@ -118,6 +124,8 @@ export default async function HomePage({
   const locType = params.locType;
   const hotelType = params.hotelType;
   const pharmaRayon = params.pharmaRayon;
+  const pharmaRxOnly = params.rx === "1";
+  const pharmaDeliveryOnly = params.livraison === "1";
   const constrType = params.constrType;
   const wedType = params.wedType;
   const q = params.q;
@@ -163,6 +171,21 @@ export default async function HomePage({
         getStoreBannersFor(restaurantGroups.map((g) => g.sellerId)),
       ])
     : [{}, {}];
+  // Ouvert / fermé à l'heure LOCALE du marché (le serveur tourne en UTC),
+  // calculé une seule fois ici. Vue par défaut (sans filtre), comme l'app :
+  // rangées « Ouverts maintenant » + plats en promotion.
+  const showRestaurantRows = isRestaurant && !resType;
+  const restaurantNow = marketNow(countryId);
+  const restaurantOpenIds = isRestaurant
+    ? restaurantGroups
+        .filter((g) => g.openingHours && isRestaurantOpen(g.openingHours, restaurantNow))
+        .map((g) => g.sellerId)
+    : [];
+  const restaurantPromoDishes = showRestaurantRows
+    ? products
+        .filter((p) => isBoosted(p) || Boolean(p.extra_attributes?.promo) || Boolean(p.extra_attributes?.discount))
+        .slice(0, 10)
+    : [];
   // Chips : « Tous » + UNIQUEMENT les types présents + filtres dérivés.
   const presentResTypes = new Set(
     restaurantGroups.map((g) => g.etablissementType).filter(Boolean),
@@ -184,6 +207,22 @@ export default async function HomePage({
   const isPharmacy = category === "pharmacie";
   const pharmacyGroups = isPharmacy
     ? groupPharmacies(products, pharmaRayon ?? PHARMACY_FILTER_ALL)
+        .filter((g) => !pharmaRxOnly || g.hasPrescriptionProducts)
+        .filter((g) => !pharmaDeliveryOnly || g.hasDelivery)
+    : [];
+  // Liens de filtre Pharmacie : rayon + bascules conservés ensemble.
+  const pharmacyHref = (opts: { rayon?: string; rx: boolean; livraison: boolean }) => {
+    const qs = new URLSearchParams({ country: countryId, category: "pharmacie" });
+    if (opts.rayon && opts.rayon !== PHARMACY_FILTER_ALL) qs.set("pharmaRayon", opts.rayon);
+    if (opts.rx) qs.set("rx", "1");
+    if (opts.livraison) qs.set("livraison", "1");
+    return `/?${qs.toString()}`;
+  };
+  // « Produits populaires » (rayon Tous) : boostés d'abord, sinon les
+  // premiers produits — même règle que l'app (8 au plus).
+  const pharmacyBoosted = isPharmacy && !pharmaRayon ? products.filter((p) => isBoosted(p)) : [];
+  const pharmacyPopular = isPharmacy && !pharmaRayon
+    ? (pharmacyBoosted.length > 0 ? pharmacyBoosted : products).slice(0, 8)
     : [];
   const isConstruction = category === "materiauxConstruction";
   const isWedding = category === "mariage";
@@ -423,10 +462,7 @@ export default async function HomePage({
               {PHARMACY_FILTERS.map((value) => {
                 const active =
                   (!pharmaRayon && value === PHARMACY_FILTER_ALL) || pharmaRayon === value;
-                const href =
-                  value === PHARMACY_FILTER_ALL
-                    ? `/?country=${countryId}&category=pharmacie`
-                    : `/?country=${countryId}&category=pharmacie&pharmaRayon=${encodeURIComponent(value)}`;
+                const href = pharmacyHref({ rayon: value, rx: pharmaRxOnly, livraison: pharmaDeliveryOnly });
                 return (
                   <Link
                     key={value}
@@ -631,6 +667,10 @@ export default async function HomePage({
                 groups={restaurantGroups}
                 ratings={restaurantRatings}
                 banners={restaurantBanners}
+                openIds={restaurantOpenIds}
+                showRows={showRestaurantRows}
+                promoDishes={restaurantPromoDishes}
+                country={country}
               />
             </section>
           )}
@@ -650,6 +690,28 @@ export default async function HomePage({
                 </div>
                 <span className="hidden text-4xl sm:block">💊</span>
               </div>
+              {/* Bascules réelles, comme l'app : pharmacies proposant des
+                  produits sous ordonnance / la livraison. */}
+              <div className="mb-4 flex flex-wrap gap-2">
+                {[
+                  { label: "Ordonnance", active: pharmaRxOnly, href: pharmacyHref({ rayon: pharmaRayon, rx: !pharmaRxOnly, livraison: pharmaDeliveryOnly }) },
+                  { label: "Livraison", active: pharmaDeliveryOnly, href: pharmacyHref({ rayon: pharmaRayon, rx: pharmaRxOnly, livraison: !pharmaDeliveryOnly }) },
+                ].map((t) => (
+                  <Link
+                    key={t.label}
+                    href={t.href}
+                    aria-pressed={t.active}
+                    className={cn(
+                      "rounded-xl border px-3.5 py-2 text-[12.5px] font-bold transition",
+                      t.active
+                        ? "border-[#007168] bg-[#007168] text-white"
+                        : "border-[#B2DFDB] bg-white text-slate-700 hover:border-[#009688]",
+                    )}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
               <div className="mb-3 flex items-center gap-2">
                 <h2 className="text-[15px] font-black text-slate-900">Pharmacies recommandées</h2>
                 <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">
@@ -666,6 +728,18 @@ export default async function HomePage({
                 <p className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm font-semibold text-slate-500">
                   Aucune pharmacie disponible pour ce filtre.
                 </p>
+              )}
+              {pharmacyPopular.length > 0 && (
+                <div className="mt-6">
+                  <h2 className="mb-3 text-[15px] font-black text-slate-900">Produits populaires</h2>
+                  <div className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+                    {pharmacyPopular.map((p) => (
+                      <div key={p.id} className="w-44 shrink-0">
+                        <ProductCard product={p} country={country} compact />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </section>
           )}
@@ -687,6 +761,21 @@ export default async function HomePage({
                 </span>
               )}
             </div>
+            {category === "personnels" && !q ? (
+              /* Personnels : mini-annuaire de prestataires, comme l'app
+                 (PersonnelCard) — pas la grille produit générique. */
+              recent.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {recent.map((p) => (
+                    <PersonnelCard key={p.id} product={p} country={country} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-[13.5px] text-slate-500">
+                  {page > 1 ? "Plus aucun prestataire sur cette page." : "Aucun prestataire pour le moment."}
+                </p>
+              )
+            ) : (
             <ProductGrid
               products={recent}
               country={country}
@@ -700,6 +789,7 @@ export default async function HomePage({
                   : "Aucun produit dans cette catégorie pour le moment."
               }
             />
+            )}
             {/* Pagination — miroir du « Charger plus » de l'app (30 par page,
                 ici 60) : sans elle, seuls les 60 articles les plus récents
                 étaient accessibles depuis le site. */}

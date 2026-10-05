@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
+import { marketNow } from "@/lib/utils/market-time";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck, Star, Clock, Bike, Cross, PackageOpen, ClipboardPlus } from "lucide-react";
@@ -114,7 +115,7 @@ export default async function PharmacyCatalogPage({
   const hasDelivery = active.some((p) =>
     attr(p, "livraison").toLowerCase().startsWith("oui"),
   );
-  const isOpen = hours.length > 0 && isRestaurantOpen(hours);
+  const isOpen = hours.length > 0 && isRestaurantOpen(hours, marketNow(country.id));
   const rating = Number(trust.score ?? 0);
 
   const bannerSrc = seller.store_banner_url;

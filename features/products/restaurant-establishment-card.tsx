@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Utensils, BadgeCheck, Timer, Flame, ArrowRight, Star } from "lucide-react";
 import {
-  isRestaurantOpen,
   topDishes,
   type RestaurantGroup,
 } from "@/features/products/restaurant-grouping";
@@ -11,24 +10,30 @@ import {
  * Carte établissement premium (1 par restaurant) — onglet Restaurant web.
  * Clic → menu du restaurant (/restaurant/[sellerId]). Aucun contact direct.
  * Design mockup 2026-07-17 : logo chevauchant le bandeau, note ⭐ réelle
- * (si avis), chips spécialités. Statut Ouvert/Fermé : heure serveur (SSR).
+ * (si avis), chips spécialités. Statut Ouvert/Fermé : calculé UNE fois côté
+ * serveur, à l'heure locale du marché (`marketNow`), et passé en `isOpen` —
+ * le recalculer ici donnait l'heure UTC au rendu serveur puis celle du
+ * navigateur à l'hydratation.
  */
 export function RestaurantEstablishmentCard({
   group,
   avgRating,
   ratingCount = 0,
   bannerUrl,
+  isOpen: isOpenNow = false,
 }: {
   group: RestaurantGroup;
   avgRating?: number;
   ratingCount?: number;
   /** Bannière boutique du restaurateur — prime sur la photo du dernier plat. */
   bannerUrl?: string;
+  /** Ouvert à l'heure locale du marché (calculé côté serveur). */
+  isOpen?: boolean;
 }) {
   const plats = `${group.productCount} ${group.productCount > 1 ? "plats" : "plat"}`;
   const subtitle = [group.cuisine, group.deliveryZone].filter(Boolean).join(" · ");
   const hasHours = group.openingHours.length > 0;
-  const isOpen = hasHours && isRestaurantOpen(group.openingHours);
+  const isOpen = hasHours && isOpenNow;
   const dishes = topDishes(group);
   // Couverture effective : bannière boutique > photo de plat > repli icône.
   const cover = (bannerUrl ?? "").trim() || group.coverUrl;
