@@ -21,32 +21,41 @@ import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { firstPhoto, formatMoney, isProductDeleted, isVisibleInCatalog } from "@/lib/utils/format";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
+import { ORDER_STATUS_LABELS, orderCountry, orderReference, orderStatusLabel } from "@/lib/utils/orders";
 
-/* ── Libellés & couleurs des statuts commande ────────────────────── */
-const STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
-  pending_whatsapp:              { label: "En attente",       color: "bg-amber-100 text-amber-700" },
-  confirmed_by_customer_service: { label: "Confirmée",        color: "bg-blue-100 text-blue-700" },
-  payment_received_cash:         { label: "Paiement reçu",    color: "bg-[#E0F2F1] text-[#009688]" },
-  assigned_to_delivery:          { label: "Livreur assigné",  color: "bg-indigo-100 text-indigo-700" },
-  accepted_by_agent:             { label: "Pris en charge",   color: "bg-indigo-100 text-indigo-700" },
-  picked_up:                     { label: "Récupérée",        color: "bg-violet-100 text-violet-700" },
-  en_route:                      { label: "En route",         color: "bg-cyan-100 text-cyan-700" },
-  arrived:                       { label: "Livreur arrivé",   color: "bg-amber-100 text-amber-800" },
-  code_generated:                { label: "Code envoyé",      color: "bg-amber-100 text-amber-800" },
-  awaiting_customer_confirmation:{ label: "Livreur chez vous", color: "bg-amber-100 text-amber-800" },
-  delivered_by_rider:            { label: "Livrée",           color: "bg-green-100 text-green-700" },
-  delivered_confirmed:           { label: "Livrée ✓",         color: "bg-green-100 text-green-700" },
-  completed:                     { label: "Terminée ✓",       color: "bg-green-100 text-green-700" },
-  cancelled:                     { label: "Annulée",          color: "bg-red-100 text-red-600" },
-  pending:                       { label: "En attente",       color: "bg-amber-100 text-amber-700" },
-  confirmed:                     { label: "Confirmée",        color: "bg-blue-100 text-blue-700" },
-  in_delivery:                   { label: "En livraison",     color: "bg-cyan-100 text-cyan-700" },
-  disputed:                      { label: "Litige en cours",  color: "bg-orange-100 text-orange-700" },
-  shipped:                       { label: "Expédiée",         color: "bg-sky-100 text-sky-700" },
-  delivered:                     { label: "Livrée ✓",         color: "bg-[#E0F2F1] text-[#009688]" },
+/* ── Couleurs des statuts commande — libellés : source unique
+   lib/utils/orders.ts (mêmes mots que l app et que /orders). ───────── */
+const STATUS_COLORS: Record<OrderStatus, string> = {
+  pending_whatsapp:              "bg-amber-100 text-amber-700",
+  confirmed_by_customer_service: "bg-blue-100 text-blue-700",
+  payment_received_cash:         "bg-[#E0F2F1] text-[#009688]",
+  assigned_to_delivery:          "bg-indigo-100 text-indigo-700",
+  accepted_by_agent:             "bg-indigo-100 text-indigo-700",
+  picked_up:                     "bg-violet-100 text-violet-700",
+  en_route:                      "bg-cyan-100 text-cyan-700",
+  arrived:                       "bg-amber-100 text-amber-800",
+  code_generated:                "bg-amber-100 text-amber-800",
+  awaiting_customer_confirmation:"bg-amber-100 text-amber-800",
+  delivered_by_rider:            "bg-amber-100 text-amber-800",
+  delivered_confirmed:           "bg-green-100 text-green-700",
+  completed:                     "bg-green-100 text-green-700",
+  cancelled:                     "bg-red-100 text-red-600",
+  pending:                       "bg-amber-100 text-amber-700",
+  confirmed:                     "bg-blue-100 text-blue-700",
+  in_delivery:                   "bg-cyan-100 text-cyan-700",
+  disputed:                      "bg-orange-100 text-orange-700",
+  shipped:                       "bg-sky-100 text-sky-700",
+  delivered:                     "bg-[#E0F2F1] text-[#009688]",
 };
+
+const STATUS_MAP = Object.fromEntries(
+  (Object.keys(STATUS_COLORS) as OrderStatus[]).map((status) => [
+    status,
+    { label: ORDER_STATUS_LABELS[status], color: STATUS_COLORS[status] },
+  ]),
+) as Record<OrderStatus, { label: string; color: string }>;
 
 /* ── Liens de navigation du profil ──────────────────────────────── */
 const NAV_LINKS = [
@@ -80,6 +89,7 @@ interface FollowedStore {
 export function ProfileDashboard() {
   const { user, profile, signOut } = useAuth();
   const country = useCountryOrDefault();
+  const { countries } = useCountry();
 
   const [orders,    setOrders]    = useState<AppOrder[]>([]);
   const [favorites, setFavorites] = useState<Product[]>([]);
@@ -91,21 +101,20 @@ export function ProfileDashboard() {
     async function load() {
       if (!user) return;
 
-      /* Commandes */
-      const phone = profile?.whatsapp_number || user.user_metadata?.whatsapp_number || "";
-      if (phone) {
-        const { data } = await supabase
-          .from("orders")
-          .select("*, order_items(*)")
-          .eq("buyer_phone", phone)
-          .order("created_at", { ascending: false })
-          .limit(30);
-        setOrders(
-          ((data ?? []) as Array<Record<string, unknown>>).map(
-            (row) => ({ ...row, items: row.order_items }) as AppOrder,
-          ),
-        );
-      }
+      /* Commandes — par buyer_id, comme /orders et comme l app : la
+         recherche par buyer_phone seul affichait « Aucune commande » dès que
+         le numéro saisi au checkout différait de celui du profil. */
+      const { data: orderRows } = await supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("buyer_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      setOrders(
+        ((orderRows ?? []) as Array<Record<string, unknown>>).map(
+          (row) => ({ ...row, items: row.order_items }) as AppOrder,
+        ),
+      );
 
       /* Favoris — 2026-10-03 : la jointure lit `products` en direct, pas la
          vue du catalogue. Même règle que visible_products et que les favoris
@@ -297,8 +306,8 @@ export function ProfileDashboard() {
           ) : (
             <div className="space-y-2">
               {orders.slice(0, 6).map((order) => {
-                const statusInfo = STATUS_MAP[order.status] ?? { label: order.status, color: "bg-slate-100 text-slate-600" };
-                const shortRef   = order.id.split("-")[0].toUpperCase();
+                const statusInfo = STATUS_MAP[order.status] ?? { label: orderStatusLabel(order.status), color: "bg-slate-100 text-slate-600" };
+                const shortRef   = orderReference(order.id);
                 return (
                   <div
                     key={order.id}
@@ -317,7 +326,7 @@ export function ProfileDashboard() {
                       </p>
                     </div>
                     <p className="shrink-0 font-black text-[#009688]">
-                      {formatMoney(order.total_price, country)}
+                      {formatMoney(order.total_price, orderCountry(order.country_id, countries, country))}
                     </p>
                   </div>
                 );

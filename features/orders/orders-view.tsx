@@ -42,8 +42,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
+import { orderCountry, orderReference } from "@/lib/utils/orders";
 import type { AppOrder, Country, OrderStatus } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
 
@@ -276,7 +277,7 @@ function OrderCard({
   onChanged: () => void;
 }) {
   const cfg      = DELIVERY_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600", icon: null };
-  const shortRef = order.id.split("-")[0].toUpperCase();
+  const shortRef = orderReference(order.id);
   const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(order.created_at));
   const items    = order.items ?? [];
   const isCancelled = order.status === "cancelled";
@@ -401,6 +402,20 @@ function OrderCard({
             <p className="text-xl font-black text-[#009688]">
               {formatMoney(order.total_price, country)}
             </p>
+            {/* Livraison : HORS total_price (§1.8), affichée à part. */}
+            {Number(order.delivery_fee_kmf ?? 0) > 0 && (
+              <p className="text-[11px] font-semibold text-slate-500">
+                + livraison {formatMoney(order.delivery_fee_kmf, country)}
+              </p>
+            )}
+            {[order.delivery_neighborhood_name, order.delivery_locality_name, order.delivery_region_name]
+              .filter(Boolean).length > 0 && (
+              <p className="text-[11px] text-slate-400">
+                📍 {[order.delivery_neighborhood_name, order.delivery_locality_name, order.delivery_region_name]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+            )}
             <p className="text-[11px] text-slate-400">
               {items.length} article{items.length > 1 ? "s" : ""} · {fmtDate}
             </p>
@@ -526,6 +541,7 @@ function OrderCard({
 export function OrdersView() {
   const { user } = useAuth();
   const country = useCountryOrDefault();
+  const { countries } = useCountry();
   const [orders, setOrders]   = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<Filter>("all");
@@ -684,7 +700,8 @@ export function OrdersView() {
             <OrderCard
               key={order.id}
               order={order}
-              country={country}
+              // Devise du pays de la COMMANDE, pas du marché affiché.
+              country={orderCountry(order.country_id, countries, country)}
               userId={user?.id || ""}
               hasPendingRequest={pendingRequests.has(order.id)}
               onChanged={load}
