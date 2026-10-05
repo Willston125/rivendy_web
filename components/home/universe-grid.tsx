@@ -92,7 +92,7 @@ export function UniverseGrid({ countryId, q }: { countryId: string; q?: string }
             >
               <Image src={u.image} alt={u.label} width={44} height={44} className="h-9 w-9 object-contain sm:h-11 sm:w-11" />
             </div>
-            <span className="line-clamp-1 text-center text-[11px] font-bold text-slate-700 sm:text-[12px]">{u.label}</span>
+            <span className="line-clamp-2 text-center text-[11px] font-bold leading-tight text-slate-700 sm:text-[12px]">{u.label}</span>
           </div>
         );
 
