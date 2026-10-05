@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/features/auth/auth-provider";
+import { useCountry } from "@/features/country/country-provider";
+import { phoneHint } from "@/lib/utils/phone-validator";
 
 export function LoginForm() {
   const router = useRouter();
@@ -16,6 +18,9 @@ export function LoginForm() {
   // une page qui exigeait d'être connecté.
   const next = params.get("next") || "/";
   const { signInWithPhone } = useAuth();
+  // Exemple de format du marché choisi — l'ancien placeholder était le
+  // numéro de l'agence de Djibouti, sur tous les marchés.
+  const { country } = useCountry();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -40,7 +45,7 @@ export function LoginForm() {
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="phone">Numero WhatsApp</Label>
-        <Input id="phone" name="tel" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+253 77 14 53 06" required />
+        <Input id="phone" name="tel" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder={phoneHint(country?.id)} required />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">

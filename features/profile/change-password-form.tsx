@@ -5,6 +5,7 @@ import { CheckCircle, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { syntheticEmailFromPhone } from "@/lib/utils/format";
+import { validatePassword } from "@/lib/utils/password-policy";
 
 export function ChangePasswordForm() {
   const { user, profile } = useAuth();
@@ -20,8 +21,14 @@ export function ChangePasswordForm() {
   const [done, setDone] = useState(false);
 
   async function changePassword() {
+    if (loading) return;
     if (!currentPwd) return setError("Entrez votre mot de passe actuel.");
-    if (newPwd.length < 8) return setError("Minimum 8 caractères.");
+    // Même politique que l'inscription, l'app et le serveur (password_policy).
+    const policyError = validatePassword(newPwd, {
+      phone: profile?.whatsapp_number,
+      fullName: profile?.full_name,
+    });
+    if (policyError) return setError(policyError);
     if (newPwd === currentPwd) return setError("Le nouveau mot de passe doit être différent.");
     if (newPwd !== confirmPwd) return setError("Les mots de passe ne correspondent pas.");
 
@@ -29,7 +36,9 @@ export function ChangePasswordForm() {
     setLoading(true);
 
     try {
-      // Vérifier l'ancien mot de passe via re-authentification
+      // 1. Prouver la connaissance du mot de passe actuel : updateUser seul ne
+      //    l'exige pas. L'email de connexion est celui de la session (il ne
+      //    suit PAS les changements de numéro).
       const phone = profile?.whatsapp_number ?? "";
       const email = user?.email ?? (phone ? syntheticEmailFromPhone(phone) : "");
       const { error: reAuthErr } = await supabase.auth.signInWithPassword({
@@ -38,13 +47,50 @@ export function ChangePasswordForm() {
       });
       if (reAuthErr) {
         setLoading(false);
-        return setError("Mot de passe actuel incorrect. Réessayez.");
+        const msg = reAuthErr.message.toLowerCase();
+        return setError(
+          msg.includes("rate") || msg.includes("too many")
+            ? "Trop de tentatives. Réessayez dans quelques minutes."
+            : "Mot de passe actuel incorrect. Réessayez.",
+        );
       }
 
-      // Mettre à jour le mot de passe
+      // 2. Poser le nouveau mot de passe.
       const { error: updateErr } = await supabase.auth.updateUser({ password: newPwd });
+      if (updateErr) {
+        setLoading(false);
+        const msg = updateErr.message.toLowerCase();
+        return setError(
+          msg.includes("should be different") || msg.includes("same as the old")
+            ? "Le nouveau mot de passe doit être différent de l'actuel."
+            : "Le serveur a refusé ce mot de passe. Choisissez-en un autre.",
+        );
+      }
+
+      // 3. Le mot de passe EST changé : la suite est du nettoyage, un échec ne
+      //    doit pas faire croire que l'opération a raté. Même séquence que
+      //    l'app (auth_provider.dart, changePassword) — avant le 2026-10-04
+      //    le site laissait l'intrus connecté sur ses autres appareils.
+      try {
+        await supabase.auth.signOut({ scope: "others" });
+      } catch (err) {
+        console.error("Révocation des autres sessions échouée :", err);
+      }
+      if (user?.id) {
+        // Pour SOI uniquement : la policy exige auth.uid() = user_id.
+        // product_id volontairement absent (uuid : une chaîne vide lèverait 22P02).
+        const { error: notifErr } = await supabase.from("app_notifications").insert({
+          user_id: user.id,
+          type: "security",
+          title: "🔐 Mot de passe modifié",
+          body:
+            "Le mot de passe de votre compte vient d'être changé et vos autres appareils ont été " +
+            "déconnectés. Si ce n'est pas vous, contactez Rivendy immédiatement.",
+          is_read: false,
+        });
+        if (notifErr) console.error("Alerte de sécurité NON créée :", notifErr.message);
+      }
       setLoading(false);
-      if (updateErr) return setError(updateErr.message);
       setDone(true);
     } catch {
       setLoading(false);
@@ -60,7 +106,7 @@ export function ChangePasswordForm() {
         </div>
         <h1 className="mt-5 text-2xl font-black text-[#1A1A1A]">Mot de passe mis à jour ✅</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Votre mot de passe a été changé avec succès.
+          Votre mot de passe a été changé. Vos autres appareils ont été déconnectés.
         </p>
       </div>
     );
@@ -77,7 +123,8 @@ export function ChangePasswordForm() {
       <div className="mb-6 flex items-start gap-3 rounded-2xl bg-blue-50 p-4">
         <span className="mt-0.5 text-blue-600">ℹ️</span>
         <p className="text-xs text-blue-800">
-          Votre mot de passe doit contenir au moins 8 caractères et être différent de l&apos;actuel.
+          Au moins 8 caractères, différent de l&apos;actuel, sans votre numéro ni votre nom. Vos autres
+          appareils seront déconnectés.
         </p>
       </div>
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DeleteAccountAction } from "@/features/auth/delete-account-action";
 
 export const metadata: Metadata = {
   title: "Supprimer mon compte — Rivendy",
@@ -22,14 +23,21 @@ export default function DeleteAccountPage() {
       </h1>
       <p className="mt-3 text-slate-600">
         Vous pouvez supprimer définitivement votre compte Rivendy à tout moment,
-        directement depuis l&apos;application. Cette page explique la procédure et
-        les données concernées, conformément à la politique de Google Play.
+        directement ici ou depuis l&apos;application. Cette page explique la
+        procédure et les données concernées, conformément à la politique de
+        Google Play.
       </p>
+
+      {/* Suppression depuis le site — même Edge Function que l'app */}
+      <section className="mt-8">
+        <h2 className="mb-3 text-xl font-semibold text-slate-900">Depuis le site</h2>
+        <DeleteAccountAction />
+      </section>
 
       {/* Procédure in-app */}
       <section className="mt-10">
         <h2 className="text-xl font-semibold text-slate-900">
-          Depuis l&apos;application (recommandé)
+          Depuis l&apos;application
         </h2>
         <ol className="mt-4 space-y-3">
           {[
@@ -83,13 +91,12 @@ export default function DeleteAccountPage() {
           Besoin d&apos;aide ?
         </h2>
         <p className="mt-2 text-slate-700">
-          Si vous ne parvenez pas à supprimer votre compte depuis
-          l&apos;application, écrivez-nous à{" "}
+          Si vous ne parvenez pas à supprimer votre compte, écrivez-nous à{" "}
           <a
-            href="mailto:contact@fortixa.fr"
+            href="mailto:support@rivendy.com"
             className="font-medium text-teal-700 hover:underline"
           >
-            contact@fortixa.fr
+            support@rivendy.com
           </a>{" "}
           en précisant le numéro de téléphone ou l&apos;email associé à votre
           compte. Nous traiterons votre demande sous 30 jours.

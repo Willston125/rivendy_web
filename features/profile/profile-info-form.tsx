@@ -6,9 +6,15 @@ import { Camera, Loader2, Mail, Phone, Save, User, Store } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { compressImage } from "@/services/image-upload";
+import { useCountry } from "@/features/country/country-provider";
+import { phoneHint, validatePhone } from "@/lib/utils/phone-validator";
 
 export function ProfileInfoForm() {
   const { user, profile, refreshProfile } = useAuth();
+  const { country } = useCountry();
+  // L'identifiant de connexion est le numéro d'INSCRIPTION (email synthétique
+  // {chiffres}@nikey.app) : changer le numéro WhatsApp ne le change pas.
+  const loginDigits = (user?.email ?? "").endsWith("@nikey.app") ? (user?.email ?? "").split("@")[0] : "";
 
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [phone, setPhone] = useState(profile?.whatsapp_number ?? "");
@@ -75,8 +81,11 @@ export function ProfileInfoForm() {
   async function save() {
     if (!user) return;
     if (!fullName.trim()) return setError("Le nom est requis.");
-    if (phone && phone.replace(/\D/g, "").length < 8)
-      return setError("Numéro invalide (minimum 8 chiffres).");
+    // Même validation que l'inscription et que l'app (phone_validator).
+    if (phone.trim() !== (profile?.whatsapp_number ?? "")) {
+      const phoneError = validatePhone(phone, country?.id ?? profile?.country_id);
+      if (phoneError) return setError(phoneError);
+    }
     if (email && !/^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,}$/.test(email))
       return setError("Email invalide.");
 
@@ -113,13 +122,32 @@ export function ProfileInfoForm() {
       return;
     }
 
-    const { error: err } = await supabase
+    // .select() : on ne dit « mis à jour » que si une ligne a réellement été
+    // écrite (une écriture refusée par RLS ne renvoie pas d'erreur).
+    const { data: written, error: err } = await supabase
       .from("profiles")
       .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq("id", user.id);
+      .eq("id", user.id)
+      .select("id");
+
+    if (err || !written || written.length === 0) {
+      setSaving(false);
+      return setError("La mise à jour n'a pas pu être enregistrée. Réessayez.");
+    }
+
+    // Comme AuthProvider.updatePhone de l'app : les métadonnées du compte
+    // suivent le profil, sinon un écran qui les lit en premier réaffiche
+    // l'ancienne valeur. Best effort — profiles fait foi.
+    const metadata: Record<string, string> = {};
+    if ("whatsapp_number" in patch) metadata.whatsapp_number = patch.whatsapp_number ?? "";
+    if ("full_name" in patch) metadata.full_name = patch.full_name ?? "";
+    if ("real_email" in patch) metadata.real_email = patch.real_email ?? "";
+    if (Object.keys(metadata).length > 0) {
+      const { error: metaErr } = await supabase.auth.updateUser({ data: metadata });
+      if (metaErr) console.error("Métadonnées du compte non synchronisées :", metaErr.message);
+    }
 
     setSaving(false);
-    if (err) return setError(err.message);
     await refreshProfile();
     setMessage("✅ Informations mises à jour !");
     setTimeout(() => setMessage(""), 3000);
@@ -187,10 +215,16 @@ export function ProfileInfoForm() {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+253 77 12 34 56"
+            placeholder={phoneHint(country?.id)}
             className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
           />
         </FormField>
+        {loginDigits && (
+          <p className="-mt-2 text-xs text-slate-500">
+            Pour vous connecter, utilisez toujours le numéro de votre inscription (+{loginDigits}) :
+            changer votre numéro WhatsApp ici ne change pas votre identifiant de connexion.
+          </p>
+        )}
 
         <FormField label="Email (optionnel)" icon={<Mail className="h-4 w-4 text-[#009688]" />}>
           <input

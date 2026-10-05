@@ -12,6 +12,8 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { syntheticEmailFromPhone } from "@/lib/utils/format";
+import { friendlyLoginError, friendlySignupError } from "@/lib/utils/auth-errors";
+import { detectPhoneCountryId } from "@/lib/utils/phone-validator";
 import { DEFAULT_COUNTRY_ID, type Profile } from "@/types/rivendy";
 
 type AuthContextValue = {
@@ -117,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const email = syntheticEmailFromPhone(phone);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) throw new Error(friendlyLoginError(error.message));
     await refreshProfile();
   }, [refreshProfile]);
 
@@ -137,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       const cleanPhone = phone.trim();
       const email = syntheticEmailFromPhone(cleanPhone);
+      const phoneCountryCode = detectPhoneCountryId(cleanPhone);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -145,20 +148,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: fullName,
             whatsapp_number: cleanPhone,
             real_email: realEmail || "",
+            // Marché d'inscription aussi dans les métadonnées : la base peut
+            // ainsi le poser dès la création du profil (handle_new_user),
+            // avant tout UPDATE client que le garde de privilèges filtrerait.
+            country_id: countryId,
+            ...(phoneCountryCode ? { phone_country_code: phoneCountryCode } : {}),
           },
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(friendlySignupError(error.message));
 
       if (data.user) {
-        await supabase.from("profiles").upsert({
+        // Mêmes colonnes que l'app (auth_provider.dart, signUp). Jusqu'au
+        // 2026-10-04 le site n'écrivait que country_id — que
+        // trg_guard_profile_privileges restaure sur la valeur par défaut DJ.
+        // Le marché d'origine restait donc DJ : secure_create_order refusait
+        // (« foreign_market ») tout achat aux Comores d'un compte créé ici.
+        const { error: profileError } = await supabase.from("profiles").upsert({
           id: data.user.id,
           full_name: fullName,
           whatsapp_number: cleanPhone,
           real_email: realEmail || "",
+          ...(phoneCountryCode ? { phone_country_code: phoneCountryCode } : {}),
           country_id: countryId,
+          default_market_country_id: countryId,
+          active_market_country_id: countryId,
           updated_at: new Date().toISOString(),
         });
+        if (profileError) {
+          console.error("Inscription — profil non enregistré :", profileError.message);
+        }
       }
 
       await refreshProfile();
@@ -188,6 +207,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut({ scope: "local" });
     } catch {
       /* déjà vide */
+    }
+    // Comme l'app (_clearSensitiveLocalData) : le marché mémorisé part avec
+    // le compte — le prochain utilisateur de ce navigateur choisit le sien.
+    try {
+      localStorage.removeItem("rivendy_country_id");
+    } catch {
+      /* stockage indisponible */
     }
   }, []);
 
