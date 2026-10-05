@@ -30,9 +30,12 @@ export function storeCompleteness(
   const checks: { ok: boolean; label: string; href: string }[] = [
     { ok: !!seller.store_banner_url, label: "Ajouter une couverture", href: "" },
     { ok: !!seller.avatar_url, label: "Ajouter une photo de profil", href: "" },
-    { ok: !!seller.store_description, label: "Ajouter une description", href: "/seller" },
-    { ok: !!seller.country_id, label: "Renseigner votre pays", href: "/seller" },
-    { ok: !!seller.voice_note_url, label: "Ajouter une présentation vocale", href: "/seller" },
+    // Ces liens menaient à /seller, qui ne propose rien de tout cela : la
+    // description et la note vocale s'éditent dans les informations du
+    // compte. « Renseigner votre pays » est retiré : le pays du profil n'est
+    // pas modifiable par le vendeur (garde de privilèges) et toujours rempli.
+    { ok: !!seller.store_description, label: "Ajouter une description", href: "/profile/info" },
+    { ok: !!seller.voice_note_url && seller.voice_note_url.startsWith("http"), label: "Ajouter une présentation vocale", href: "/profile/info#presentation-vocale" },
     { ok: hasProduct, label: "Publier votre premier produit", href: "/sell" },
   ];
   const done = checks.filter((c) => c.ok).length;

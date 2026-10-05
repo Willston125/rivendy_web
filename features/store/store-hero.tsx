@@ -4,7 +4,7 @@ import type { Country, Product, Profile } from "@/types/rivendy";
 import { categoryLabel } from "@/lib/utils/format";
 import { FollowButton } from "@/features/store/follow-button";
 import { ShareButton } from "@/components/ui/share-button";
-import { StoreCoverEditButton, StoreAvatarEditButton } from "@/features/store/store-image-editor";
+import { StoreCoverEditButton, StoreAvatarEditButton, StoreCoverVideoButton } from "@/features/store/store-image-editor";
 import { StoreHeroCta } from "@/features/store/store-hero-cta";
 import { distinctCategories } from "@/features/store/store-helpers";
 import { ProductVideoPlayer } from "@/features/products/product-video-player";
@@ -89,6 +89,8 @@ export function StoreHero({
         <div className="pointer-events-none absolute inset-0 hidden bg-gradient-to-r from-white from-[38%] via-white/75 via-[58%] to-white/0 lg:block" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent lg:hidden" />
         <StoreCoverEditButton sellerId={seller.id} />
+        {/* Vidéo de couverture : Certifié / Pro (vérifié par le serveur) */}
+        {seller.is_certified && <StoreCoverVideoButton sellerId={seller.id} />}
 
         {/* Carte stats flottante — ancrée au coin bas-droit de la bannière (mobile et desktop) */}
         <div className="absolute bottom-4 right-4 z-10 lg:bottom-5 lg:right-5">

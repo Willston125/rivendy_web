@@ -1,7 +1,11 @@
 "use client";
 
 import { Printer, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { QrCode } from "@/components/ui/qr-code";
+
+/** Événement émis par le menu propriétaire pour lancer l'impression. */
+export const PRINT_CATALOG_EVENT = "rivendy:print-catalog";
 import { formatMoney } from "@/lib/utils/format";
 import { type Country } from "@/types/rivendy";
 
@@ -44,9 +48,13 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
     }, 500);
   };
 
-  // URL injectée par la page serveur : identique au premier rendu client,
-  // donc aucun décalage d'hydratation dans le QR code.
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(storeUrl)}`;
+  // « Imprimer le catalogue » du menu propriétaire déclenche la même
+  // impression (il ne faisait que défiler jusqu'aux produits).
+  useEffect(() => {
+    const onRequest = () => handlePrint();
+    window.addEventListener(PRINT_CATALOG_EVENT, onRequest);
+    return () => window.removeEventListener(PRINT_CATALOG_EVENT, onRequest);
+  });
 
   return (
     <>
@@ -105,11 +113,9 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
 
           {/* QR Code de la boutique */}
           <div className="flex flex-col items-center text-center space-y-1.5 p-2 border border-slate-100 rounded-2xl bg-slate-50">
-            <img
-              src={qrCodeUrl}
-              alt="Scan QR Code"
-              className="h-28 w-28 object-contain"
-            />
+            {/* QR généré localement (storeUrl vient du serveur : même rendu
+                des deux côtés, aucun décalage d'hydratation). */}
+            <QrCode value={storeUrl} size={112} title="QR code de la boutique" />
             <p className="text-[9px] font-black text-slate-800 uppercase tracking-wider">Scanner pour commander</p>
             <p className="text-[7px] text-slate-400 font-bold">rivendy.com</p>
           </div>

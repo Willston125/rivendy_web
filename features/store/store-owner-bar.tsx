@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ChevronDown, Pencil, Plus, LayoutGrid, BarChart3, Printer, Share2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
+import { PRINT_CATALOG_EVENT } from "@/features/store/print-catalog";
 
 interface OwnerBarProps {
   sellerId: string;
@@ -111,7 +112,7 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
                     {missing[0] && (
                       <button
                         type="button"
-                        onClick={() => goTo(missing[0].href || "/seller")}
+                        onClick={() => goTo(missing[0].href || "/profile/info")}
                         className="mt-1 block text-left text-[11px] font-bold text-[#009688] hover:underline"
                       >
                         → {missing[0].label}
@@ -122,7 +123,7 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
 
                 <button
                   type="button"
-                  onClick={() => goTo("/seller")}
+                  onClick={() => goTo("/profile/info")}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <Pencil className="h-4 w-4 text-slate-400" />
@@ -165,7 +166,11 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
                 </button>
                 <button
                   type="button"
-                  onClick={scrollToProducts}
+                  onClick={() => {
+                    // Lance la vraie impression (PrintCatalog écoute l'événement).
+                    setMenuOpen(false);
+                    window.dispatchEvent(new Event(PRINT_CATALOG_EVENT));
+                  }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <Printer className="h-4 w-4 text-slate-400" />

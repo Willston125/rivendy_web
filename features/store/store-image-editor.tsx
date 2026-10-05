@@ -2,7 +2,16 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera } from "lucide-react";
+import { Camera, Film, Loader2 } from "lucide-react";
+import {
+  MAX_VIDEO_SECONDS,
+  VideoError,
+  attachCoverVideo,
+  createUploadTicket,
+  deleteVideo,
+  readVideoDuration,
+  uploadVideoFile,
+} from "@/lib/video/video-service";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { ImageCropperModal } from "@/features/store/image-cropper-modal";
@@ -36,12 +45,15 @@ async function uploadCropped(
       return false;
     }
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    const { error: dbErr } = await supabase
+    // .select() : une écriture refusée par la RLS ne renvoie pas d'erreur —
+    // seule une ligne relue prouve que l'image est enregistrée.
+    const { data: written, error: dbErr } = await supabase
       .from("profiles")
       .update({ [column]: data.publicUrl, updated_at: new Date().toISOString() })
-      .eq("id", userId);
+      .eq("id", userId)
+      .select("id");
     if (dbErr) console.error("[store-image] update profil échoué:", dbErr.message);
-    return !dbErr;
+    return !dbErr && !!written && written.length > 0;
   } catch (e) {
     console.error("[store-image] exception:", e);
     return false;
@@ -102,6 +114,77 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
             else setErrMsg("Erreur lors de la mise à jour. Réessayez.");
           }}
         />
+      )}
+    </>
+  );
+}
+
+/* ── Vidéo de couverture (Certifié / Pro) ─────────────────────────
+   Miroir de seller_store_screen (app) : kind=store_cover → envoi direct à
+   Cloudflare → attach-cover-video (qui détruit l'ancienne vidéo). Le forfait
+   est vérifié par le SERVEUR (create-video-upload) ; la vidéo s'affiche dès
+   que le webhook l'a déclarée prête — jamais « ready » posé côté client. */
+export function StoreCoverVideoButton({ sellerId }: { sellerId: string }) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  if (!user || user.id !== sellerId) return null;
+
+  async function send(file: File) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const duration = await readVideoDuration(file);
+      if (!Number.isFinite(duration) || duration > MAX_VIDEO_SECONDS + 0.5) {
+        throw new VideoError(`Vidéo de ${MAX_VIDEO_SECONDS} secondes maximum : raccourcissez-la avant de l'envoyer.`);
+      }
+      const { uploadUrl, cfUid } = await createUploadTicket("store_cover");
+      await uploadVideoFile(uploadUrl, file);
+      const attached = await attachCoverVideo(cfUid);
+      if (!attached) {
+        await deleteVideo(cfUid); // pas d'orpheline facturée à vie (§1.9)
+        throw new VideoError("La vidéo n'a pas pu être rattachée à votre boutique.");
+      }
+      setMsg({ ok: true, text: "Vidéo envoyée : elle apparaîtra sur votre boutique après traitement." });
+      router.refresh();
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "L'envoi de la vidéo a échoué, réessayez." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          if (f) void send(f);
+        }}
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+        className="absolute right-3 top-14 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-black/70 disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+        Vidéo de couverture
+      </button>
+      {msg && (
+        <div
+          className={`absolute right-3 top-[6.25rem] z-10 max-w-xs rounded-xl px-3 py-1.5 text-xs font-bold text-white shadow ${msg.ok ? "bg-[#009688]" : "bg-red-600"}`}
+        >
+          {msg.text}
+        </div>
       )}
     </>
   );
