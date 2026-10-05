@@ -506,6 +506,22 @@ export default async function HomePage({
           {/* ── Section Hôtels (hôtel-first) ──────────────────────── */}
           {isHotel && (
             <section>
+              {/* Passerelle vers la réservation en ligne — comme l'onglet Hôtels
+                  de l'app, visible même sans hôtel « vitrine ». */}
+              <Link
+                href={`/hotels?country=${countryId}`}
+                className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[#009688] to-[#007168] p-5 text-white transition hover:opacity-95"
+              >
+                <div>
+                  <p className="text-lg font-black">Réservez votre hôtel en ligne</p>
+                  <p className="mt-0.5 text-[12.5px] font-medium text-white/85">
+                    Dates, chambres disponibles et confirmation immédiate
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-xl bg-white px-3.5 py-1.5 text-[12.5px] font-bold text-[#007168]">
+                  Voir les hôtels →
+                </span>
+              </Link>
               <div className="mb-3 flex items-center gap-2">
                 <h2 className="text-[15px] font-black text-slate-900">Hôtels recommandés</h2>
                 <span className="rounded-full bg-[#E0F2F1] px-2 py-0.5 text-[11px] font-bold text-[#007168]">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
+  BedDouble,
   ChevronRight,
   Heart,
   KeyRound,
@@ -62,6 +63,7 @@ const NAV_LINKS = [
   { href: "/profile/info",             icon: UserRound, label: "Informations personnelles" },
   { href: "/profile/password",         icon: KeyRound,  label: "Sécurité & mot de passe" },
   { href: "/profile/payment-methods",  icon: Wallet,    label: "Modes de paiement" },
+  { href: "/hotels/bookings",          icon: BedDouble, label: "Mes réservations d'hôtel" },
   { href: "/profile/settings",         icon: Settings,  label: "Paramètres" },
   { href: "/seller",                   icon: Store,     label: "Mon espace vendeur" },
 ];

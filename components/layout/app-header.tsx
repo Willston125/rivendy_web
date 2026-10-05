@@ -29,6 +29,8 @@ import type { AppNotification } from "@/features/notifications/use-notifications
 const navItems = [
   { href: "/", label: "Explorer" },
   { href: "/preorders", label: "Sur commande" },
+  // Réservation hôtelière en ligne (parité app, 2026-10-04)
+  { href: "/hotels", label: "Hôtels" },
   { href: "/seller", label: "Ma boutique" },
 ];
 
