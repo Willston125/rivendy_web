@@ -12,7 +12,8 @@
     "check:security": "node scripts/check-security-contracts.mjs",
     "check:classes": "node scripts/check-dead-classes.mjs",
     "check:commission": "node scripts/check-commission-grid.mjs",
-    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission"
+    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission && npm run check:listings",
+    "check:listings": "node scripts/sync-listings-from-app.mjs --check"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
@@ -21,6 +22,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.9.0",
     "next": "16.2.10",
+    "qrcode-generator": "2.0.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0"

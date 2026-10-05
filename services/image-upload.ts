@@ -31,7 +31,9 @@ export async function uploadProductPhotos(userId: string, files: File[]) {
   const urls: string[] = [];
 
   for (let index = 0; index < files.length; index += 1) {
-    const compressed = await compressImage(files[index]);
+    // Mêmes réglages que l'app (ImageService : 1080 px, JPEG 75 %) : une
+    // photo publiée depuis le site pèse autant qu'une photo de l'app.
+    const compressed = await compressImage(files[index], 1080, 0.75);
     const path = `${userId}/${Date.now()}_${index}.jpg`;
     const { error } = await supabase.storage
       .from("products-images")

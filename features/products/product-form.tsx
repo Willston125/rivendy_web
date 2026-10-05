@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Camera, ImagePlus, Loader2, X } from "lucide-react";
+import { Camera, Film, ImagePlus, Loader2, Lock, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { uploadProductPhotos } from "@/services/image-upload";
 import {
+  CATEGORIES,
+  SUBCATEGORIES,
   VENDOR_CATEGORIES,
   isRivendyManagedCategory,
   type CategoryId,
@@ -19,6 +21,21 @@ import {
 } from "@/types/rivendy";
 import { formatMoney } from "@/lib/utils/format";
 import { breakdown, getCommissionRate, referenceRate } from "@/lib/utils/commission";
+import {
+  CONDITION_OPTIONS,
+  CONSTRUCTION_CATEGORY_ID,
+  CONSTRUCTION_SUBCATEGORIES,
+  DEFAULT_CONDITION,
+  FASHION_SIZE_OPTIONS,
+  MAX_PRODUCT_PHOTOS,
+  constructionDescription,
+  findConstructionSubcategory,
+  findPhaseBListing,
+  isFashionCategory,
+  isPhaseBCategory,
+  phaseBCategoryFor,
+} from "@/lib/listings";
+import { MAX_VIDEO_SECONDS, readVideoDuration, uploadProductVideo } from "@/lib/video/video-service";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import {
@@ -26,16 +43,16 @@ import {
   fetchHomeMarketId,
   needsHomeMarketReminder,
 } from "@/features/products/publish-market-dialog";
+import { cn } from "@/lib/utils/cn";
 
-type EditableProduct = Partial<Product> & { id?: string; country_id?: string | null };
-
-const CONDITION_OPTIONS = ["Neuf", "Très bon état", "Bon état", "Correct"];
-const MAX_PHOTOS = 8;
+type EditableProduct = Partial<Product> & {
+  id?: string;
+  country_id?: string | null;
+  listing_type?: string | null;
+};
 
 /* ── Séparateur de section ───────────────────────────────────────── */
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  
-
   return (
     <p className="border-b border-slate-100 pb-2 text-[13px] font-black uppercase tracking-wider text-slate-400">
       {children}
@@ -43,24 +60,66 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+const csvList = (v: string | undefined | null) =>
+  (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
+/** Comparaison stable (tableaux, objets JSON) pour l'édition différentielle. */
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Formulaire de publication / édition — miroir de `sell_screen.dart` et
+ * `edit_product_screen.dart` (app). Remis à parité le 2026-10-04 :
+ *  - sous-catégorie obligatoire (Femme, Homme, Bébé, Électronique, Maison) ;
+ *  - type d'annonce + champs métier (Location, Mariage, Restaurant,
+ *    Personnels) et sous-catégorie Construction — sans eux, les annonces
+ *    publiées depuis le site échappaient aux filtres de ces univers ;
+ *  - mêmes états, tailles et limites que l'app (3 photos) ;
+ *  - l'édition n'envoie QUE ce qui a changé (« un formulaire n'écrit que ce
+ *    qu'il a édité ») ;
+ *  - la publication ne réécrit plus le profil du vendeur (nom, numéro).
+ */
 export function ProductForm({ product }: { product?: EditableProduct }) {
   const router = useRouter();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user } = useAuth();
   const country = useCountryOrDefault();
   const { countries, setCountryId } = useCountry();
+  const isEdit = !!product?.id;
+
+  // Article Rivendy (alimentation, hôtel, pharmacie) : reste ÉDITABLE, sa
+  // catégorie s'affiche en lecture seule (§1.10, comme edit_product_screen).
+  const lockedCategory = isEdit && isRivendyManagedCategory(String(product?.category ?? ""));
+
+  const initialPhaseB = findPhaseBListing(product?.subcategory);
+  const initialConstruction = findConstructionSubcategory(product?.subcategory);
+  const initialAttrs = product?.extra_attributes ?? {};
 
   const [title, setTitle]               = useState(product?.title ?? "");
   const [description, setDescription]   = useState(product?.description ?? "");
   const [sellerPrice, setSellerPrice]   = useState(String(product?.seller_price || product?.price || ""));
-  const [category, setCategory]         = useState<CategoryId>((product?.category as CategoryId) || "femme");
+  const [category, setCategory]         = useState<CategoryId>(
+    (product?.category as CategoryId) || (VENDOR_CATEGORIES[0]?.id as CategoryId) || "femme",
+  );
+  const [subcategory, setSubcategory]   = useState(
+    initialPhaseB || initialConstruction ? "" : (product?.subcategory ?? ""),
+  );
+  const [phaseBTypeKey, setPhaseBTypeKey] = useState(initialPhaseB?.typeKey ?? "");
+  const [phaseBValues, setPhaseBValues] = useState<Record<string, string>>(() => {
+    if (!initialPhaseB) return {};
+    const out: Record<string, string> = {};
+    for (const f of initialPhaseB.fields) if (initialAttrs[f.key]) out[f.key] = String(initialAttrs[f.key]);
+    return out;
+  });
+  const [constructionKey, setConstructionKey] = useState(initialConstruction?.key ?? "");
+  const [constructionValues, setConstructionValues] = useState<Record<string, string>>({});
   const [size, setSize]                 = useState(product?.size ?? "");
-  const [variantSizes, setVariantSizes] = useState(product?.extra_attributes?.sizes ?? "");
-  const [variantColors, setVariantColors] = useState(product?.extra_attributes?.colors ?? "");
-  const [condition, setCondition]       = useState(product?.condition ?? "Bon état");
+  const [variantSizes, setVariantSizes] = useState<string[]>(csvList(initialAttrs.sizes));
+  const [variantColors, setVariantColors] = useState(initialAttrs.colors ?? "");
+  const [condition, setCondition]       = useState(product?.condition ?? DEFAULT_CONDITION);
   const [stock, setStock]               = useState(String(product?.stock_quantity ?? 1));
-  const [packageContents, setPackageContents] = useState(product?.package_contents ?? "");
   const [files, setFiles]               = useState<File[]>([]);
   const [existingPhotos, setExistingPhotos] = useState<string[]>(product?.photos ?? []);
+  const [video, setVideo]               = useState<File | null>(null);
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [success, setSuccess]           = useState("");
@@ -73,10 +132,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const [articleMarket, setArticleMarket] = useState<{ id: string; name: string } | null>(null);
   // Montants enregistrés de l'article (2026-10-03). Même règle que l'app : la
   // RPC de prix ne repasse que si le prix vendeur (au centime près) ou la
-  // catégorie changent — un article publié avant la grille du 2026-10-02 garde
-  // ainsi ses montants tant que son prix ne bouge pas (PROTECTED_ZONES §1.4).
-  // Même repli que le champ prix ; relevés après chaque retarification, pour
-  // qu'un retour à l'ancien prix compte aussi comme un changement.
+  // catégorie changent (PROTECTED_ZONES §1.4).
   const [savedPricing, setSavedPricing] = useState(() => ({
     sellerPrice: Number(product?.seller_price || product?.price || 0),
     category:    product?.category ?? "",
@@ -85,36 +141,38 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   }));
 
   const previews           = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  const numericSellerPrice = Number(sellerPrice || 0);
+  const numericSellerPrice = Number(String(sellerPrice).replace(/\s/g, "").replace(",", ".") || 0);
   const isFood             = category === "alimentation";
-  const showVariants       = ["femme", "homme", "bebeEnfants"].includes(category);
+  const isPhaseB           = isPhaseBCategory(category);
+  const isConstruction     = category === CONSTRUCTION_CATEGORY_ID;
+  const isFashion          = isFashionCategory(category);
+  const subcategoryOptions = !isPhaseB && !isConstruction ? SUBCATEGORIES[category] ?? [] : [];
+  const phaseBCategory     = phaseBCategoryFor(category);
+  const phaseBListing      = phaseBCategory?.listings.find((l) => l.typeKey === phaseBTypeKey) ?? null;
+  const constructionSub    = findConstructionSubcategory(constructionKey);
+  // Taille : saisie pour tout sauf alimentation, Phase B et construction (app).
+  const showSize           = !isFood && !isPhaseB && !isConstruction;
+  const showCondition      = !isFood && !isPhaseB && !isConstruction;
   const totalPhotos        = existingPhotos.length + files.length;
-  const canAddMore         = totalPhotos < MAX_PHOTOS;
+  const canAddMore         = totalPhotos < MAX_PRODUCT_PHOTOS;
   const pricingChanged     =
     Math.round(numericSellerPrice * 100) !== Math.round(savedPricing.sellerPrice * 100)
     || category !== savedPricing.category;
+  const categoryLabel = CATEGORIES.find((c) => c.id === category)?.label ?? category;
 
-  /* ── Aperçu commission ──────────────────────────────────────────
-   * Taux réel de la catégorie (lu en base dès qu'il a répondu, sinon grille
-   * de référence). Remplace l'ancien « ~7 % » codé en dur, qui annonçait
-   * 7 % même sur les catégories à 0 % ou à 10 %.                        */
+  /* ── Aperçu commission ────────────────────────────────────────── */
   const [dbRate, setDbRate] = useState<number | null>(null);
   const effectiveRate = dbRate ?? referenceRate(category);
 
   useEffect(() => {
     let cancelled = false;
-    setDbRate(null);
     getCommissionRate(category, country?.id)
       .then((rate) => { if (!cancelled) setDbRate(rate); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [category, country?.id]);
 
-  // Grille par prix (2026-10-02) : seuils et arrondi dépendent du marché.
-  // 2026-10-03 : en édition, sans changement de prix ni de catégorie, rien
-  // n'est recalculé — l'aperçu montre alors les montants enregistrés, pas
-  // ceux de la grille du jour.
-  const preview = product?.id && !pricingChanged
+  const preview = isEdit && !pricingChanged
     ? {
         commission:    savedPricing.commission,
         displayPrice:  savedPricing.price,
@@ -123,52 +181,83 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     : breakdown(numericSellerPrice, isFood ? 0 : effectiveRate, country?.id);
   const estimatedCommission = preview.commission;
   const estimatedDisplay    = preview.displayPrice;
-  // Taux EFFECTIF : par portion et arrondi au pas, il n'est plus un chiffre rond.
   const rateLabel = estimatedCommission > 0
     ? `${(preview.effectiveRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`
     : effectiveRate > 0 ? "6 à 10 %" : "0 %";
 
+  function changeCategory(next: CategoryId) {
+    setCategory(next);
+    setDbRate(null);
+    // Mêmes remises à zéro que l'app : un sous-type d'une autre catégorie
+    // n'a plus de sens.
+    setSubcategory("");
+    setPhaseBTypeKey("");
+    setPhaseBValues({});
+    setConstructionKey("");
+    setConstructionValues({});
+  }
+
   function onFilesChange(nextFiles: FileList | null) {
     if (!nextFiles) return;
-    setFiles((current) => [...current, ...Array.from(nextFiles)].slice(0, MAX_PHOTOS - existingPhotos.length));
+    setFiles((current) => [...current, ...Array.from(nextFiles)].slice(0, MAX_PRODUCT_PHOTOS - existingPhotos.length));
   }
 
-  function removeExisting(url: string) {
-    setExistingPhotos((current) => current.filter((p) => p !== url));
+  async function onVideoChange(file: File | null) {
+    setVideo(null);
+    if (!file) return;
+    try {
+      const duration = await readVideoDuration(file);
+      if (!Number.isFinite(duration) || duration > MAX_VIDEO_SECONDS + 0.5) {
+        setError(`Vidéo de ${MAX_VIDEO_SECONDS} secondes maximum : raccourcissez-la avant de l'envoyer.`);
+        return;
+      }
+      setError("");
+      setVideo(file);
+    } catch {
+      setError("Ce fichier vidéo ne peut pas être lu.");
+    }
   }
 
-  function removeNew(index: number) {
-    setFiles((current) => current.filter((_, i) => i !== index));
+  function toggleSize(value: string) {
+    setVariantSizes((current) =>
+      current.includes(value) ? current.filter((s) => s !== value) : [...current, value],
+    );
+  }
+
+  /* ── Validation (mêmes règles que sell_screen) ─────────────────── */
+  function validationError(): string | null {
+    if (!lockedCategory && isRivendyManagedCategory(category)) {
+      return "Cette catégorie est réservée à Rivendy et ne peut pas être publiée depuis ce formulaire.";
+    }
+    if (!country?.id) return "Sélectionne ton marché avant de publier.";
+    if (!title.trim()) return "Le titre est requis.";
+    if (!Number.isFinite(numericSellerPrice) || numericSellerPrice <= 0) {
+      return "Saisis un prix vendeur strictement positif.";
+    }
+    if (subcategoryOptions.length > 0 && !subcategory) return "Sous-catégorie requise.";
+    if (isPhaseB && !phaseBTypeKey) return "Précisez le type d'annonce.";
+    if (isConstruction && !constructionKey && !isEdit) return "Précisez la sous-catégorie Construction.";
+    // Taille exigée à la publication (sell_screen) ; l'édition ne l'impose pas.
+    if (!isEdit && showSize && !size.trim()) return "La taille est requise (« Unique » si elle ne s'applique pas).";
+    const stockValue = Number(stock);
+    if (!Number.isInteger(stockValue) || stockValue < 1) return "La quantité en stock doit être d'au moins 1.";
+    return null;
   }
 
   /* ── Soumission ─────────────────────────────────────────────────── */
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user) return;
+    if (!user || loading) return;
     setArticleMarket(null);
-    // Garde-fou (défense en profondeur) : les catégories Rivendy ne sont
-    // jamais publiables par un vendeur. Le test énumérait les identifiants à
-    // la main et avait oublié `alimentation` — on interroge désormais la
-    // source unique, qui ne peut plus diverger du menu déroulant.
-    if (isRivendyManagedCategory(category)) {
-      setError("Cette catégorie est réservée à Rivendy et ne peut pas être publiée depuis ce formulaire.");
+    const invalid = validationError();
+    if (invalid) {
+      setError(invalid);
       return;
     }
-    if (!country?.id) {
-      setError("Sélectionne ton marché avant de publier.");
-      return;
-    }
-    if (!Number.isFinite(numericSellerPrice) || numericSellerPrice <= 0) {
-      setError("Saisis un prix vendeur strictement positif.");
-      return;
-    }
+    if (!country?.id) return;
 
-    // 🌍 Un article se modifie depuis SON marché (2026-10-03) : la policy
-    // products_update_own exige country_id = marché actif, et un UPDATE refusé
-    // ne modifie aucune ligne, sans erreur. On s'arrête avant tout envoi
-    // (photos comprises) et on propose ce marché — jamais de bascule
-    // silencieuse du marché du vendeur.
-    const articleCountryId = product?.id ? (product.country_id ?? null) : null;
+    // 🌍 Un article se modifie depuis SON marché (policy products_update_own).
+    const articleCountryId = isEdit ? (product?.country_id ?? null) : null;
     if (articleCountryId && articleCountryId !== country.id) {
       const articleCountry = countries.find((c) => c.id === articleCountryId);
       setSuccess("");
@@ -178,10 +267,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       return;
     }
 
-    // 🌍 Hors de son marché d'origine, publier doit être un CHOIX — jamais un
-    // oubli après une visite sur un autre marché. Création seulement :
-    // modifier un article ne change pas son marché. Avant tout envoi.
-    if (!product?.id) {
+    // 🌍 Hors de son marché d'origine, publier doit être un CHOIX.
+    if (!isEdit) {
       setLoading(true);
       const homeId = await fetchHomeMarketId(supabase, user.id);
       setLoading(false);
@@ -196,8 +283,6 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     await publish();
   }
 
-  /** Choix « Revenir sur mon marché » : rien n'est publié, le vendeur
-   *  vérifie son prix dans la monnaie de son marché puis republie. */
   async function switchToHomeMarket() {
     const reminder = marketReminder;
     setMarketReminder(null);
@@ -208,8 +293,6 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     setNotice(`Marché ${reminder.homeName} sélectionné : vérifie ton prix dans sa monnaie, puis publie.`);
   }
 
-  /** Choix « Passer sur le marché de l'article » (édition) : rien n'est
-   *  enregistré, le vendeur vérifie son prix dans sa monnaie puis met à jour. */
   async function switchToArticleMarket() {
     const target = articleMarket;
     setArticleMarket(null);
@@ -218,6 +301,20 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     setError("");
     setSuccess("");
     setNotice(`Marché ${target.name} sélectionné : vérifie ton prix dans sa monnaie, puis mets à jour le produit.`);
+  }
+
+  /** extra_attributes : champs Phase B + variantes mode (`_buildExtraAttributes`). */
+  function buildExtraAttributes(): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    if (isPhaseB) {
+      for (const [k, v] of Object.entries(phaseBValues)) if (v.trim()) attrs[k] = v.trim();
+    }
+    if (isFashion) {
+      const sizes = FASHION_SIZE_OPTIONS.filter((s) => variantSizes.includes(s));
+      if (sizes.length) attrs.sizes = sizes.join(",");
+      if (variantColors.trim()) attrs.colors = variantColors.trim();
+    }
+    return attrs;
   }
 
   async function publish() {
@@ -229,88 +326,105 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
 
     try {
       const uploaded = files.length ? await uploadProductPhotos(user.id, files) : [];
-      const photos   = [...existingPhotos, ...uploaded].filter(Boolean);
+      const photos   = [...existingPhotos, ...uploaded].filter(Boolean).slice(0, MAX_PRODUCT_PHOTOS);
       if (!photos.length) throw new Error("Ajoute au moins une photo du produit.");
 
-      // Taux relu au moment de l'envoi (et non celui de l'aperçu) : l'admin
-      // peut l'avoir changé pendant la saisie. Même fonction que l'aperçu →
-      // aucune divergence possible entre ce qui est montré et ce qui est écrit.
-      const rate = isFood ? 0 : await getCommissionRate(category, country?.id);
-      const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate, country?.id);
+      const rate = isFood ? 0 : await getCommissionRate(category, country.id);
+      const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate, country.id);
 
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        full_name: profile?.full_name || user.user_metadata?.full_name || "Utilisateur Rivendy",
-        whatsapp_number: profile?.whatsapp_number || user.user_metadata?.whatsapp_number || "",
-        country_id: country.id,
-        active_market_country_id: country.id,
-        updated_at: new Date().toISOString(),
-      });
-      if (profileError) throw profileError;
+      // Marché actif persisté AVANT l'insertion : current_publish_market()
+      // le lit. On n'écrit QUE cette colonne — jusqu'au 2026-10-04 la
+      // publication réécrivait aussi le nom et le numéro WhatsApp du vendeur
+      // avec les valeurs chargées en début de session (destination des
+      // retraits comprise).
+      if (!isEdit) {
+        const { error: marketError } = await supabase
+          .from("profiles")
+          .update({ active_market_country_id: country.id })
+          .eq("id", user.id);
+        if (marketError) throw marketError;
+      }
 
-      // Variantes (vêtements) : tailles + couleurs en CSV, format lu par
-      // Product.availableSizes / availableColors côté app.
-      const csv = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean).join(",");
-      const variantExtra: Record<string, string> = showVariants
-        ? {
-            ...(product?.extra_attributes ?? {}),
-            ...(csv(variantSizes) ? { sizes: csv(variantSizes) } : {}),
-            ...(csv(variantColors) ? { colors: csv(variantColors) } : {}),
-          }
-        : {};
+      const extraAttributes = buildExtraAttributes();
+      const subcategoryValue = isPhaseB
+        ? phaseBTypeKey
+        : isConstruction
+          ? (constructionKey || product?.subcategory || "")
+          : subcategory;
+      const finalDescription = isConstruction && !isEdit
+        ? constructionDescription(description.trim(), constructionSub, constructionValues)
+        : description.trim();
 
-      // Annonce refusée : la modifier la RENVOIE en modération, comme dans
-      // l'app (edit_product_screen.dart). Elle restait « rejected », hors de
-      // la file du dashboard, qui ne lit que « pending » (2026-10-03). Le
-      // motif est effacé : il ne vaut que pour « rejected ».
-      const resubmit = product?.status === "rejected";
-      const editedStatus = resubmit ? "pending" : product?.status || "pending";
-
-      const productDetails = {
-        seller_id:        user.id,
-        // country_id EXIGÉ par la policy RLS d'insertion (products_insert_own_market :
-        // le produit doit porter le marché du vendeur). Sans lui, l'INSERT est
-        // rejeté par la RLS — c'était la cause du « Publication impossible » (2026-07-17).
-        // En édition, on ne déplace pas le produit de marché : on garde sa valeur.
-        country_id:       product?.id ? (product.country_id ?? country.id) : country.id,
-        title:            title.trim(),
-        description:      description.trim(),
+      // Valeurs du formulaire, sur le modèle de l'insert de sell_screen.
+      const formValues: Record<string, unknown> = {
+        title:          title.trim(),
+        description:    finalDescription,
         category,
-        size:             isFood ? "" : (showVariants ? csv(variantSizes).split(",")[0] ?? "" : size.trim()),
-        condition:        isFood ? "Neuf" : condition,
+        subcategory:    subcategoryValue,
+        size:           showSize ? size.trim() : "",
+        condition:      isFood || isPhaseB ? "Neuf" : condition,
         photos,
-        status:           product?.id ? editedStatus : "pending",
-        ...(resubmit ? { reject_reason: null } : {}),
-        stock_quantity:   Number(stock || 1),
-        product_type:     isFood ? "food_package" : "standard",
-        package_contents: isFood ? packageContents.trim() : "",
-        ...(showVariants && Object.keys(variantExtra).length > 0 ? { extra_attributes: variantExtra } : {}),
-        updated_at:       new Date().toISOString(),
+        stock_quantity: Number(stock),
+        ...(isPhaseB && phaseBListing
+          ? { listing_type: phaseBListing.listingType, business_type: phaseBListing.businessType }
+          : {}),
       };
 
-      if (product?.id) {
-        // Le prix ne passe jamais par un UPDATE direct : la RPC recalcule les
-        // trois montants ensemble après l'enregistrement de la catégorie.
-        // 2026-10-03 : un UPDATE refusé par la RLS (article d'un autre marché
-        // que le marché actif) ne modifie AUCUNE ligne, sans erreur — seule la
-        // RPC de prix aboutissait et l'écran annonçait un succès. On vérifie
-        // qu'une ligne a réellement été modifiée AVANT de toucher au prix.
-        const { data: updated, error: updateError } = await supabase
-          .from("products")
-          .update(productDetails)
-          .eq("id", product.id)
-          .select("id");
-        if (updateError) throw updateError;
-        if (!updated?.length) {
-          throw new Error("Modification non enregistrée : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
+      if (isEdit && product?.id) {
+        // N'envoyer QUE ce qui a changé. Jamais seller_id, country_id,
+        // product_type ni package_contents : l'ancienne version les
+        // renvoyait, et un article validé entre-temps repassait en attente.
+        const patch: Record<string, unknown> = {};
+        const original: Record<string, unknown> = {
+          title: product.title ?? "",
+          description: product.description ?? "",
+          category: product.category ?? "",
+          subcategory: product.subcategory ?? "",
+          size: product.size ?? "",
+          condition: product.condition ?? "",
+          photos: product.photos ?? [],
+          stock_quantity: Number(product.stock_quantity ?? 1),
+          listing_type: product.listing_type ?? null,
+          business_type: product.business_type ?? null,
+        };
+        for (const [key, value] of Object.entries(formValues)) {
+          if (!same(value, original[key])) patch[key] = value;
         }
-        // Photos désormais rattachées à l'article : un nouvel essai ne les
-        // téléverse pas une seconde fois.
+        // extra_attributes : on REMPLACE les clés gérées par ce formulaire
+        // (une variante retirée doit disparaître) et on garde les autres.
+        const managedKeys = new Set<string>([
+          ...(isFashion ? ["sizes", "colors"] : []),
+          ...(phaseBListing ? phaseBListing.fields.map((f) => f.key) : []),
+        ]);
+        const mergedAttrs: Record<string, string> = {};
+        for (const [k, v] of Object.entries(initialAttrs)) if (!managedKeys.has(k)) mergedAttrs[k] = v;
+        Object.assign(mergedAttrs, extraAttributes);
+        if (!same(mergedAttrs, initialAttrs)) patch.extra_attributes = mergedAttrs;
+
+        // Annonce refusée : la modifier la RENVOIE en modération (comme l'app).
+        const resubmit = product.status === "rejected";
+        if (resubmit) {
+          patch.status = "pending";
+          patch.reject_reason = null;
+        }
+
+        if (Object.keys(patch).length > 0) {
+          patch.updated_at = new Date().toISOString();
+          // Un UPDATE refusé par la RLS ne modifie AUCUNE ligne, sans erreur :
+          // on vérifie qu'une ligne a réellement été modifiée.
+          const { data: updated, error: updateError } = await supabase
+            .from("products")
+            .update(patch)
+            .eq("id", product.id)
+            .select("id");
+          if (updateError) throw updateError;
+          if (!updated?.length) {
+            throw new Error("Modification non enregistrée : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
+          }
+        }
         setExistingPhotos(photos);
         setFiles([]);
 
-        // Retarification seulement si le prix vendeur ou la catégorie ont
-        // changé : corriger un titre ne déplace plus le prix acheteur.
         if (pricingChanged) {
           const { data: priceResult, error: priceError } = await supabase.rpc(
             "seller_update_product_price",
@@ -319,7 +433,6 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           const result = priceResult as
             { success?: boolean; error?: string; commission_amount?: number; price?: number } | null;
           if (priceError || !result || !result.success) {
-            // Le reste de l'article EST enregistré : le dire, plutôt qu'un échec global.
             const cause = priceError?.message || result?.error;
             throw new Error(`Modifications enregistrées${resubmit ? " et annonce renvoyée en validation" : ""}, mais le prix n'a pas pu être mis à jour${cause ? ` (${cause})` : ""}. Réessaie.`);
           }
@@ -330,32 +443,55 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             price:       Number(result.price ?? displayPrice),
           });
         }
-        setSuccess(resubmit
-          ? "Annonce modifiée et renvoyée en validation. Elle sera visible après validation par notre équipe."
-          : "Produit mis à jour avec succès ✓");
+
+        if (Object.keys(patch).length === 0 && !pricingChanged) {
+          setNotice("Aucune modification à enregistrer.");
+        } else {
+          setSuccess(resubmit
+            ? "Annonce modifiée et renvoyée en validation. Elle sera visible après validation par notre équipe."
+            : "Produit mis à jour avec succès ✓");
+        }
       } else {
-        // Le trigger Supabase recalcule ces montants. Les valeurs client ne
-        // servent qu'à conserver la compatibilité pendant le déploiement.
-        const { error: insertError } = await supabase.from("products").insert({
-          ...productDetails,
-          seller_price: numericSellerPrice,
-          commission_amount: commissionAmount,
-          price: displayPrice,
-        });
+        // La base force status 'pending', product_type 'standard', is_story
+        // false et recalcule la commission (guard_product_insert) : les
+        // montants client ne servent qu'à la compatibilité.
+        const { data: inserted, error: insertError } = await supabase
+          .from("products")
+          .insert({
+            ...formValues,
+            seller_id: user.id,
+            country_id: country.id,
+            status: "pending",
+            product_type: isFood ? "food_package" : "standard",
+            ...(Object.keys(extraAttributes).length > 0 ? { extra_attributes: extraAttributes } : {}),
+            seller_price: numericSellerPrice,
+            commission_amount: commissionAmount,
+            price: displayPrice,
+          })
+          .select("id")
+          .single();
         if (insertError) throw insertError;
+
+        // 🎬 Vidéo : jamais bloquante (§1.9) — l'article photo est déjà créé.
+        let videoWarning: string | null = null;
+        const newId = (inserted as { id?: string } | null)?.id;
+        if (video && newId) {
+          setVideoProgress(0);
+          videoWarning = await uploadProductVideo(video, newId, (r) => setVideoProgress(r));
+          setVideoProgress(null);
+        }
         setSuccess("Produit envoyé en modération. Il sera visible après validation par notre équipe.");
+        if (videoWarning) setNotice(videoWarning);
+
+        setTitle(""); setDescription(""); setSellerPrice("");
+        setSize(""); setFiles([]); setExistingPhotos([]); setVideo(null);
+        setSubcategory(""); setPhaseBTypeKey(""); setPhaseBValues({});
+        setConstructionKey(""); setConstructionValues({});
+        setVariantSizes([]); setVariantColors(""); setStock("1");
       }
 
-      await refreshProfile();
       router.refresh();
-      if (!product?.id) {
-        setTitle(""); setDescription(""); setSellerPrice("");
-        setSize(""); setFiles([]); setExistingPhotos([]);
-      }
     } catch (err) {
-      // Les erreurs Supabase (PostgrestError, StorageError) ne sont PAS des
-      // instances de Error : sans cette extraction, toute vraie cause (RLS,
-      // contrainte, upload) était masquée par le message générique.
       const msg =
         err instanceof Error
           ? err.message
@@ -365,6 +501,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       setError(msg);
     } finally {
       setLoading(false);
+      setVideoProgress(null);
     }
   }
 
@@ -401,13 +538,146 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         </div>
       </div>
 
-      {/* ── Prix & Catégorie ─────────────────────────────────────── */}
+      {/* ── Catégorie ────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionTitle>Prix & Catégorie</SectionTitle>
+        <SectionTitle>Catégorie</SectionTitle>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="price">Ton prix vendeur</Label>
+            <Label htmlFor="category">Catégorie</Label>
+            {lockedCategory ? (
+              <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600">
+                <Lock className="h-4 w-4 text-slate-400" />
+                {categoryLabel} — gérée par Rivendy
+              </div>
+            ) : (
+              <Select id="category" value={category} onChange={(e) => changeCategory(e.target.value as CategoryId)}>
+                {VENDOR_CATEGORIES.map((item) => (
+                  <option value={item.id} key={item.id}>{item.label}</option>
+                ))}
+              </Select>
+            )}
+          </div>
+
+          {subcategoryOptions.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">Sous-catégorie</Label>
+              <Select id="subcategory" value={subcategory} onChange={(e) => setSubcategory(e.target.value)} required>
+                <option value="">Précisez le type</option>
+                {subcategoryOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {isPhaseB && phaseBCategory && (
+            <div className="space-y-2">
+              <Label htmlFor="phaseBType">Type d&apos;annonce</Label>
+              <Select
+                id="phaseBType"
+                value={phaseBTypeKey}
+                onChange={(e) => {
+                  setPhaseBTypeKey(e.target.value);
+                  setPhaseBValues({});
+                }}
+                required
+              >
+                <option value="">Précisez le type</option>
+                {phaseBCategory.listings.map((l) => (
+                  <option key={l.typeKey} value={l.typeKey}>{l.emoji}  {l.label}</option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {isConstruction && !isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="constructionSub">Sous-catégorie Construction</Label>
+              <Select
+                id="constructionSub"
+                value={constructionKey}
+                onChange={(e) => {
+                  setConstructionKey(e.target.value);
+                  setConstructionValues({});
+                }}
+                required
+              >
+                <option value="">Précisez la sous-catégorie</option>
+                {CONSTRUCTION_SUBCATEGORIES.map((s) => (
+                  <option key={s.key} value={s.key}>{s.emoji}  {s.label}</option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* Champs métier — optionnels, ils améliorent la visibilité (app) */}
+        {isPhaseB && phaseBListing && phaseBListing.fields.length > 0 && (
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold text-slate-600">
+              {phaseBListing.emoji} Détails {phaseBListing.label} (optionnel — améliore la visibilité)
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {phaseBListing.fields.map((f) => (
+                <div key={f.key} className="space-y-1.5">
+                  <Label htmlFor={`pb-${f.key}`}>{f.label}</Label>
+                  {f.inputType === "dropdown" && f.options.length > 0 ? (
+                    <Select
+                      id={`pb-${f.key}`}
+                      value={phaseBValues[f.key] ?? ""}
+                      onChange={(e) => setPhaseBValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                    >
+                      <option value="">{f.hint || "—"}</option>
+                      {f.options.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Input
+                      id={`pb-${f.key}`}
+                      value={phaseBValues[f.key] ?? ""}
+                      inputMode={f.inputType === "number" ? "numeric" : undefined}
+                      placeholder={f.hint}
+                      onChange={(e) => setPhaseBValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isConstruction && !isEdit && constructionSub && constructionSub.fields.length > 0 && (
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold text-slate-600">
+              {constructionSub.emoji} Détails {constructionSub.label} (ajoutés à la description)
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {constructionSub.fields.map((f) => (
+                <div key={f.key} className="space-y-1.5">
+                  <Label htmlFor={`cs-${f.key}`}>{f.label}</Label>
+                  <Input
+                    id={`cs-${f.key}`}
+                    value={constructionValues[f.key] ?? ""}
+                    inputMode={f.inputType === "number" ? "numeric" : undefined}
+                    placeholder={f.hint}
+                    onChange={(e) => setConstructionValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Prix ─────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <SectionTitle>Prix</SectionTitle>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="price">{isPhaseB || isConstruction ? "Prix / Tarif" : "Ton prix vendeur"}</Label>
             <Input
               id="price"
               value={sellerPrice}
@@ -417,22 +687,20 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
               required
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="category">Catégorie</Label>
-            <Select
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryId)}
-            >
-              {VENDOR_CATEGORIES.map((item) => (
-                <option value={item.id} key={item.id}>{item.label}</option>
-              ))}
-            </Select>
-          </div>
+          {showSize && (
+            <div className="space-y-2">
+              <Label htmlFor="size">Taille</Label>
+              <Input
+                id="size"
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                placeholder="M, 42, Unique…"
+                required={!isEdit}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Aperçu prix affiché */}
         {numericSellerPrice > 0 && (
           <div className="rounded-xl border border-[#B2DFDB] bg-[#E0F2F1] p-4">
             <p className="text-[12px] font-black text-[#009688]">Aperçu du prix affiché</p>
@@ -442,9 +710,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
                 <span className="font-bold">{formatMoney(numericSellerPrice, country)}</span>
               </div>
               <div className="flex justify-between">
-                <span>
-                  Commission Rivendy ({isFood ? "incluse" : rateLabel})
-                </span>
+                <span>Commission Rivendy ({isFood ? "incluse" : rateLabel})</span>
                 <span className="font-bold">+ {formatMoney(estimatedCommission, country)}</span>
               </div>
               <div className="flex justify-between border-t border-[#B2DFDB] pt-1">
@@ -465,54 +731,56 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       <div className="space-y-4">
         <SectionTitle>Détails</SectionTitle>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          {!isFood && (
-            <>
-              {showVariants ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="sizes">Tailles disponibles</Label>
-                    <Input
-                      id="sizes"
-                      value={variantSizes}
-                      onChange={(e) => setVariantSizes(e.target.value)}
-                      placeholder="S, M, L, XL"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="colors">Couleurs disponibles</Label>
-                    <Input
-                      id="colors"
-                      value={variantColors}
-                      onChange={(e) => setVariantColors(e.target.value)}
-                      placeholder="Noir, Blanc, Rouge"
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="size">Taille / variante</Label>
-                  <Input
-                    id="size"
-                    value={size}
-                    onChange={(e) => setSize(e.target.value)}
-                    placeholder="M, 42, Unique…"
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="condition">État</Label>
-                <Select
-                  id="condition"
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value)}
-                >
-                  {CONDITION_OPTIONS.map((opt) => (
-                    <option key={opt}>{opt}</option>
-                  ))}
-                </Select>
+        {isFashion && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Tailles proposées à l&apos;acheteur</Label>
+              <div className="flex flex-wrap gap-2">
+                {FASHION_SIZE_OPTIONS.map((s) => {
+                  const on = variantSizes.includes(s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => toggleSize(s)}
+                      aria-pressed={on}
+                      className={cn(
+                        "min-w-11 rounded-lg border px-3 py-1.5 text-sm font-bold transition",
+                        on ? "border-[#009688] bg-[#009688] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-[#009688]/40",
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
-            </>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="colors">Couleurs disponibles</Label>
+              <Input
+                id="colors"
+                value={variantColors}
+                onChange={(e) => setVariantColors(e.target.value)}
+                placeholder="Noir, Blanc, Rouge"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {showCondition && (
+            <div className="space-y-2">
+              <Label htmlFor="condition">État de l&apos;article</Label>
+              <Select id="condition" value={condition} onChange={(e) => setCondition(e.target.value)}>
+                {/* Valeur historique (« Correct »…) conservée pour ne pas la perdre à l'édition */}
+                {!(CONDITION_OPTIONS as readonly string[]).includes(condition) && (
+                  <option value={condition}>{condition}</option>
+                )}
+                {CONDITION_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </Select>
+            </div>
           )}
           <div className="space-y-2">
             <Label htmlFor="stock">Quantité en stock</Label>
@@ -520,24 +788,13 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
               id="stock"
               type="number"
               min={1}
+              step={1}
               value={stock}
               onChange={(e) => setStock(e.target.value)}
+              required
             />
           </div>
         </div>
-
-        {isFood && (
-          <div className="space-y-2">
-            <Label htmlFor="packageContents">Contenu du colis</Label>
-            <Textarea
-              id="packageContents"
-              value={packageContents}
-              onChange={(e) => setPackageContents(e.target.value)}
-              placeholder="Détaille ce que contient la commande..."
-              rows={3}
-            />
-          </div>
-        )}
       </div>
 
       {/* ── Photos ───────────────────────────────────────────────── */}
@@ -545,45 +802,30 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         <div className="flex items-center justify-between">
           <SectionTitle>Photos</SectionTitle>
           <span className="text-[11px] font-bold text-slate-400">
-            {totalPhotos}/{MAX_PHOTOS}
+            {totalPhotos}/{MAX_PRODUCT_PHOTOS}
           </span>
         </div>
 
-        {/* Boutons d'ajout */}
         {canAddMore && (
           <div className="flex flex-wrap gap-3">
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#009688] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#00796B]">
               <ImagePlus className="h-4 w-4" />
               Galerie
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => onFilesChange(e.target.files)}
-              />
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onFilesChange(e.target.files)} />
             </label>
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
               <Camera className="h-4 w-4" />
               Caméra
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => onFilesChange(e.target.files)}
-              />
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFilesChange(e.target.files)} />
             </label>
           </div>
         )}
 
-        {/* Grille de previews */}
         {(existingPhotos.length > 0 || previews.length > 0) && (
-          <div className="grid grid-cols-4 gap-2 md:grid-cols-6">
+          <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
             {existingPhotos.map((photo, i) => (
               <div key={photo} className="group relative aspect-square overflow-hidden rounded-xl bg-slate-100">
                 <Image src={photo} alt={`Photo ${i + 1}`} fill sizes="120px" className="object-cover" />
-                {/* Badge première photo */}
                 {i === 0 && (
                   <span className="absolute bottom-1 left-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white">
                     Principale
@@ -591,8 +833,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
                 )}
                 <button
                   type="button"
-                  onClick={() => removeExisting(photo)}
-                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"
+                  onClick={() => setExistingPhotos((current) => current.filter((p) => p !== photo))}
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
                   aria-label="Supprimer"
                 >
                   <X className="h-3 w-3" />
@@ -604,8 +846,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
                 <Image src={src} alt={`Aperçu ${i + 1}`} fill sizes="120px" className="object-cover" />
                 <button
                   type="button"
-                  onClick={() => removeNew(i)}
-                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"
+                  onClick={() => setFiles((current) => current.filter((_, idx) => idx !== i))}
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
                   aria-label="Supprimer"
                 >
                   <X className="h-3 w-3" />
@@ -615,12 +857,41 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           </div>
         )}
 
-        {totalPhotos === 0 && (
-          <p className="text-xs font-medium text-slate-400">
-            Minimum 1 photo requise · jusqu&apos;à {MAX_PHOTOS} photos acceptées
-          </p>
-        )}
+        {/* Les 3 photos de l'app : au-delà, l'édition depuis l'app supprimait
+            en silence les photos 4 à 8 d'une annonce créée sur le site. */}
+        <p className="text-xs font-medium text-slate-400">
+          {totalPhotos === 0 ? "Minimum 1 photo requise · " : ""}jusqu&apos;à {MAX_PRODUCT_PHOTOS} photos
+        </p>
       </div>
+
+      {/* ── Vidéo (création seulement, comme l'app) ──────────────── */}
+      {!isEdit && (
+        <div className="space-y-3">
+          <SectionTitle>Vidéo (facultative)</SectionTitle>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+            <Film className="h-4 w-4" />
+            {video ? "Changer de vidéo" : "Ajouter une vidéo"}
+            <input type="file" accept="video/*" className="hidden" onChange={(e) => void onVideoChange(e.target.files?.[0] ?? null)} />
+          </label>
+          {video && (
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <span className="truncate">{video.name}</span>
+              <button type="button" onClick={() => setVideo(null)} className="text-xs font-bold text-red-500 hover:underline">
+                Retirer
+              </button>
+            </div>
+          )}
+          {videoProgress != null && (
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full bg-[#009688] transition-all" style={{ width: `${Math.round(videoProgress * 100)}%` }} />
+            </div>
+          )}
+          <p className="text-xs text-slate-400">
+            {MAX_VIDEO_SECONDS} secondes maximum. Selon votre formule (Gratuit 3, Certifié 15, Pro illimité par mois).
+            Si l&apos;envoi échoue, l&apos;article est publié avec ses photos.
+          </p>
+        </div>
+      )}
 
       {/* ── Messages retour ──────────────────────────────────────── */}
       {error && (
@@ -644,10 +915,9 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         </div>
       )}
 
-      {/* ── Bouton soumettre ─────────────────────────────────────── */}
       <Button type="submit" className="w-full" size="lg" disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {product?.id ? "Mettre à jour le produit" : "Envoyer en modération"}
+        {isEdit ? "Mettre à jour le produit" : "Envoyer en modération"}
       </Button>
 
       {marketReminder && country && (

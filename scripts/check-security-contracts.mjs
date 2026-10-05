@@ -3,7 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (path) => readFileSync(join(root, path), "utf8");
+// Fins de ligne normalisées : git peut extraire les fichiers en CRLF sous Windows.
+const read = (path) => readFileSync(join(root, path), "utf8").replace(/\r\n/g, "\n");
 const compact = (source) => source.replace(/\s+/g, "");
 const failures = [];
 
@@ -16,7 +17,15 @@ if (!productForm.includes('"seller_update_product_price"')) {
   failures.push("La modification d'un prix vendeur doit passer par seller_update_product_price.");
 }
 
-if (!/status:\s*product\?\.id\s*\?[^:]+:\s*["']pending["']/.test(productForm)) {
+// L'insertion d'un nouveau produit vendeur porte status "pending" — et aucun
+// statut publié ("active", "boosted", "validated") n'apparaît dans le formulaire.
+// (Forme mise à jour le 2026-10-04 : l'insertion est désormais un bloc dédié.)
+const insertBlock = productForm.slice(productForm.indexOf('.from("products")\n          .insert('));
+if (
+  !productForm.includes('.from("products")\n          .insert(') ||
+  !/status:\s*["']pending["']/.test(insertBlock.slice(0, 600)) ||
+  /status:\s*["'](active|boosted|validated)["']/.test(productForm)
+) {
   failures.push("Un nouveau produit vendeur doit être envoyé en modération.");
 }
 
