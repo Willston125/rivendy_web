@@ -41,6 +41,7 @@ import {
 import { ConstructionCompanyCard } from "@/features/products/construction-company-card";
 import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
+import { isBoosted } from "@/lib/utils/format";
 
 export async function generateMetadata({
   searchParams,
@@ -86,7 +87,23 @@ type HomeSearchParams = Promise<{
   pharmaRayon?: string;
   constrType?: string;
   wedType?: string;
+  page?: string;
 }>;
+
+/** Taille d'une page du fil standard. */
+const PAGE_SIZE = 60;
+
+/** Accueils métier qui REGROUPENT les annonces (établissements, offres) :
+ *  ils ont besoin de l'ensemble du marché, pas d'une page. */
+const GROUPED_CATEGORIES = new Set<string>([
+  "alimentation",
+  "restaurant",
+  "location",
+  "hotel",
+  "pharmacie",
+  "materiauxConstruction",
+  "mariage",
+]);
 
 export default async function HomePage({
   searchParams,
@@ -109,10 +126,14 @@ export default async function HomePage({
   const sort = (["recent", "price_asc", "price_desc"].includes(params.sort ?? "")
     ? params.sort
     : "recent") as ProductSort;
+  const grouped = !!category && GROUPED_CATEGORIES.has(category);
+  const page = grouped ? 1 : Math.max(1, Math.floor(Number(params.page) || 1));
+  const limit = grouped ? 300 : PAGE_SIZE;
+  const offset = (page - 1) * PAGE_SIZE;
 
   const [country, products, ads, inlineAds, promoAds, stories] = await Promise.all([
     getCountry(countryId),
-    getProducts({ countryId, category, subcategory, search: q, priceMin, priceMax, sort }),
+    getProducts({ countryId, category, subcategory, search: q, priceMin, priceMax, sort, limit, offset }),
     getAdvertisements({ countryId, positions: ["web_home_banner", "home_banner"] }),
     getAdvertisements({ countryId, positions: ["web_feed_inline"] }),
     getAdvertisements({ countryId, positions: ["web_promo_offers", "web_promo_preorder", "web_restaurant_banner", "web_category_banner"] }),
@@ -171,8 +192,22 @@ export default async function HomePage({
   const constructionCompanies = isConstruction
     ? groupConstructionCompanies(products, constrType ?? CONSTRUCTION_FILTER_ALL)
     : [];
-  const boosted = products.filter((p) => p.status === "boosted").slice(0, 10);
-  const recent  = products.filter((p) => p.status !== "boosted");
+  // Rail « boostés » : les 10 premiers, en page 1. Les suivants restent dans
+  // la grille (déjà en tête grâce au tri SQL) — avant le 2026-10-04 ils
+  // n'apparaissaient nulle part.
+  const boosted = page === 1 ? products.filter((p) => isBoosted(p)).slice(0, 10) : [];
+  const boostedIds = new Set(boosted.map((p) => p.id));
+  const recent  = products.filter((p) => !boostedIds.has(p.id));
+  const hasNextPage = !grouped && products.length === PAGE_SIZE;
+  const pageHref = (n: number) => {
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === "string" && value && key !== "page") next.set(key, value);
+    }
+    next.set("country", countryId);
+    if (n > 1) next.set("page", String(n));
+    return `/?${next.toString()}`;
+  };
 
   const categoryObj   = category ? CATEGORIES.find((c) => c.id === category) : null;
   const categoryLabel = categoryObj?.label ?? category ?? null;
@@ -630,13 +665,10 @@ export default async function HomePage({
                   ? categoryLabel
                   : "Nouveautés"}
               </h2>
-              {!q && (
-                <Link
-                  href={`/?country=${countryId}`}
-                  className="shrink-0 text-[12px] font-semibold text-[#009688] transition hover:underline"
-                >
-                  Voir tout
-                </Link>
+              {page > 1 && (
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-500">
+                  Page {page}
+                </span>
               )}
             </div>
             <ProductGrid
@@ -647,9 +679,34 @@ export default async function HomePage({
               emptyLabel={
                 q
                   ? `Aucun résultat pour "${q}" — essaie un autre mot.`
+                  : page > 1
+                  ? "Plus aucun article sur cette page."
                   : "Aucun produit dans cette catégorie pour le moment."
               }
             />
+            {/* Pagination — miroir du « Charger plus » de l'app (30 par page,
+                ici 60) : sans elle, seuls les 60 articles les plus récents
+                étaient accessibles depuis le site. */}
+            {(page > 1 || hasNextPage) && (
+              <nav className="mt-5 flex items-center justify-center gap-3" aria-label="Pagination">
+                {page > 1 && (
+                  <Link
+                    href={pageHref(page - 1)}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12.5px] font-bold text-slate-600 transition hover:border-[#009688]/40 hover:text-[#009688]"
+                  >
+                    ← Page précédente
+                  </Link>
+                )}
+                {hasNextPage && (
+                  <Link
+                    href={pageHref(page + 1)}
+                    className="rounded-full bg-[#009688] px-4 py-2 text-[12.5px] font-bold text-white shadow-sm transition hover:bg-[#007168]"
+                  >
+                    Voir plus d&apos;articles →
+                  </Link>
+                )}
+              </nav>
+            )}
           </section>
           )}
         </div>

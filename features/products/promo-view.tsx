@@ -9,34 +9,47 @@ import type { Product } from "@/types/rivendy";
 
 export function PromoView() {
   const country = useCountryOrDefault();
+  const countryId = country?.id;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Lecture par `visible_products` (statuts, suppressions et précommandes
+  // appliqués par la base) et sur le MARCHÉ COURANT. Avant le 2026-10-04 le
+  // site lisait `products` sur les 16 marchés : articles d'autres pays
+  // chiffrés dans la devise du visiteur.
   useEffect(() => {
+    if (!countryId) return;
+    let cancelled = false;
     async function load() {
       // Priorité aux produits boostés, sinon tous les produits actifs
       const { data: boosted } = await supabase
-        .from("products")
+        .from("visible_products")
         .select("*")
+        .eq("country_id", countryId)
         .eq("status", "boosted")
         .order("created_at", { ascending: false })
         .limit(40);
+      if (cancelled) return;
 
       if (boosted && boosted.length > 0) {
         setProducts(boosted as Product[]);
       } else {
         const { data: all } = await supabase
-          .from("products")
+          .from("visible_products")
           .select("*")
-          .in("status", ["active", "boosted"])
+          .eq("country_id", countryId)
           .order("created_at", { ascending: false })
           .limit(40);
+        if (cancelled) return;
         setProducts((all as Product[]) ?? []);
       }
       setLoading(false);
     }
     load();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [countryId]);
 
   if (!country) return null;
 

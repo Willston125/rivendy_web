@@ -9,9 +9,10 @@ import { createAnonServerClient } from "@/lib/supabase/server";
 import {
   getCountry,
   getSellerProfile,
-  getSellerPublicProducts,
+  getSellerStorefront,
   getStoreTrustSummary,
 } from "@/services/public-data";
+import { DEFAULT_COUNTRY_ID } from "@/types/rivendy";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StoreOwnerBar } from "@/features/store/store-owner-bar";
 import { StoreHero } from "@/features/store/store-hero";
@@ -62,25 +63,30 @@ export async function generateMetadata({
 /* ── Page ────────────────────────────────────────────────────────── */
 export default async function StorePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sellerId: string }>;
+  searchParams: Promise<{ country?: string }>;
 }) {
   const { sellerId } = await params;
+  const { country: requestedMarket } = await searchParams;
 
-  // Étape 1 : profil en premier (nécessaire pour country_id + guard notFound)
+  // Étape 1 : profil en premier (guard notFound)
   const seller = await getSellerProfileCached(sellerId);
   if (!seller) notFound();
 
-  // Étape 2 : tout le reste en parallèle, y compris getCountry
-  const [products, trust, followCountRes, country] = await Promise.all([
-    getSellerPublicProducts(sellerId, seller.country_id),
+  // Étape 2 : articles + marché de la vitrine (celui des ARTICLES, voir
+  // getSellerStorefront), puis le reste en parallèle.
+  const [storefront, trust, followCountRes] = await Promise.all([
+    getSellerStorefront(sellerId, requestedMarket),
     getStoreTrustSummary(sellerId),
     createAnonServerClient()
       .from("store_follows")
       .select("id", { count: "exact", head: true })
       .eq("seller_id", sellerId),
-    getCountry(seller.country_id || "DJ"),
   ]);
+  const products = storefront.products;
+  const country = await getCountry(storefront.market || seller.country_id || DEFAULT_COUNTRY_ID);
 
   const followersCount = followCountRes.count ?? 0;
 

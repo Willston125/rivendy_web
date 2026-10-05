@@ -9,11 +9,11 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import {
   getCountry,
   getSellerProfile,
-  getSellerPublicProducts,
+  getSellerStorefront,
   getStoreTrustSummary,
 } from "@/services/public-data";
 import { CONSTRUCTION_MATERIALS, constructionMaterialLabel } from "@/features/products/construction-listings";
-import type { Product } from "@/types/rivendy";
+import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -58,19 +58,25 @@ function buildSections(products: Product[]) {
 
 export default async function ConstructionCatalogPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sellerId: string }>;
+  searchParams: Promise<{ country?: string }>;
 }) {
   const { sellerId } = await params;
+  const { country: requestedMarket } = await searchParams;
 
   const seller = await getSellerProfileCached(sellerId);
   if (!seller) notFound();
 
-  const [products, trust, country] = await Promise.all([
-    getSellerPublicProducts(sellerId, seller.country_id),
+  // Marché des ARTICLES, pas le pays du profil (figé à DJ depuis le
+  // 2026-09-02) : voir getSellerStorefront.
+  const [storefront, trust] = await Promise.all([
+    getSellerStorefront(sellerId, requestedMarket),
     getStoreTrustSummary(sellerId),
-    getCountry(seller.country_id || "DJ"),
   ]);
+  const products = storefront.products;
+  const country = await getCountry(storefront.market || seller.country_id || DEFAULT_COUNTRY_ID);
 
   const active = products.filter(
     (p) => p.category === "materiauxConstruction" && (p.status === "active" || p.status === "boosted"),

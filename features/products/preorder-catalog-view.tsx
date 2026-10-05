@@ -9,6 +9,7 @@ import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import type { Product, Advertisement } from "@/types/rivendy";
 import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
+import { isAdLive } from "@/features/ads/ad-window";
 
 export function PreorderCatalogView() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,19 +19,32 @@ export function PreorderCatalogView() {
 
   const countryId = useCountryOrDefault()?.id;
 
+  // Miroir de `ProductService.getPreorderProducts` (app) : précommandes
+  // actives, non supprimées, du MARCHÉ COURANT. Avant le 2026-10-04 le site
+  // lisait les 16 marchés à la fois et chiffrait tout dans la devise du
+  // visiteur — une précommande djiboutienne s'affichait en KMF aux Comores.
   useEffect(() => {
+    if (!countryId) return;
+    let cancelled = false;
     async function load() {
       const { data } = await supabase
         .from("products")
         .select("*")
         .eq("product_type", "preorder")
         .in("status", ["active", "boosted"])
+        .eq("is_deleted", false)
+        .is("deleted_at", null)
+        .eq("country_id", countryId)
         .order("created_at", { ascending: false });
+      if (cancelled) return;
       setProducts((data as Product[]) ?? []);
       setLoading(false);
     }
     load();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [countryId]);
 
   // Bannières pub de l'onglet « Sur commande » (position web_preorder_banner).
   useEffect(() => {
@@ -44,13 +58,7 @@ export function PreorderCatalogView() {
         .eq("position", "web_preorder_banner")
         .order("display_order", { ascending: true });
       const now = Date.now();
-      const DAY = 86_400_000;
-      const active = ((data as Advertisement[]) ?? []).filter((ad) => {
-        if (ad.starts_at && new Date(ad.starts_at).getTime() - DAY > now) return false;
-        if (ad.ends_at && new Date(ad.ends_at).getTime() + DAY <= now) return false;
-        return true;
-      });
-      setBannerAds(active);
+      setBannerAds(((data as Advertisement[]) ?? []).filter((ad) => isAdLive(ad, now)));
     }
     loadAds();
   }, [countryId]);

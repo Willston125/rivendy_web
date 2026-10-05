@@ -10,7 +10,23 @@ import { ProductComments } from "@/features/products/product-comments";
 import { ProductRatingInput } from "@/features/products/product-rating-input";
 import { ProductViewTracker } from "@/features/products/product-view-tracker";
 import { categoryLabel, formatMoney, isBoosted, isProductPublished } from "@/lib/utils/format";
-import { getCountry, getProductById, getSimilarProducts } from "@/services/public-data";
+import {
+  getCountry,
+  getProductAverageRating,
+  getProductById,
+  getSimilarProducts,
+} from "@/services/public-data";
+import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
+
+/**
+ * Marché de l'ARTICLE : il fixe la devise du prix affiché. Le pays du profil
+ * vendeur n'y est qu'un repli — il vaut 'DJ' pour tous les comptes créés
+ * depuis le 2026-09-02 (valeur par défaut figée par trg_guard_profile_privileges),
+ * ce qui affichait en FDJ des articles publiés aux Comores.
+ */
+function productMarket(product: Pick<Product, "country_id" | "seller_country_id">) {
+  return product.country_id || product.seller_country_id || DEFAULT_COUNTRY_ID;
+}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> },
@@ -23,7 +39,7 @@ export async function generateMetadata(
     ? (product.photos[0] as string)
     : "/brand/hero-woman.png";
 
-  const country = await getCountry(product.seller_country_id || "DJ");
+  const country = await getCountry(productMarket(product));
   return {
     title: `${product.title} — Rivendy`,
     description:
@@ -51,14 +67,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   // Les actions d'achat sont neutralisées dans ProductActions.
   if (!product || !isProductPublished(product)) notFound();
 
-  const [country, similar] = await Promise.all([
-    getCountry(product.seller_country_id || "DJ"),
+  const [country, similar, rating] = await Promise.all([
+    getCountry(productMarket(product)),
     getSimilarProducts(product),
+    getProductAverageRating(product.id),
   ]);
 
   const boosted   = isBoosted(product);
-  const hasRating = product.average_rating != null && Number(product.average_rating) > 0;
-  const rating    = Number(product.average_rating ?? 0);
+  const hasRating = rating > 0;
   const fullStars = Math.floor(rating);
   const hasHalf   = rating - fullStars >= 0.5;
 

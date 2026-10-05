@@ -16,5 +16,28 @@ function track(adId: string, metric: "view" | "click") {
     });
 }
 
-export const trackAdView = (adId: string) => track(adId, "view");
+/** Publicités déjà comptées en vue pendant cette session de navigation —
+ *  miroir de `_viewedThisSession` de l'app : une vue par pub et par session,
+ *  sinon chaque rotation du carrousel ou rechargement gonflait le compteur. */
+const SEEN_KEY = "rivendy_ads_seen";
+
+function alreadyCounted(adId: string): boolean {
+  try {
+    const raw = sessionStorage.getItem(SEEN_KEY);
+    const seen = new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
+    if (seen.has(adId)) return true;
+    seen.add(adId);
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+    return false;
+  } catch {
+    // Stockage indisponible (navigation privée stricte) : compter une fois
+    // par chargement de page plutôt que pas du tout.
+    return false;
+  }
+}
+
+export const trackAdView = (adId: string) => {
+  if (!adId || alreadyCounted(adId)) return;
+  track(adId, "view");
+};
 export const trackAdClick = (adId: string) => track(adId, "click");

@@ -1,4 +1,5 @@
 import { createAnonServerClient } from "@/lib/supabase/server";
+import { isAdLive } from "@/features/ads/ad-window";
 import {
   DEFAULT_COUNTRY_ID,
   type Advertisement,
@@ -27,6 +28,19 @@ function normalizeAttrs(raw: unknown): Record<string, string> {
   return out;
 }
 
+function optionalString(value: unknown): string | null {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text && text !== "null" ? text : null;
+}
+
+/**
+ * ⚠️ Chaque colonne lue par un écran doit être recopiée ici : tout ce que le
+ * serveur du site affiche passe par cette fonction. Jusqu'au 2026-10-04 elle
+ * oubliait `country_id` (la garde « marché d'origine » ne se déclenchait
+ * jamais avant le paiement), les colonnes vidéo (la vidéo produit n'était
+ * jamais affichée) et les colonnes story — sans la moindre erreur.
+ */
 function normalizeProduct(row: ProductRow): Product {
   const profile = row.profiles;
   const photos = Array.isArray(row.photos) ? row.photos.map(String) : [];
@@ -34,6 +48,9 @@ function normalizeProduct(row: ProductRow): Product {
   return {
     id: String(row.id ?? ""),
     seller_id: String(row.seller_id ?? ""),
+    // Marché de l'ARTICLE : c'est lui qui fixe la devise et la garde
+    // « marché d'origine », jamais le pays du profil vendeur.
+    country_id: optionalString(row.country_id),
     title: String(row.title ?? ""),
     description: String(row.description ?? ""),
     price: toNumber(row.price),
@@ -51,6 +68,14 @@ function normalizeProduct(row: ProductRow): Product {
     delivery_days: row.delivery_days == null ? null : Number(row.delivery_days),
     show_in_catalog: Boolean(row.show_in_catalog ?? false),
     is_story: Boolean(row.is_story ?? false),
+    story_started_at: optionalString(row.story_started_at),
+    story_expires_at: optionalString(row.story_expires_at),
+    show_as_rivendy: Boolean(row.show_as_rivendy ?? false),
+    is_deleted: Boolean(row.is_deleted ?? false),
+    deleted_at: optionalString(row.deleted_at),
+    video_uid: optionalString(row.video_uid),
+    video_status: optionalString(row.video_status),
+    video_thumbnail_url: optionalString(row.video_thumbnail_url),
     package_contents: String(row.package_contents ?? ""),
     epuise_at: (row.epuise_at as string | null) ?? null,
     sold_at: (row.sold_at as string | null) ?? null,
@@ -175,21 +200,9 @@ export async function getAdvertisements({
   if (error || !data) return [];
 
   const now = Date.now();
-  const DAY_MS = 24 * 60 * 60 * 1000;
   return data
     .map((row) => normalizeAd(row as Record<string, unknown>))
-    .filter((ad) => {
-      // Date de début INCLUSIVE : le dashboard stocke une date à minuit UTC. Une
-      // pub « commence aujourd'hui » doit être visible dès le début de ce jour en
-      // heure locale du marché (UTC+0..+4) — sinon elle reste cachée jusqu'à
-      // minuit UTC (= jusqu'à 3-4h du matin local). On accorde donc 24h de marge
-      // (symétrique du +24h sur la fin) pour couvrir les fuseaux est-africains.
-      if (ad.starts_at && new Date(ad.starts_at).getTime() - DAY_MS > now) return false;
-      // Date de fin INCLUSIVE : le dashboard stocke une date à minuit, donc une
-      // fin = « aujourd'hui » doit rester valable jusqu'à la fin de ce jour (+24h).
-      if (ad.ends_at && new Date(ad.ends_at).getTime() + DAY_MS <= now) return false;
-      return true;
-    });
+    .filter((ad) => isAdLive(ad, now));
 }
 
 // Tri du catalogue — parity Flutter search_screen.dart (_sortOrder)
@@ -204,6 +217,7 @@ export async function getProducts({
   priceMax,
   sort = "recent",
   limit = 60,
+  offset = 0,
 }: {
   countryId?: string;
   category?: CategoryId | string;
@@ -213,9 +227,11 @@ export async function getProducts({
   priceMax?: number;
   sort?: ProductSort;
   limit?: number;
+  /** Pagination — miroir du `range(offset, offset + limit - 1)` de l'app. */
+  offset?: number;
 }) {
   const supabase = createAnonServerClient();
-  let query = supabase.from("visible_products").select("*").limit(limit);
+  let query = supabase.from("visible_products").select("*");
 
   // Parity Flutter : filtrer sur country_id du produit (pas seller_country_id du profil)
   if (countryId && countryId !== "all") query = query.eq("country_id", countryId);
@@ -232,17 +248,23 @@ export async function getProducts({
   // Tri — parity Flutter : recent | price_asc | price_desc
   if (sort === "price_asc") query = query.order("price", { ascending: true });
   else if (sort === "price_desc") query = query.order("price", { ascending: false });
-  else query = query.order("created_at", { ascending: false });
+  else {
+    // Boostés d'abord TOUTES PAGES CONFONDUES, en SQL, comme l'app
+    // (product_service.dart, getProducts). Jusqu'au 2026-10-04 le site lisait
+    // les 60 articles les plus récents puis triait en mémoire : un boost payé
+    // mais plus ancien que ces 60 n'apparaissait nulle part.
+    // Un boost expiré est remis à NULL par la tâche pg_cron `expire-boosts`
+    // (toutes les 15 min) : il peut rester en tête 15 min au plus.
+    query = query
+      .order("boost_expires_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
+  }
 
-  const { data, error } = await query;
+  const from = Math.max(0, offset);
+  const { data, error } = await query.range(from, from + limit - 1);
   if (error || !data) return [];
 
-  const products = data.map((row) => normalizeProduct(row as ProductRow));
-  // Tri récents : on remonte les boostés ; tri prix : on respecte le prix.
-  if (sort === "recent") {
-    return products.sort((a, b) => Number(b.status === "boosted") - Number(a.status === "boosted"));
-  }
-  return products;
+  return data.map((row) => normalizeProduct(row as ProductRow));
 }
 
 export async function getProductById(id: string) {
@@ -257,6 +279,20 @@ export async function getProductById(id: string) {
   return normalizeProduct(data as ProductRow);
 }
 
+/**
+ * Note moyenne d'un article — même RPC que l'app
+ * (`product_rating_service.dart`), ouverte à `anon`. La colonne
+ * `products.average_rating` lue jusqu'au 2026-10-04 n'existe dans aucune
+ * migration : la note n'était donc JAMAIS affichée sur le site.
+ */
+export async function getProductAverageRating(productId: string): Promise<number> {
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase.rpc("get_product_avg_rating", { p_product_id: productId });
+  if (error || data == null) return 0;
+  const value = Number(data);
+  return Number.isFinite(value) ? value : 0;
+}
+
 export async function getSimilarProducts(product: Product, limit = 8) {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
@@ -264,7 +300,9 @@ export async function getSimilarProducts(product: Product, limit = 8) {
     .select("*")
     .eq("category", product.category)
     .neq("id", product.id)
-    .eq("country_id", product.seller_country_id ?? DEFAULT_COUNTRY_ID)
+    // Même marché que l'ARTICLE (pas le pays du profil vendeur, figé à DJ
+    // pour les comptes créés depuis le 2026-09-02).
+    .eq("country_id", product.country_id || product.seller_country_id || DEFAULT_COUNTRY_ID)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -315,6 +353,45 @@ export async function getSellerPublicProducts(sellerId: string, countryId?: stri
   const { data, error } = await query;
   if (error || !data) return [];
   return data.map((row) => normalizeProduct(row as ProductRow));
+}
+
+/**
+ * Vitrine d'un vendeur : articles d'UN marché, et ce marché.
+ *
+ * Le marché vient des ARTICLES, jamais du pays du profil : `profiles.country_id`
+ * vaut 'DJ' pour tous les comptes créés depuis le 2026-09-02 (valeur par défaut
+ * figée par trg_guard_profile_privileges). Filtrer et chiffrer sur ce champ
+ * vidait la boutique d'un vendeur comorien, ou affichait ses prix en FDJ.
+ *
+ * Choix du marché, dans l'ordre :
+ *  1. celui demandé (`?country=`), s'il contient des articles du vendeur —
+ *     c'est le comportement de l'app, qui filtre sur le marché du visiteur ;
+ *  2. sinon celui où le vendeur a le plus d'articles ;
+ *  3. sinon le pays du profil.
+ * Tous les prix affichés sont ainsi natifs du marché choisi, sans conversion.
+ */
+export async function getSellerStorefront(sellerId: string, requestedMarket?: string | null) {
+  const all = await getSellerPublicProducts(sellerId);
+  const counts = new Map<string, number>();
+  for (const p of all) {
+    if (p.country_id) counts.set(p.country_id, (counts.get(p.country_id) ?? 0) + 1);
+  }
+  const requested = (requestedMarket ?? "").trim().toUpperCase();
+  let market: string | null = requested && counts.has(requested) ? requested : null;
+  if (!market) {
+    let best = 0;
+    for (const [id, n] of counts) {
+      if (n > best) {
+        best = n;
+        market = id;
+      }
+    }
+  }
+  return {
+    market,
+    products: market ? all.filter((p) => p.country_id === market) : all,
+    markets: [...counts.keys()],
+  };
 }
 
 export async function getStoreTrustSummary(sellerId: string) {

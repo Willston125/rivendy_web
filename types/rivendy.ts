@@ -165,6 +165,8 @@ export interface Product {
   is_story: boolean;
   story_started_at?: string | null;
   story_expires_at?: string | null;
+  /** TRUE → affiché « Rivendy » + badge officiel (miroir de `Product.showAsRivendy`). */
+  show_as_rivendy?: boolean | null;
   package_contents: string;
   epuise_at?: string | null;
   sold_at?: string | null;
@@ -279,6 +281,14 @@ export interface AppOrder {
   total_price: number;
   total_commission: number;
   total_seller_amount: number;
+  /** Frais de livraison, HORS total_price (invariant §1.8). */
+  delivery_fee_kmf?: number | null;
+  /** Snapshot d'adresse figé à la commande (parcours KM). */
+  delivery_region_name?: string | null;
+  delivery_locality_name?: string | null;
+  delivery_neighborhood_name?: string | null;
+  delivery_landmark?: string | null;
+  delivery_address_details?: string | null;
   delivered_at?: string | null;
   created_at: string;
   updated_at?: string;
