@@ -6,10 +6,12 @@ import { CartProvider } from "@/features/cart/cart-provider";
 import { CountryProvider } from "@/features/country/country-provider";
 import { MarketSelectorModal } from "@/features/country/market-selector-modal";
 import { MarketUrlSync } from "@/features/country/market-url-sync";
+import { NotificationsProvider } from "@/features/notifications/use-notifications";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
+      <NotificationsProvider>
       <CountryProvider>
         {/* Modal obligatoire si aucun marché résolu — parity Flutter MarketSwitcher */}
         <MarketSelectorModal />
@@ -19,6 +21,7 @@ export function Providers({ children }: { children: ReactNode }) {
         </Suspense>
         <CartProvider>{children}</CartProvider>
       </CountryProvider>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

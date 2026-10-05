@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
+  Bell,
   ChevronRight,
   CreditCard,
   FileText,
@@ -12,6 +13,7 @@ import {
   LogOut,
   Shield,
   Store,
+  Trash2,
   User,
   Wallet,
 } from "lucide-react";
@@ -103,6 +105,24 @@ export function SettingsView() {
           iconBg: "#6A5ACD18",
           label: "Mot de passe",
           href: "/profile/password",
+        },
+        {
+          // Parité app : écran « Notifications » des paramètres (§1.13).
+          icon: Bell,
+          iconColor: "#007168",
+          iconBg: "#E0F2F1",
+          label: "Notifications",
+          sub: "Avis, boutiques suivies, offres",
+          href: "/profile/notifications",
+        },
+        {
+          // Parité app : la suppression de compte est accessible depuis les
+          // paramètres (exigence Google Play), pas seulement par un lien direct.
+          icon: Trash2,
+          iconColor: "#DC2626",
+          iconBg: "#FEE2E2",
+          label: "Supprimer mon compte",
+          href: "/delete-account",
         },
       ],
     },

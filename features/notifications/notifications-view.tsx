@@ -14,7 +14,12 @@ import {
   Clock,
   ShieldAlert,
 } from "lucide-react";
-import { useNotifications } from "@/features/notifications/use-notifications";
+import {
+  notificationDestination,
+  notificationLinkLabel,
+  notificationStep,
+  useNotifications,
+} from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
@@ -45,28 +50,10 @@ export function NotificationsView() {
     return date.toLocaleDateString("fr-FR");
   };
 
-  // Destination d'une notification, ou null quand elle n'en a pas.
-  // Sert AUSSI à l'affichage : une carte sans destination ne doit pas se
-  // présenter comme cliquable (le clic ne ferait que la marquer comme lue).
-  const destinationFor = (n: AppNotification): string | null => {
-    switch (n.type) {
-      case "new_order":
-        return "/wallet";
-      case "review_request":
-      case "order_placed":
-      case "delivery_code":
-        return "/orders";
-      case "new_product":
-      case "new_comment":
-      case "product_approved":
-      case "product_rejected":
-        // product_id peut être NULL : sans lui, il n'y a aucune fiche à ouvrir
-        return n.product_id ? `/products/${n.product_id}` : null;
-      default:
-        // "security" et les types inconnus n'ont volontairement pas de destination
-        return null;
-    }
-  };
+  // Destination : source unique `notificationDestination` (miroir de
+  // l'app). Sert AUSSI à l'affichage : une carte sans destination ne se
+  // présente pas comme cliquable.
+  const destinationFor = notificationDestination;
 
   const handleNotificationTap = async (n: AppNotification) => {
     await markRead(n.id);
@@ -121,6 +108,12 @@ export function NotificationsView() {
           {notifications.map((n) => {
             const isDeliveryCode = n.type === "delivery_code";
             const isOrderPlaced = n.type === "order_placed";
+            // Étape écrite par le serveur : une commande ANNULÉE arrive aussi
+            // en "order_placed" — sans lire l'étape elle s'affichait en vert.
+            const step = isOrderPlaced ? notificationStep(n) : "";
+            const orderTone =
+              step === "cancelled" ? "red" : ["assigned", "delivered", "disputed"].includes(step) ? "amber" : "green";
+            const isRejected = n.type === "product_rejected";
             const isComment = n.type === "new_comment";
             const isSecurity = n.type === "security";
             const code = extractCode(n.body);
@@ -137,7 +130,13 @@ export function NotificationsView() {
                     ? isDeliveryCode
                       ? "border-amber-200 bg-amber-50/20"
                       : isOrderPlaced
-                      ? "border-green-200 bg-green-50/20"
+                      ? orderTone === "red"
+                        ? "border-red-200 bg-red-50/20"
+                        : orderTone === "amber"
+                        ? "border-amber-200 bg-amber-50/20"
+                        : "border-green-200 bg-green-50/20"
+                      : isRejected || isSecurity
+                      ? "border-red-200 bg-red-50/20"
                       : "border-[#009688]/20 bg-[#009688]/5"
                     : "border-slate-100"
                 )}
@@ -213,11 +212,7 @@ export function NotificationsView() {
                         à cliquer sur une carte qui ne mène nulle part. */}
                     {destination && (
                       <span className="flex items-center text-[#009688]">
-                        {destination === "/wallet"
-                          ? "Voir mon portefeuille"
-                          : destination === "/orders"
-                          ? "Voir ma commande"
-                          : "Voir le produit"}
+                        {notificationLinkLabel(destination)}
                         <ChevronRight className="h-3 w-3" />
                       </span>
                     )}

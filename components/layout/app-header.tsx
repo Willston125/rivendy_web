@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
 import { useCountry } from "@/features/country/country-provider";
-import { useNotifications } from "@/features/notifications/use-notifications";
+import { notificationDestination, useNotifications } from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
 
 const navItems = [
@@ -256,7 +256,15 @@ export function AppHeader() {
                         <button
                           key={n.id}
                           type="button"
-                          onClick={() => markRead(n.id)}
+                          onClick={() => {
+                            // Même destination que la page /notifications et
+                            // que l'app : avant le 2026-10-04 le clic ne
+                            // faisait que marquer la notification comme lue.
+                            void markRead(n.id);
+                            const destination = notificationDestination(n);
+                            setNotifOpen(false);
+                            if (destination) router.push(destination);
+                          }}
                           className={cn(
                             "flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-slate-50",
                             !n.is_read && "bg-[#E0F2F1]/40",
@@ -291,6 +299,15 @@ export function AppHeader() {
                       ))
                     )}
                   </div>
+                  {/* Accès à la page complète — le seul lien vers /notifications
+                      était dans le menu mobile. */}
+                  <Link
+                    href="/notifications"
+                    onClick={() => setNotifOpen(false)}
+                    className="block border-t border-slate-100 px-4 py-2.5 text-center text-[12px] font-bold text-[#009688] transition hover:bg-slate-50"
+                  >
+                    Voir toutes les notifications
+                  </Link>
                 </div>
               </>
             )}

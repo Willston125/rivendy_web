@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   UserRound,
+  Bell,
   Settings,
   KeyRound,
   Wallet,
@@ -28,6 +29,7 @@ const ACCOUNT_NAV: AccountLink[] = [
   { href: "/profile/password", label: "Sécurité", icon: KeyRound },
   { href: "/profile/payment-methods", label: "Moyens de paiement", icon: CreditCard },
   { href: "/wallet", label: "Portefeuille", icon: Wallet },
+  { href: "/profile/notifications", label: "Notifications", icon: Bell },
   { href: "/profile/settings", label: "Paramètres", icon: Settings },
   { href: "/seller", label: "Ma boutique", icon: Store },
 ];
