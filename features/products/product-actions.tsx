@@ -45,7 +45,15 @@ export function ProductActions({ product }: { product: Product }) {
     );
   }
 
-  if (Number(product.stock_quantity ?? 0) <= 0) {
+  // Location / Hôtel : pas de panier — demande traitée par l'agence Rivendy
+  // (parité app). Une chambre d'hôtel n'est jamais "achetée" directement.
+  const isRental = product.category === "location";
+  const isHotelRoom = product.category === "hotel";
+
+  // Le stock ne concerne que les articles vendus : une annonce de location à
+  // stock 0 perdait sa demande (« épuisé »), alors que l'app la propose
+  // toujours (location_detail_screen).
+  if (!isRental && !isHotelRoom && Number(product.stock_quantity ?? 0) <= 0) {
     return (
       <div className="space-y-2">
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
@@ -66,11 +74,6 @@ export function ProductActions({ product }: { product: Product }) {
       </div>
     );
   }
-
-  // Location / Hôtel : pas de panier — demande traitée par l'agence Rivendy
-  // (parité app). Une chambre d'hôtel n'est jamais "achetée" directement.
-  const isRental = product.category === "location";
-  const isHotelRoom = product.category === "hotel";
 
   return (
     <div className="space-y-2">

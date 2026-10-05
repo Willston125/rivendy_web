@@ -17,6 +17,8 @@ import {
   getSimilarProducts,
 } from "@/services/public-data";
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
+import { findPhaseBListing, isPhaseBCategory } from "@/lib/listings";
+import { locationPriceUnit, locationPriceValue } from "@/features/products/location-listings";
 
 /**
  * Marché de l'ARTICLE : il fixe la devise du prix affiché. Le pays du profil
@@ -75,6 +77,23 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   const boosted   = isBoosted(product);
   const hasRating = rating > 0;
+
+  // Annonces métier (Location, Mariage, Restaurant, Personnels) : leurs
+  // champs vivent dans extra_attributes, libellés depuis le référentiel de
+  // l'app. La fiche location affiche le MÊME prix que la carte (prix_* avec
+  // son unité) — avant le 2026-10-04 elle montrait le prix brut sans unité.
+  const listing = isPhaseBCategory(product.category) ? findPhaseBListing(product.subcategory) : null;
+  const listingDetails = listing
+    ? listing.fields
+        .map((f) => ({ label: f.label, value: String(product.extra_attributes?.[f.key] ?? "").trim() }))
+        .filter((d) => d.value.length > 0)
+    : [];
+  const isRental = product.category === "location";
+  const displayPrice = isRental ? locationPriceValue(product) : product.price;
+  const priceUnit = isRental ? locationPriceUnit(product) : null;
+  // État / Taille / Stock n'ont pas de sens pour une annonce métier ni pour
+  // la construction (l'app ne les saisit pas).
+  const showProductFacts = !listing && !isRental && product.category !== "materiauxConstruction";
   const fullStars = Math.floor(rating);
   const hasHalf   = rating - fullStars >= 0.5;
 
@@ -171,7 +190,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </h1>
 
             <p className="text-3xl font-black text-[#007168]">
-              {formatMoney(product.price, country)}
+              {formatMoney(displayPrice, country)}
+              {priceUnit && <span className="ml-1 text-base font-bold text-slate-500">/ {priceUnit}</span>}
             </p>
 
             {/* Note / avis */}
@@ -198,7 +218,29 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             )}
           </div>
 
+          {/* Détails de l'annonce métier */}
+          {listing && (
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {listing.emoji} {listing.label}
+              </p>
+              {listingDetails.length > 0 ? (
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {listingDetails.map((d) => (
+                    <div key={d.label}>
+                      <dt className="text-xs text-slate-400">{d.label}</dt>
+                      <dd className="font-bold text-[#1A1A1A]">{d.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-sm text-slate-500">Détails communiqués par Rivendy sur demande.</p>
+              )}
+            </div>
+          )}
+
           {/* Métadonnées : État · Taille · Stock */}
+          {showProductFacts && (
           <div className="grid grid-cols-3 gap-2 text-sm">
             <div className="rounded-xl bg-white p-3 text-center shadow-sm">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">État</p>
@@ -215,6 +257,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               </p>
             </div>
           </div>
+          )}
 
           {/* Variantes déclarées (tailles / couleurs) — parity app */}
           {(() => {

@@ -1,64 +1,104 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { KeyRound, X, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import type { Product } from "@/types/rivendy";
 
+type Outcome =
+  | { kind: "recorded"; ref: string | null; whatsapp: boolean }
+  | { kind: "whatsapp_only" };
+
 /**
- * Demande de location (parité RentalRequestSheet Flutter). Trace la demande
- * dans `rental_requests` (best-effort) puis ouvre WhatsApp vers l'AGENCE
- * Rivendy — jamais le propriétaire du bien. Charte de centralisation contact.
+ * Demande de location (parité RentalRequestSheet Flutter). La demande est
+ * ENREGISTRÉE pour Rivendy (dashboard → Demandes location), puis WhatsApp
+ * s'ouvre vers l'AGENCE — jamais le propriétaire du bien.
+ *
+ * Corrigé le 2026-10-04 (audit de parité) :
+ *  - l'enregistrement relisait la ligne (`insert().select()`) alors que
+ *    `rental_requests` n'a AUCUNE policy SELECT : Postgres refusait tout
+ *    l'INSERT (42501), l'erreur était avalée — aucune demande n'a jamais été
+ *    enregistrée, sur le site comme dans l'app. Désormais : RPC
+ *    `create_rental_request` (référence renvoyée par le serveur) et, tant
+ *    qu'elle n'est pas déployée, INSERT sans relecture ;
+ *  - « Demande envoyée ✓ » s'affichait même sans numéro d'agence et quand le
+ *    navigateur bloquait WhatsApp (ouvert APRÈS un await) : l'onglet est
+ *    désormais ouvert dans le clic, et le message dit ce qui s'est passé ;
+ *  - la policy INSERT est réservée aux comptes connectés : on le demande.
  */
 export function RentalRequestForm({ product }: { product: Product }) {
+  const { user, profile } = useAuth();
   const { country } = useCountry();
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [duration, setDuration] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(profile?.full_name ?? "");
+  const [phone, setPhone] = useState(profile?.whatsapp_number ?? "");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [error, setError] = useState("");
 
   const valid = name.trim() !== "" && phone.trim() !== "";
-  const agency = country?.whatsapp_number ?? "";
+  const agency = normalizePhoneForWhatsApp(country?.whatsapp_number ?? "");
+
+  async function record(): Promise<{ ok: boolean; ref: string | null }> {
+    const params = {
+      p_item_product_id: product.id,
+      p_item_name: product.title,
+      p_buyer_name: name.trim(),
+      p_buyer_phone: phone.trim(),
+      p_start_date: start || null,
+      p_end_date: end || null,
+      p_duration_text: duration.trim() || null,
+      p_notes: message.trim() || null,
+      p_country_id: product.country_id || country?.id || null,
+    };
+    const { data, error: rpcError } = await supabase.rpc("create_rental_request", params);
+    if (!rpcError) {
+      const res = data as { success?: boolean; request_number?: string } | null;
+      return { ok: res?.success === true, ref: res?.request_number ?? null };
+    }
+    // RPC pas encore déployée (PGRST202) : INSERT SANS relecture — la seule
+    // forme que la policy actuelle accepte. Pas de référence dans ce cas.
+    if (rpcError.code === "PGRST202" || /could not find the function/i.test(rpcError.message)) {
+      const { error: insertError } = await supabase.from("rental_requests").insert({
+        owner_seller_id: product.seller_id,
+        item_product_id: product.id,
+        item_name: product.title,
+        buyer_name: name.trim(),
+        buyer_phone: phone.trim(),
+        start_date: start || null,
+        end_date: end || null,
+        duration_text: duration.trim() || null,
+        notes: message.trim() || null,
+        country_id: product.country_id || country?.id || null,
+      });
+      return { ok: !insertError, ref: null };
+    }
+    return { ok: false, ref: null };
+  }
 
   async function send() {
-    if (!valid || sending) return;
+    if (!valid || sending || !user) return;
     setSending(true);
+    setError("");
 
-    // Enregistrement en base — non bloquant (si RLS/échec, WhatsApp part quand même).
-    let requestNumber: string | null = null;
-    try {
-      const { data } = await supabase
-        .from("rental_requests")
-        .insert({
-          owner_seller_id: product.seller_id,
-          item_product_id: product.id,
-          item_name: product.title,
-          buyer_name: name.trim(),
-          buyer_phone: phone.trim(),
-          start_date: start || null,
-          end_date: end || null,
-          duration_text: duration.trim() || null,
-          notes: message.trim() || null,
-          country_id: country?.id ?? null,
-        })
-        .select("request_number")
-        .single();
-      requestNumber = (data?.request_number as string | undefined) ?? null;
-    } catch {
-      // ignoré — best-effort
-    }
+    // Onglet ouvert DANS le clic : ouvert après un await, il est bloqué par
+    // la plupart des navigateurs.
+    const waWindow = agency ? window.open("about:blank", "_blank") : null;
+
+    const { ok, ref } = await record();
 
     const fmt = (d: string) => (d ? d.split("-").reverse().join("/") : "");
     const lines = [
       "🔑 *Demande de location Rivendy*",
-      ...(requestNumber ? [`📋 Réf : ${requestNumber}`] : []),
+      ...(ref ? [`📋 Réf : ${ref}`] : []),
       `Bien : ${product.title}`,
       ...(start ? [`Début : ${fmt(start)}`] : []),
       ...(end ? [`Fin : ${fmt(end)}`] : []),
@@ -68,13 +108,23 @@ export function RentalRequestForm({ product }: { product: Product }) {
       ...(message.trim() ? [`Message : ${message.trim()}`] : []),
     ];
 
-    const wa = normalizePhoneForWhatsApp(agency);
-    if (wa) {
-      window.open(`https://wa.me/${wa}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
+    let whatsappOpened = false;
+    if (waWindow) {
+      waWindow.location.href = `https://wa.me/${agency}?text=${encodeURIComponent(lines.join("\n"))}`;
+      whatsappOpened = true;
     }
+
     setSending(false);
-    setDone(requestNumber);
+    if (ok) {
+      setOutcome({ kind: "recorded", ref, whatsapp: whatsappOpened });
+    } else if (whatsappOpened) {
+      setOutcome({ kind: "whatsapp_only" });
+    } else {
+      setError("La demande n'a pas pu être envoyée. Réessayez dans un moment.");
+    }
   }
+
+  const loginHref = `/auth/login?next=${encodeURIComponent(`/products/${product.id}`)}`;
 
   return (
     <>
@@ -103,13 +153,28 @@ export function RentalRequestForm({ product }: { product: Product }) {
             </div>
             <p className="mb-4 text-xs font-medium text-slate-500">{product.title}</p>
 
-            {done !== null ? (
+            {!user ? (
+              <div className="space-y-3 py-4 text-center">
+                <p className="text-sm text-slate-600">Connectez-vous pour envoyer une demande de location.</p>
+                <Link href={loginHref} className="inline-flex rounded-xl bg-[#009688] px-4 py-2 text-sm font-bold text-white">
+                  Se connecter
+                </Link>
+              </div>
+            ) : outcome ? (
               <div className="space-y-3 py-4 text-center">
                 <p className="text-sm font-bold text-[#007168]">
-                  {done ? `Demande ${done} envoyée ✓` : "Votre demande a été envoyée à Rivendy ✓"}
+                  {outcome.kind === "recorded"
+                    ? outcome.ref
+                      ? `Demande ${outcome.ref} enregistrée ✓`
+                      : "Votre demande est enregistrée ✓"
+                    : "Votre demande part sur WhatsApp : envoyez le message pour la confirmer."}
                 </p>
-                <p className="text-xs text-slate-500">Rivendy vous confirmera la disponibilité rapidement.</p>
-                <button onClick={() => { setOpen(false); setDone(null); }} className="mt-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">Fermer</button>
+                <p className="text-xs text-slate-500">
+                  {outcome.kind === "recorded" && !outcome.whatsapp
+                    ? "Rivendy vous contactera pour confirmer la disponibilité."
+                    : "Rivendy vous confirmera la disponibilité rapidement."}
+                </p>
+                <button onClick={() => { setOpen(false); setOutcome(null); }} className="mt-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">Fermer</button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -133,6 +198,7 @@ export function RentalRequestForm({ product }: { product: Product }) {
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#009688] focus:outline-none" />
                 <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message (optionnel)" rows={2}
                   className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#009688] focus:outline-none" />
+                {error && <p className="rounded-xl bg-red-50 p-2.5 text-xs font-semibold text-red-700">{error}</p>}
                 <button onClick={send} disabled={!valid || sending}
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#009688] text-sm font-black text-white transition hover:bg-[#00897B] disabled:bg-slate-300">
                   {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Envoi…</> : "Envoyer la demande via Rivendy"}
