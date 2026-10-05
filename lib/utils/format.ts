@@ -72,12 +72,23 @@ export function isBoosted(product: Pick<Product, "status" | "boost_expires_at">)
   return new Date(product.boost_expires_at).getTime() > Date.now();
 }
 
+/**
+ * Référence de commande `CMD-AAAAMMJJ-XXXXXX` — miroir EXACT de
+ * `generateOrderId` (rivendy_app/lib/core/utils/order_id.dart) : 6 caractères
+ * tirés d'un générateur CRYPTOGRAPHIQUE sur un alphabet sans caractères
+ * ambigus (ni O/0, ni I/1/L — la référence est lue au téléphone).
+ * Jusqu'au 2026-10-04 le site tirait 5 caractères base36 de Math.random.
+ */
+const ORDER_ID_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
 export function orderId(prefix = "CMD") {
   const date = new Date();
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
-  const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+  const bytes = new Uint32Array(6);
+  globalThis.crypto.getRandomValues(bytes);
+  const suffix = Array.from(bytes, (n) => ORDER_ID_ALPHABET[n % ORDER_ID_ALPHABET.length]).join("");
   return `${prefix}-${yyyy}${mm}${dd}-${suffix}`;
 }
 

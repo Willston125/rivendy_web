@@ -13,7 +13,7 @@ import {
   Truck,
   User,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,11 @@ import { useCart } from "@/features/cart/cart-provider";
 import { CartNotice } from "@/features/cart/cart-notice";
 import { useCountry } from "@/features/country/country-provider";
 
-import { firstPhoto, formatMoney, isOrderable, orderId } from "@/lib/utils/format";
+import { formatMoney, isOrderable, orderId } from "@/lib/utils/format";
+import { compressImage } from "@/services/image-upload";
+import { phoneHint } from "@/lib/utils/phone-validator";
+import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
+import { loadSavedAddresses, saveAddress, type SavedAddress } from "./saved-addresses";
 import { orderFailureMessage } from "@/lib/utils/order-errors";
 import { useForeignMarketGuard } from "@/features/checkout/foreign-market-order";
 import {
@@ -32,10 +36,34 @@ import {
   isDeliverable,
   isStructuredDeliveryMarket,
   orderSnapshotParams,
+  shortAddressLabel,
   type DeliveryAddress,
 } from "@/lib/utils/delivery-location";
 import { DeliveryAddressPicker } from "./delivery-address-picker";
-import type { CartItem, PaymentMethod } from "@/types/rivendy";
+import type { CartItem, PaymentMethod, SellerCartGroup } from "@/types/rivendy";
+
+/** « Commander maintenant » : l'article voyage hors du panier (sessionStorage). */
+export const BUY_NOW_KEY = "rivendy_buy_now";
+
+/**
+ * Moyens de paiement de secours — miroir de `_fallbackPaymentMethods`
+ * (country_provider.dart) : DJ et KM seulement. Les autres marchés n'ont PAS
+ * de repli (pas de « cash » inventé) : la commande est bloquée tant que
+ * Rivendy n'y a pas configuré de moyen de paiement, comme dans l'app.
+ */
+function fallbackPaymentMethods(marketId?: string | null): PaymentMethod[] {
+  const make = (id: number, name: string, type: string, order: number): PaymentMethod => ({
+    id, country_id: marketId ?? "", name, type, logo_icon: null, color_hex: null,
+    is_active: true, api_ready: false, display_order: order,
+  });
+  if (marketId === "DJ") {
+    return [make(1, "Cash à la livraison", "cash", 1), make(2, "D-Money", "mobile_money", 2), make(3, "Waafi", "mobile_money", 3), make(4, "CAC Pay", "mobile_money", 4)];
+  }
+  if (marketId === "KM") {
+    return [make(10, "Cash à la livraison", "cash", 1), make(11, "Mvola", "mobile_money", 2), make(12, "HaloMoney", "mobile_money", 3)];
+  }
+  return [];
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type DeliveryMode = "none" | "delivery" | "pickup";
@@ -59,11 +87,51 @@ type CheckoutProductPatch = {
 export function CheckoutForm() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { groups, totalAmount, totalItems, sellerCount, removeItem, revalidateCart } = useCart();
+  const cart = useCart();
+  const { removeItem, revalidateCart } = cart;
   const { country: countryOrNull, paymentMethods, needsMarketSelection } = useCountry();
   // country est alias de countryOrNull — utilise optional chaining partout
   const country = countryOrNull;
   const marketGuard = useForeignMarketGuard();
+
+  // Verrou anti double envoi, posé AVANT tout await (comme _isProcessing de
+  // l'app) : un double clic pendant la vérification du marché déclenchait
+  // deux commandes et réservait deux fois le stock.
+  const submittingRef = useRef(false);
+
+  // « Commander maintenant » (2026-10-04) : comme l'app, on commande CET
+  // article seul — l'ancien bouton l'ajoutait au panier et commandait tout
+  // le panier.
+  const [buyNow, setBuyNow] = useState<CartItem | null>(null);
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("buy-now")) return;
+    try {
+      const raw = sessionStorage.getItem(BUY_NOW_KEY);
+      if (raw) setBuyNow(JSON.parse(raw) as CartItem);
+    } catch {
+      /* stockage indisponible : on retombe sur le panier */
+    }
+  }, []);
+  const groups: SellerCartGroup[] = useMemo(
+    () =>
+      buyNow
+        ? [{ sellerId: buyNow.product.seller_id, sellerName: buyNow.product.seller_name || "Boutique Rivendy", items: [buyNow] }]
+        : cart.groups,
+    [buyNow, cart.groups],
+  );
+  const totalAmount = buyNow ? Number(buyNow.product.price) * buyNow.quantity : cart.totalAmount;
+  const totalItems = buyNow ? buyNow.quantity : cart.totalItems;
+  const sellerCount = buyNow ? 1 : cart.sellerCount;
+
+  // 📋 Ordonnance (pharmacie) — comme l'app : bucket PRIVÉ `ordonnances`,
+  // lien signé 7 jours transmis dans la note de la commande pharmacie.
+  const [prescription, setPrescription] = useState<File | null>(null);
+  const hasPharmacyItems = groups.some((g) => g.items.some((i) => i.product.category === "pharmacie"));
+
+  // 📒 Carnet d'adresses (user_delivery_addresses, partagé avec l'app).
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedSavedId, setSelectedSavedId] = useState<string>("");
+  const [saveNewAddress, setSaveNewAddress] = useState(true);
 
 
   // Infos acheteur
@@ -98,27 +166,20 @@ export function CheckoutForm() {
 
   // ── Computed ──────────────────────────────────────────────────────────────
 
-  const fallbackMethods: PaymentMethod[] = useMemo(
-    () => [
-      {
-        id: 0,
-        country_id: country?.id ?? "DJ",
-
-        name: "Cash à la livraison",
-        type: "cash",
-        logo_icon: null,
-        color_hex: null,
-        is_active: true,
-        api_ready: false,
-        display_order: 0,
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [country?.id],
-  );
-
-
+  const fallbackMethods: PaymentMethod[] = useMemo(() => fallbackPaymentMethods(country?.id), [country?.id]);
   const activeMethods = paymentMethods.length ? paymentMethods : fallbackMethods;
+  const noPaymentMethod = activeMethods.length === 0;
+
+  // Instructions Mobile Money : numéro du marché (mobile-money.ts, miroir de
+  // l'app) quand il est configuré — l'acheteur sait où envoyer le paiement.
+  const marketId = country?.id;
+  const mobileMoneyTarget = useMemo(() => {
+    if (!selectedMethod || selectedMethod.type === "cash" || !marketId) return null;
+    const wanted = selectedMethod.name.toLowerCase();
+    return getMobileMoneyForCountry(marketId).find(
+      (m) => m.enabled && m.number && (wanted.includes(m.name.toLowerCase()) || m.name.toLowerCase().includes(wanted)),
+    ) ?? null;
+  }, [selectedMethod, marketId]);
 
   const commissionTotal = useMemo(
     () =>
@@ -141,6 +202,24 @@ export function CheckoutForm() {
   const usesStructuredAddress = isStructuredDeliveryMarket(country?.id);
 
   const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddress | null>(null);
+
+  useEffect(() => {
+    if (!user || !usesStructuredAddress) return;
+    let cancelled = false;
+    void loadSavedAddresses(user.id).then((list) => {
+      if (cancelled) return;
+      setSavedAddresses(list);
+      // Adresse par défaut présélectionnée, comme l'app.
+      const preferred = list.find((a) => a.isDefault) ?? list[0];
+      if (preferred) {
+        setSelectedSavedId(preferred.id);
+        setDeliveryAddress(preferred);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, usesStructuredAddress]);
 
   const deliveryFee = useMemo(() => {
     if (deliveryMode !== "delivery" || !usesStructuredAddress) return 0;
@@ -183,20 +262,42 @@ export function CheckoutForm() {
     buyerName.trim().length > 0 &&
     buyerPhone.trim().length > 0 &&
     isDeliveryReady &&
-    selectedMethod !== null;
+    selectedMethod !== null &&
+    !noPaymentMethod;
 
   // ── Soumission ────────────────────────────────────────────────────────────
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isFormValid || !groups.length) return;
-    // 🌍 2026-10-03 : pas de commande hors du marché d'origine du compte — le
-    // panier peut avoir été rempli sur un autre marché (la base l'impose aussi).
-    if (!(await marketGuard.allows(groups.flatMap((g) => g.items.map((i) => i.product.country_id))))) return;
+    if (!isFormValid || !groups.length || submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError("");
 
     try {
+      // 🌍 2026-10-03 : pas de commande hors du marché d'origine du compte — le
+      // panier peut avoir été rempli sur un autre marché (la base l'impose aussi).
+      if (!(await marketGuard.allows(groups.flatMap((g) => g.items.map((i) => i.product.country_id))))) return;
+
+      // 📋 Ordonnance : envoyée AVANT toute commande — si elle échoue, rien
+      // n'est commandé (l'acheteur l'avait jointe, il compte dessus).
+      let prescriptionUrl: string | null = null;
+      if (prescription && hasPharmacyItems) {
+        if (!user) throw new Error("Connectez-vous pour joindre une ordonnance.");
+        const compressed = await compressImage(prescription, 1600, 0.85);
+        const path = `${user.id}/${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from("ordonnances")
+          .upload(path, compressed, { contentType: "image/jpeg", upsert: true });
+        if (upErr) throw new Error("L'ordonnance n'a pas pu être envoyée. Réessayez — aucune commande n'a été passée.");
+        // 604 800 s = 7 jours : le temps du traitement par l'agence.
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("ordonnances")
+          .createSignedUrl(path, 604800);
+        if (signErr || !signed?.signedUrl) throw new Error("L'ordonnance n'a pas pu être envoyée. Réessayez — aucune commande n'a été passée.");
+        prescriptionUrl = signed.signedUrl;
+      }
+
       // Rafraîchir les données produit depuis Supabase
       const productIds = Array.from(
         new Set(groups.flatMap((group) => group.items.map((item) => item.product.id))),
@@ -292,7 +393,30 @@ export function CheckoutForm() {
       let failedCount = 0;
 
       for (const group of checkoutGroups) {
-        const id = orderId();
+        let id = orderId();
+
+        // Marché de la commande = marché des ARTICLES (tous du marché
+        // d'origine, la RPC l'impose) — jamais un « DJ » par défaut.
+        const orderMarket = group.items.find((i) => i.product.country_id)?.product.country_id || country?.id;
+        if (!orderMarket) {
+          firstFailure ??= "Marché de la commande introuvable. Rechargez la page puis réessayez.";
+          failedCount++;
+          continue;
+        }
+
+        // Note transmise à l'équipe Rivendy : ordonnance, variantes choisies
+        // (taille/couleur — la RPC ne les reçoit pas autrement, elles se
+        // perdaient), puis les précisions de l'acheteur.
+        const variantLines = group.items
+          .filter((i) => i.selectedSize || i.selectedColor)
+          .map((i) => `• ${i.product.title} — ${[i.selectedSize && `Taille ${i.selectedSize}`, i.selectedColor && `Couleur ${i.selectedColor}`].filter(Boolean).join(", ")}`);
+        const groupHasPharmacy = group.items.some((i) => i.product.category === "pharmacie");
+        const noteParts = [
+          prescriptionUrl && groupHasPharmacy ? `📋 Ordonnance : ${prescriptionUrl} (lien valable 7 jours)` : null,
+          variantLines.length ? `Variantes choisies :\n${variantLines.join("\n")}` : null,
+          orderNote.trim() || null,
+        ].filter(Boolean);
+        const orderNoteParam = noteParts.length ? noteParts.join("\n\n") : null;
 
         // Snapshot d'adresse : uniquement en mode livraison structurée.
         // Les clés absentes prennent la valeur par défaut de la RPC (NULL / 0),
@@ -308,26 +432,34 @@ export function CheckoutForm() {
             }
           : {};
 
-        // Appeler le RPC sécurisé pour créer la commande et les articles
-        const { data: rpcResult, error: rpcError } = await supabase.rpc("secure_create_order", {
-          p_order_id: id,
-          p_order_type: sellerCount > 1 ? "multi" : "single",
-          p_seller_id: group.sellerId,
-          p_seller_name: group.sellerName,
-          p_buyer_name: buyerName.trim(),
-          p_buyer_phone: buyerPhone.trim(),
-          p_buyer_zone: effectiveZoneLabel,
-          p_payment_method: paymentName,
-          p_payment_status: paymentStatus,
-          p_country_id: country?.id ?? "DJ",
-          p_transaction_ref: transactionRef.trim() || null,
-          p_order_note: orderNote.trim() || null,
-          p_items: group.items.map((item) => ({
-            product_id: item.product.id,
-            quantity: item.quantity,
-          })),
-          ...snapshot,
-        });
+        // Appeler le RPC sécurisé pour créer la commande et les articles.
+        // Une nouvelle tentative avec une nouvelle référence si le serveur
+        // répond duplicate_order_id (comme OrderService.createOrderWithResult).
+        const callRpc = (ref: string) =>
+          supabase.rpc("secure_create_order", {
+            p_order_id: ref,
+            p_order_type: sellerCount > 1 ? "multi" : "single",
+            p_seller_id: group.sellerId,
+            p_seller_name: group.sellerName,
+            p_buyer_name: buyerName.trim(),
+            p_buyer_phone: buyerPhone.trim(),
+            p_buyer_zone: effectiveZoneLabel,
+            p_payment_method: paymentName,
+            p_payment_status: paymentStatus,
+            p_country_id: orderMarket,
+            p_transaction_ref: transactionRef.trim() || null,
+            p_order_note: orderNoteParam,
+            p_items: group.items.map((item) => ({
+              product_id: item.product.id,
+              quantity: item.quantity,
+            })),
+            ...snapshot,
+          });
+        let { data: rpcResult, error: rpcError } = await callRpc(id);
+        if (!rpcError && (rpcResult as SecureOrderResult | null)?.error === "duplicate_order_id") {
+          id = orderId();
+          ({ data: rpcResult, error: rpcError } = await callRpc(id));
+        }
 
         // Les codes de la RPC sont traduits ici, une seule fois.
         const resultObj = rpcResult as SecureOrderResult | null;
@@ -351,8 +483,21 @@ export function CheckoutForm() {
       // Aucune commande créée : panier conservé, l'acheteur peut réessayer.
       if (!orderIds.length) throw new Error(firstFailure ?? "Commande impossible. Réessaie.");
 
-      for (const group of orderedGroups) {
-        for (const item of group.items) removeItem(item.product.id);
+      // « Commander maintenant » : le panier n'est pas touché.
+      if (buyNow) {
+        try { sessionStorage.removeItem(BUY_NOW_KEY); } catch { /* rien */ }
+      } else {
+        for (const group of orderedGroups) {
+          for (const item of group.items) removeItem(item.product.id);
+        }
+      }
+
+      // Nouvelle adresse enregistrée dans le carnet (best effort, comme l'app).
+      if (
+        user && deliveryMode === "delivery" && usesStructuredAddress && deliveryAddress &&
+        !selectedSavedId && saveNewAddress
+      ) {
+        void saveAddress(user.id, deliveryAddress, savedAddresses.length === 0);
       }
       setPartialFailure(
         failedCount
@@ -368,6 +513,7 @@ export function CheckoutForm() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Commande impossible. Réessaie.");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -518,7 +664,62 @@ export function CheckoutForm() {
           {deliveryMode === "delivery" && (
             <div className="mt-4">
               {usesStructuredAddress ? (
-                <DeliveryAddressPicker onChange={setDeliveryAddress} />
+                <div className="space-y-3">
+                  {/* Carnet d'adresses — partagé avec l'app */}
+                  {savedAddresses.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-bold text-slate-700">Mes adresses</p>
+                      {savedAddresses.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSavedId(a.id);
+                            setDeliveryAddress(a);
+                          }}
+                          className={`flex w-full items-start gap-2 rounded-xl border-2 p-3 text-left text-sm transition ${
+                            selectedSavedId === a.id ? "border-[#009688] bg-[#E0F2F1]" : "border-slate-200 bg-white hover:border-[#009688]/40"
+                          }`}
+                        >
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#009688]" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-bold text-slate-900">{shortAddressLabel(a)}</span>
+                            {a.landmark && <span className="block truncate text-xs text-slate-500">Repère : {a.landmark}</span>}
+                          </span>
+                          <span className="shrink-0 text-xs font-bold text-[#009688]">{formatKmf(a.deliveryFeeKmf)}</span>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSavedId("");
+                          setDeliveryAddress(null);
+                        }}
+                        className={`w-full rounded-xl border-2 border-dashed p-3 text-sm font-bold transition ${
+                          !selectedSavedId ? "border-[#009688] text-[#009688]" : "border-slate-200 text-slate-500 hover:border-[#009688]/40"
+                        }`}
+                      >
+                        + Nouvelle adresse
+                      </button>
+                    </div>
+                  )}
+                  {!selectedSavedId && (
+                    <>
+                      <DeliveryAddressPicker onChange={setDeliveryAddress} />
+                      {user && (
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={saveNewAddress}
+                            onChange={(e) => setSaveNewAddress(e.target.checked)}
+                            className="h-4 w-4 accent-[#009688]"
+                          />
+                          Enregistrer cette adresse pour mes prochaines commandes
+                        </label>
+                      )}
+                    </>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-1.5">
                   <Label htmlFor="buyerZone" className="text-sm font-bold text-slate-700">
@@ -530,7 +731,7 @@ export function CheckoutForm() {
                       id="buyerZone"
                       value={buyerZone}
                       onChange={(e) => setBuyerZone(e.target.value)}
-                      placeholder="Balbala, Héron, PK12..."
+                      placeholder="Quartier, point de repère…"
                       className="pl-9"
                       required
                     />
@@ -586,7 +787,7 @@ export function CheckoutForm() {
                   id="buyerPhone"
                   value={buyerPhone}
                   onChange={(e) => setBuyerPhone(e.target.value)}
-                  placeholder="+253 77 00 00 00"
+                  placeholder={phoneHint(country?.id)}
                   type="tel"
                   className="pl-9"
                   required
@@ -605,7 +806,7 @@ export function CheckoutForm() {
                 onChange={(e) => setOrderNote(e.target.value.slice(0, 500))}
                 rows={3}
                 maxLength={500}
-                placeholder="Ordonnance, taille souhaitée, point de repère pour la livraison…"
+                placeholder="Précision de livraison, horaire, demande particulière…"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm
                            text-slate-900 placeholder:text-slate-400 focus:border-[#00C4B4]
                            focus:outline-none focus:ring-1 focus:ring-[#00C4B4]"
@@ -614,9 +815,44 @@ export function CheckoutForm() {
           </div>
         </section>
 
+        {/* Ordonnance — commandes pharmacie, comme l'app */}
+        {hasPharmacyItems && (
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-1 text-base font-black text-slate-950">📋 Ordonnance</h2>
+            <p className="mb-3 text-xs text-slate-500">
+              Si un médicament l&apos;exige, joignez une photo de l&apos;ordonnance. Elle reste privée : seule
+              l&apos;équipe Rivendy y accède, par un lien valable 7 jours.
+            </p>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+              {prescription ? "Changer la photo" : "Joindre une photo"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => setPrescription(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            {prescription && (
+              <p className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                <span className="truncate">{prescription.name}</span>
+                <button type="button" onClick={() => setPrescription(null)} className="font-bold text-red-500 hover:underline">
+                  Retirer
+                </button>
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Méthodes de paiement */}
         <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-base font-black text-slate-950">Mode de paiement</h2>
+          {noPaymentMethod && (
+            <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              Aucun moyen de paiement n&apos;est encore configuré pour ce marché. Contactez Rivendy depuis
+              Aide &amp; Support pour commander.
+            </p>
+          )}
           <div className="space-y-2">
             {activeMethods.map((method) => (
               <PaymentCard
@@ -632,11 +868,16 @@ export function CheckoutForm() {
           <div
             className={`overflow-hidden transition-all duration-300 ease-out ${
               selectedMethod?.type !== "cash" && selectedMethod !== null
-                ? "mt-4 max-h-24 opacity-100"
+                ? "mt-4 max-h-48 opacity-100"
                 : "max-h-0 opacity-0"
             }`}
           >
             <div className="space-y-1.5">
+              <p className="text-xs text-slate-600">
+                {mobileMoneyTarget
+                  ? `Envoyez ${formatMoney(amountDue, country)} au ${mobileMoneyTarget.name} ${mobileMoneyTarget.number}, puis indiquez la référence de la transaction.`
+                  : "L'équipe Rivendy vous indiquera comment régler par ce moyen."}
+              </p>
               <Label htmlFor="transactionRef" className="text-sm font-bold text-slate-700">
                 Référence de paiement (optionnel)
               </Label>
@@ -718,7 +959,7 @@ export function CheckoutForm() {
 
         <div className="flex items-start gap-2 rounded-xl bg-[#E0F2F1] p-3 text-xs font-semibold text-[#009688]">
           <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>WhatsApp s&apos;ouvre sur le numéro officiel Rivendy — jamais celui du vendeur.</span>
+          <span>Votre commande est transmise à Rivendy : l&apos;équipe vous contacte depuis son numéro officiel — jamais celui du vendeur.</span>
         </div>
 
         <button

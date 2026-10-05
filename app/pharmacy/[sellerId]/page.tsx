@@ -235,8 +235,9 @@ export default async function PharmacyCatalogPage({
               Ordonnances acceptées via Rivendy
             </h3>
             <p className="mt-1 text-[13px] font-medium leading-relaxed text-slate-600">
-              Importez votre ordonnance depuis l&apos;application mobile Rivendy et
-              recevez vos médicaments en toute simplicité.
+              Ajoutez vos produits au panier : au moment de commander, joignez la
+              photo de votre ordonnance (sur le site comme dans l&apos;application).
+              Elle reste privée et n&apos;est vue que par l&apos;équipe Rivendy.
             </p>
             <p className="mt-1.5 text-[12px] italic text-slate-500">
               Pour les médicaments soumis à ordonnance, une validation peut être

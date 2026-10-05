@@ -27,11 +27,14 @@ const CART_KEY = "rivendy_cart_v1";
    été retiré. Sans réseau, le panier reste tel quel : la commande
    revérifie de toute façon. */
 const FRESH_COLUMNS =
-  "id, title, price, seller_price, commission_amount, photos, status, stock_quantity, is_deleted, deleted_at";
+  "id, seller_id, country_id, category, title, price, seller_price, commission_amount, photos, status, stock_quantity, is_deleted, deleted_at";
 
 type FreshProduct = Pick<
   Product,
   | "id"
+  | "seller_id"
+  | "country_id"
+  | "category"
   | "title"
   | "price"
   | "seller_price"
@@ -163,6 +166,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
             quantity: Math.min(item.quantity, stock),
             product: {
               ...item.product,
+              // Marché, vendeur et catégorie relus (2026-10-04) : un panier
+              // enregistré avant ce correctif n'avait pas country_id, et la
+              // garde « marché d'origine » ne pouvait pas s'y appliquer.
+              seller_id: row.seller_id || item.product.seller_id,
+              country_id: row.country_id ?? item.product.country_id ?? null,
+              category: row.category || item.product.category,
               title: row.title || item.product.title,
               price: Number(row.price ?? item.product.price),
               seller_price: Number(row.seller_price ?? row.price ?? item.product.seller_price),

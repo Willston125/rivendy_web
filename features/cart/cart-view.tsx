@@ -71,7 +71,10 @@ export function CartView() {
           </div>
           <button
             type="button"
-            onClick={clearCart}
+            onClick={() => {
+              // Confirmation, comme l'app (cart_bottom_sheet) : un clic perdait tout.
+              if (confirm("Vider le panier ? Tous les articles seront retirés.")) clearCart();
+            }}
             className="text-sm font-bold text-slate-400 transition hover:text-red-500"
           >
             Vider le panier
