@@ -108,7 +108,8 @@ export function groupConstructionCompanies(
 
     companies.push({
       sellerId: first.seller_id,
-      sellerName: first.seller_name ?? "",
+      // show_as_rivendy : l'établissement s'affiche « Rivendy » (comme l'app).
+      sellerName: first.show_as_rivendy ? "Rivendy" : (first.seller_name ?? ""),
       coverUrl: cover,
       specialties: specialties(list),
       zone,

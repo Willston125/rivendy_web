@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
+  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Heart,
@@ -16,29 +17,39 @@ import { cn } from "@/lib/utils/cn";
 import { firstPhoto } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
+import { ContentFilter } from "@/lib/utils/content-filter";
 import type { Product } from "@/types/rivendy";
+
+/** Sous-domaine de lecture Cloudflare Stream (public) — même que l'app. */
+const STREAM_SUBDOMAIN = "customer-22iqkw4cwdg7uf5h.cloudflarestream.com";
 
 /** Story groupée par vendeur — chaque produit = une barre de progression. */
 export interface SellerStory {
   sellerId: string;
   sellerName: string;
   sellerAvatar: string | null;
+  /** Badge « Vendeur certifié » dans l'anneau et l'en-tête (comme l'app). */
+  sellerCertified?: boolean;
   products: Product[];
 }
 
 const STORY_DURATION = 5000; // 5s par produit (identique à l'app Flutter)
+/** Story vidéo : clips de 15 s au plus (rognés à l'envoi). */
+const VIDEO_STORY_DURATION = 15000;
 
 interface StoryViewerProps {
   stories: SellerStory[];
   initialIndex: number;
   onClose: () => void;
+  /** Appelé à l'ouverture des stories d'un vendeur (anneau « vu »). */
+  onSellerViewed?: (story: SellerStory) => void;
 }
 
 /**
  * Visionneuse de stories plein écran — réplique web de `story_overlay.dart`.
  * Barres de progression, autoplay 5s, navigation tap/clavier, like, commentaires, partage.
  */
-export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps) {
+export function StoryViewer({ stories, initialIndex, onClose, onSellerViewed }: StoryViewerProps) {
   const [mounted, setMounted] = useState(false);
   const [sellerIndex, setSellerIndex] = useState(initialIndex);
   const [productIndex, setProductIndex] = useState(0);
@@ -51,8 +62,17 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
 
   const seller = stories[sellerIndex];
   const product: Product | undefined = seller?.products[productIndex];
+  // Story vidéo prête (le webhook pose 'ready', jamais le client) : lue comme
+  // dans l'app (story_viewer.dart), sur une durée de clip.
+  const videoUid = product?.video_uid && product.video_status === "ready" ? product.video_uid : null;
+  const duration = videoUid ? VIDEO_STORY_DURATION : STORY_DURATION;
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (seller) onSellerViewed?.(seller);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellerIndex]);
 
   /* ── Navigation ─────────────────────────────────────────────── */
   const goNext = useCallback(() => {
@@ -85,8 +105,8 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
     let raf = 0;
     let start: number | null = null;
     const tick = (now: number) => {
-      if (start === null) start = now - progress * STORY_DURATION;
-      const ratio = Math.min(1, (now - start) / STORY_DURATION);
+      if (start === null) start = now - progress * duration;
+      const ratio = Math.min(1, (now - start) / duration);
       setProgress(ratio);
       if (ratio >= 1) {
         goNext();
@@ -129,12 +149,22 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
       {/* Conteneur format portrait (story) */}
       <div className="relative h-full w-full max-w-[460px] overflow-hidden bg-black sm:h-[92vh] sm:rounded-2xl">
         {/* ── Image ──────────────────────────────────────────── */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo}
-          alt={product.title}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        {videoUid ? (
+          <iframe
+            key={videoUid}
+            src={`https://${STREAM_SUBDOMAIN}/${videoUid}/iframe?autoplay=true&muted=true&controls=false&preload=auto&poster=${encodeURIComponent(product.video_thumbnail_url || photo)}`}
+            className="pointer-events-none absolute inset-0 h-full w-full border-0"
+            allow="autoplay; encrypted-media"
+            title={`Story vidéo — ${product.title}`}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo}
+            alt={product.title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/60" />
 
         {/* ── Zones de tap (gauche = précédent, droite = suivant) ─ */}
@@ -196,8 +226,9 @@ export function StoryViewer({ stories, initialIndex, onClose }: StoryViewerProps
               )}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-white drop-shadow">
+              <p className="flex items-center gap-1 truncate text-sm font-bold text-white drop-shadow">
                 {seller.sellerName || "Boutique"}
+                {seller.sellerCertified && <BadgeCheck className="h-4 w-4 shrink-0 fill-amber-400 text-white" />}
               </p>
               <div className="flex items-center gap-1.5">
                 {seller.products.length > 1 && (
@@ -447,6 +478,12 @@ function CommentsPanel({
     if (!trimmed || sending) return;
     if (!user) {
       window.location.href = "/auth/login";
+      return;
+    }
+    // Même filtre que les commentaires de la fiche produit et que l'app
+    // (story_comments_sheet) : les commentaires de story passaient sans.
+    if (!ContentFilter.isClean(trimmed)) {
+      alert(ContentFilter.errorMessage);
       return;
     }
     setSending(true);

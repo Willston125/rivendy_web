@@ -37,7 +37,9 @@ function buildUniverses(countryId: string, q?: string): Universe[] {
       ],
     },
     { label: "Beauté", image: "/categories/beaute.png", bg: "#F4EAFB", accent: "#AB6FD4", href: catHref("beauteParfums") },
-    { label: "Maison", image: "/categories/maison.png", bg: "#FFF4E5", accent: "#F0A63E", href: catHref("maison") },
+    // Décision propriétaire du 2026-09-01 (comme l'app, universe_grid.dart) :
+    // « Sur commande » remplace Maison sur l'accueil ; Maison passe dans Services.
+    { label: "Sur commande", image: "/categories/sur_commande.png", bg: "#FFF4E5", accent: "#F0A63E", href: "/preorders" },
     { label: "Électronique", image: "/categories/electronique.png", bg: "#EAF2FF", accent: "#5B8DEF", href: catHref("electronique") },
     {
       label: "Services",
@@ -45,13 +47,13 @@ function buildUniverses(countryId: string, q?: string): Universe[] {
       bg: "#EEF1FF",
       accent: "#7C86E0",
       group: [
+        { label: "Maison", href: catHref("maison") },
         { label: "Location", href: catHref("location") },
         { label: "Mariage", href: catHref("mariage") },
         { label: "Hôtels", href: catHref("hotel") },
         { label: "Personnels", href: catHref("personnels") },
         { label: "Construction", href: catHref("materiauxConstruction") },
         { label: "Artisanat", href: catHref("artisanatLocal") },
-        { label: "Sur commande", href: "/preorders" },
       ],
     },
   ];

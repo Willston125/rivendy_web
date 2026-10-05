@@ -47,7 +47,7 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
   const handleToggleFollow = async () => {
     if (!user) {
       // Rediriger vers la connexion plutôt qu'alert()
-      router.push(`/auth/login?redirect=/store/${sellerId}`);
+      router.push(`/auth/login?next=${encodeURIComponent(`/store/${sellerId}`)}`);
       return;
     }
     // Le bouton est masqué pour le propriétaire (voir ci-dessous), mais garde-fou

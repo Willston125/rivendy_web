@@ -154,7 +154,8 @@ export function groupRestaurants(
 
     groups.push({
       sellerId: first.seller_id,
-      sellerName: first.seller_name ?? "",
+      // show_as_rivendy : l'établissement s'affiche « Rivendy » (comme l'app).
+      sellerName: first.show_as_rivendy ? "Rivendy" : (first.seller_name ?? ""),
       logoUrl: first.seller_avatar_url || "",
       coverUrl: firstCover(list),
       etablissementType: type,

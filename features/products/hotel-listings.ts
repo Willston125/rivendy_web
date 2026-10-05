@@ -117,7 +117,8 @@ export function groupHotels(products: Product[], filter: string = HOTEL_FILTER_A
 
     hotels.push({
       sellerId: first.seller_id,
-      sellerName: first.seller_name ?? "",
+      // show_as_rivendy : l'établissement s'affiche « Rivendy » (comme l'app).
+      sellerName: first.show_as_rivendy ? "Rivendy" : (first.seller_name ?? ""),
       coverUrl: cover,
       locality,
       amenities,

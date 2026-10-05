@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck, Zap } from "lucide-react";
+import { BadgeCheck, Play, Zap } from "lucide-react";
+import { isPhaseBCategory } from "@/lib/listings";
 import { ProductCardAction, ProductCardFavorite } from "@/features/products/product-card-action";
 import { categoryLabel, firstPhoto, formatMoney, isBoosted } from "@/lib/utils/format";
 import type { Country, Product } from "@/types/rivendy";
@@ -20,6 +21,13 @@ export function ProductCard({
     Number(product.stock_quantity ?? 1) === 0;
 
   const boosted = isBoosted(product);
+  // Badges de l'app (product_card.dart) : état de l'article, « Sur commande »,
+  // Boosté, ▶ vidéo prête. Le badge « NOUVEAU » posé sur TOUTES les cartes
+  // non boostées n'existait pas dans l'app et ne voulait rien dire.
+  const isPreorder = product.product_type === "preorder";
+  const showCondition = !isPhaseBCategory(String(product.category)) && product.category !== "materiauxConstruction" && !!product.condition;
+  const hasVideo = !!product.video_uid && product.video_status === "ready";
+  const sellerLabel = product.show_as_rivendy ? "Rivendy" : product.seller_name || "Boutique Rivendy";
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-md">
@@ -37,6 +45,13 @@ export function ProductCard({
           className={`object-cover transition duration-300 group-hover:scale-105 ${isEpuise ? "opacity-50 grayscale" : ""}`}
         />
 
+        {/* ▶ Vidéo prête (bas gauche, comme l'app) — la carte ne la joue jamais */}
+        {hasVideo && !isEpuise && (
+          <span className="absolute bottom-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
+            <Play className="ml-0.5 h-3 w-3 fill-white text-white" />
+          </span>
+        )}
+
         {/* Épuisé */}
         {isEpuise && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -49,14 +64,20 @@ export function ProductCard({
         {/* Badges haut-gauche */}
         {!isEpuise && (
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
-            {boosted ? (
+            {boosted && !isPreorder && (
               <span className="flex items-center gap-1 rounded-md bg-[#1A1A1A]/90 px-2 py-0.5 text-[10px] font-black text-white backdrop-blur-sm">
                 <Zap className="h-2.5 w-2.5 fill-white" />
                 BOOST
               </span>
-            ) : (
-              <span className="rounded-md bg-[#009688] px-2 py-0.5 text-[10px] font-black text-white shadow-sm">
-                NOUVEAU
+            )}
+            {isPreorder && (
+              <span className="rounded-md bg-[#F0A63E] px-2 py-0.5 text-[10px] font-black text-white shadow-sm">
+                Sur commande
+              </span>
+            )}
+            {showCondition && !isPreorder && (
+              <span className="rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-black text-slate-700 shadow-sm backdrop-blur-sm">
+                {product.condition}
               </span>
             )}
             {product.seller_is_certified && (
@@ -110,7 +131,8 @@ export function ProductCard({
           {!compact && product.seller_is_certified && (
             <BadgeCheck className="h-3 w-3 shrink-0 text-amber-400" />
           )}
-          <span className="truncate">{product.seller_name || "Boutique Rivendy"}</span>
+          {product.show_as_rivendy && <BadgeCheck className="h-3 w-3 shrink-0 text-[#009688]" />}
+          <span className="truncate">{sellerLabel}</span>
         </Link>
 
         {/* Spacer pour pousser le bouton en bas */}

@@ -134,7 +134,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       />
 
       {/* Incrémente views_count — parity Flutter product_detail_screen */}
-      <ProductViewTracker productId={product.id} />
+      <ProductViewTracker productId={product.id} sellerId={product.seller_id} />
 
       {/* Breadcrumb */}
       <nav className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">

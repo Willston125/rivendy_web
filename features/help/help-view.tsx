@@ -8,19 +8,19 @@ import { normalizePhoneForWhatsApp } from "@/lib/utils/format";
 const FAQS = [
   {
     q: "Comment publier un article à vendre ?",
-    a: "Cliquez sur le bouton \"Publier\" dans la navigation. Ajoutez 1 à 5 photos de votre article, remplissez le titre, la description, le prix et la catégorie, puis cliquez sur \"Publier l'annonce\". Votre article sera visible sur le feed en quelques secondes.",
+    a: "Cliquez sur le bouton \"Publier\" dans la navigation. Ajoutez jusqu'à 3 photos (et une courte vidéo si vous le souhaitez), remplissez le titre, la description, le prix, la catégorie et sa sous-catégorie, puis envoyez l'annonce. Elle est visible sur le feed dès qu'elle a été validée par l'équipe Rivendy.",
   },
   {
     q: "Comment passer une commande sur Rivendy ?",
-    a: "Ajoutez les produits que vous souhaitez à votre panier, puis cliquez sur \"Commander\". Renseignez votre nom, votre numéro de téléphone, votre zone de livraison et votre moyen de paiement. Rivendy vous confirme ensuite la commande via WhatsApp.",
+    a: "Ajoutez les produits que vous souhaitez à votre panier, puis cliquez sur \"Commander\". Renseignez votre nom, votre numéro, votre adresse de livraison et votre moyen de paiement. L'équipe Rivendy prend la commande en charge et vous contacte ; vous suivez chaque étape dans \"Mes commandes\" et vous confirmez la réception à la livraison.",
   },
   {
     q: "Comment acheter un article en toute sécurité ?",
-    a: "Consultez le profil du vendeur, ses avis et son badge de certification. Chaque commande sur Rivendy est gérée par notre équipe — aucun contact direct avec le vendeur n'est nécessaire. Pour les paiements, utilisez les moyens sécurisés disponibles (D-Money, Waafi, Cash à la livraison).",
+    a: "Consultez le profil du vendeur, ses avis et son badge de certification. Chaque commande sur Rivendy est gérée par notre équipe — aucun contact direct avec le vendeur n'est nécessaire. Pour les paiements, utilisez les moyens proposés dans votre pays au moment de commander (Mobile Money, espèces à la livraison).",
   },
   {
     q: "Comment signaler un article ou un utilisateur ?",
-    a: "Contactez notre support directement via WhatsApp ou email en indiquant l'identifiant de l'article ou du profil concerné. Notre équipe examinera le signalement sous 24h.",
+    a: "Utilisez le bouton \"Signaler\" présent sur la fiche de l'article, sur la boutique ou sous un commentaire. Notre équipe examine chaque signalement.",
   },
   {
     q: "Puis-je modifier ou supprimer mon annonce ?",
@@ -32,7 +32,7 @@ const FAQS = [
   },
   {
     q: "Comment fonctionne le portefeuille Rivendy ?",
-    a: "En tant que vendeur, vos gains s'accumulent dans votre portefeuille Rivendy au fur et à mesure de vos ventes confirmées. Vous pouvez ensuite faire une demande de retrait via WhatsApp — traité sous 24h vers votre compte D-Money, Waafi ou par virement.",
+    a: "En tant que vendeur, vous êtes crédité de votre prix dans le portefeuille Rivendy dès que l'acheteur confirme la réception (ou automatiquement après 24 h). Depuis le portefeuille, faites une demande de retrait (à partir de 5 000 KMF aux Comores, 2 000 ailleurs) : l'équipe Rivendy la valide puis vous verse sur votre Mobile Money.",
   },
   {
     q: "Comment obtenir le badge Vendeur Certifié ?",
@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: "Quels sont les frais et commissions Rivendy ?",
-    a: "La commission dépend de la catégorie de votre article : 7 % pour la mode, la maison, la beauté, l'électronique et le mariage, 5 % pour l'artisanat local, 10 % pour les matériaux de construction. Les catégories Location, Restaurant, Personnels, Hôtels, Pharmacie et Supermarché ne sont soumises à aucune commission. La commission s'ajoute à votre prix : vous encaissez exactement le montant que vous avez saisi. Le montant exact est affiché lors de la publication. Les achats sont gratuits pour les acheteurs.",
+    a: "La commission dépend du prix, par tranche : 6 % jusqu'au premier seuil, 8 % entre les deux seuils, 10 % au-delà (les seuils dépendent de votre pays). Les catégories Location, Restaurant, Personnels, Hôtels, Pharmacie et Supermarché ne sont soumises à aucune commission. La commission s'ajoute à votre prix : vous encaissez exactement le montant que vous avez saisi. Le montant exact est affiché lors de la publication.",
   },
 ] as const;
 
@@ -53,7 +53,7 @@ export function HelpView() {
   const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
   const waMsg = encodeURIComponent("Bonjour, j'ai besoin d'aide avec Rivendy.");
   const waUrl = `https://wa.me/${whatsapp}?text=${waMsg}`;
-  const emailUrl = `mailto:support@rivendy.dj?subject=Aide%20Rivendy&body=Bonjour%2C%20j'ai%20besoin%20d'aide%20avec%20Rivendy.`;
+  const emailUrl = `mailto:support@rivendy.com?subject=Aide%20Rivendy&body=Bonjour%2C%20j'ai%20besoin%20d'aide%20avec%20Rivendy.`;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
@@ -149,7 +149,7 @@ export function HelpView() {
           Contacter le support
         </a>
         <p className="mt-3 text-xs text-slate-400">
-          support@rivendy.dj
+          support@rivendy.com
         </p>
       </div>
     </div>

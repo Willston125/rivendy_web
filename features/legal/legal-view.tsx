@@ -18,13 +18,13 @@ Rivendy est une plateforme de mise en relation (marketplace) permettant aux util
 
 3. Engagements de l'Acheteur
 • L'acheteur s'engage à payer le prix convenu, incluant les potentiels frais de livraison.
-• Tout litige doit d'abord faire l'objet de discussions via les outils de communication internes avant intervention du support.
+• L'acheteur confirme la réception de sa commande dans « Mes commandes ». En cas de problème, il le signale depuis la commande : le dossier est examiné par l'équipe Rivendy.
 
 4. Responsabilité de Rivendy
-Rivendy agit en tant qu'hébergeur de l'application et n'est pas responsable des litiges entre acheteur et vendeur en cas de vente directe (main propre). Cependant, tout signalement d'escroquerie entraînera le bannissement immédiat du membre.
+Toutes les commandes passent par Rivendy : acheteur et vendeur ne communiquent pas directement, l'équipe Rivendy assure le suivi de chaque commande jusqu'à la confirmation de réception. Tout signalement d'escroquerie avérée entraîne le bannissement du membre.
 
 5. Frais et Commissions
-L'utilisation du Wallet Rivendy et certains statuts VIP ou annonces "Boostées" sont assujettis à des frais clairement indiqués lors de la transaction.
+Une commission Rivendy s'ajoute au prix fixé par le vendeur (le vendeur encaisse exactement son prix) ; son montant est affiché avant la publication et inclus dans le prix payé par l'acheteur. Les abonnements vendeur (Certifié, Pro) et les annonces « Boostées » sont payants, au tarif affiché avant tout paiement.
 
 6. Propriété Intellectuelle
 Le nom Rivendy, son logo, et tout contenu produit par la plateforme sont protégés. Toute reproduction sans autorisation est interdite.
@@ -32,15 +32,18 @@ Le nom Rivendy, son logo, et tout contenu produit par la plateforme sont protég
 7. Modification des CGU
 Rivendy se réserve le droit de modifier les présentes CGU à tout moment. Les utilisateurs seront informés des changements majeurs via notification dans l'application.
 
-Mise à jour : Novembre 2024`;
+Mise à jour : Octobre 2026`;
 
 const PRIVACY = `Politique de Confidentialité de Rivendy
 
 1. Collecte des Données
 Nous collectons uniquement les données nécessaires au bon fonctionnement de la plateforme :
-• Informations de profil (nom, email, téléphone)
-• Données de transaction et paiements
-• Préférences et favoris
+• Informations de profil (nom, numéro WhatsApp, email facultatif, photo)
+• Adresses de livraison enregistrées
+• Données de commande, de transaction et de paiement
+• Contenus publiés par les vendeurs (photos, vidéos, présentation vocale)
+• Ordonnances jointes à une commande de pharmacie : stockées dans un espace privé, consultées uniquement par l'équipe Rivendy via un lien valable 7 jours
+• Préférences, favoris et préférences de notifications
 • Données d'utilisation (analytics anonymisés)
 
 2. Utilisation de vos Données
@@ -51,7 +54,7 @@ Vos données sont strictement utilisées pour :
 • Lutter contre la fraude et les abus
 
 3. Partage et Sécurité
-Rivendy s'engage à ne jamais revendre vos informations personnelles à des tiers. Toutes les données sont chiffrées selon les standards de sécurité en vigueur (SSL, Supabase sécurisé).
+Rivendy s'engage à ne jamais revendre vos informations personnelles à des tiers. Les données transitent de façon chiffrée (HTTPS). Elles sont traitées par nos sous-traitants techniques, uniquement pour faire fonctionner le service : Supabase (base de données et fichiers), Cloudflare (vidéos), Google Firebase (notifications de l'application), Resend (emails) et Vercel (hébergement du site).
 
 Nous pouvons partager des données anonymisées avec nos partenaires analytiques pour améliorer nos services.
 
@@ -59,7 +62,7 @@ Nous pouvons partager des données anonymisées avec nos partenaires analytiques
 Le site utilise des cookies strictement nécessaires au fonctionnement. Aucun cookie publicitaire tiers n'est déposé sans votre consentement.
 
 5. Durée de Conservation
-Vos données sont conservées aussi longtemps que votre compte est actif. En cas de suppression du compte, vos données personnelles sont effacées sous 30 jours.
+Vos données sont conservées aussi longtemps que votre compte est actif. Vous pouvez supprimer votre compte à tout moment depuis l'application ou le site (Paramètres → Supprimer mon compte) : la suppression est immédiate — profil anonymisé, annonces retirées, fichiers effacés, connexion supprimée. L'historique des commandes déjà réalisées est conservé de manière anonymisée pour des raisons légales et comptables.
 
 6. Vos Droits (RGPD)
 Vous disposez des droits suivants sur vos données :
@@ -68,9 +71,9 @@ Vous disposez des droits suivants sur vos données :
 • Droit à l'effacement ("droit à l'oubli")
 • Droit d'opposition au traitement
 
-Pour toute demande : support@rivendy.dj
+Pour toute demande : support@rivendy.com
 
-Mise à jour : Novembre 2024`;
+Mise à jour : Octobre 2026`;
 
 export function LegalView({ defaultTab = "cgu" }: { defaultTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(defaultTab);
@@ -174,8 +177,8 @@ export function LegalView({ defaultTab = "cgu" }: { defaultTab?: Tab }) {
       {/* Footer contact */}
       <p className="mt-6 text-center text-xs text-slate-400">
         Pour toute question légale :{" "}
-        <a href="mailto:support@rivendy.dj" className="font-bold text-[#007168] hover:underline">
-          support@rivendy.dj
+        <a href="mailto:support@rivendy.com" className="font-bold text-[#007168] hover:underline">
+          support@rivendy.com
         </a>
       </p>
     </div>
