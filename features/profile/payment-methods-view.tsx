@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Smartphone,
-  Banknote,
   CreditCard,
-  Wallet,
   Plus,
   Trash2,
   CreditCardIcon,
 } from "lucide-react";
+import { useAuth } from "@/features/auth/auth-provider";
+import { useCountryOrDefault } from "@/features/country/country-provider";
+import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
+import { phoneHint } from "@/lib/utils/phone-validator";
 
 /* ── Types ─────────────────────────────────────────────────── */
 
-type PaymentType = "D-Money" | "CAC Pay" | "Waafi" | "Cash";
+/** Nom de l'opérateur (Waafi, M-Pesa…) ou « Cash ». */
+type PaymentType = string;
 
 interface SavedMethod {
   id: string;
@@ -22,48 +25,64 @@ interface SavedMethod {
   number: string;
 }
 
-const PAYMENT_TYPES: PaymentType[] = ["D-Money", "CAC Pay", "Waafi", "Cash"];
-
-function getIcon(type: PaymentType) {
-  switch (type) {
-    case "D-Money":
-      return Smartphone;
-    case "CAC Pay":
-      return Banknote;
-    case "Waafi":
-      return Wallet;
-    case "Cash":
-      return CreditCard;
-    default:
-      return CreditCardIcon;
-  }
-}
-
-function getColor(type: PaymentType) {
-  switch (type) {
-    case "D-Money":
-      return "#1976D2";
-    case "CAC Pay":
-      return "#E64A19";
-    case "Waafi":
-      return "#388E3C";
-    case "Cash":
-      return "#6A5ACD";
-    default:
-      return "#007168";
-  }
-}
+const CASH = "Cash";
 
 /* ── Component ─────────────────────────────────────────────── */
 
+/**
+ * Moyens de paiement du vendeur — comme l'app (payment_methods_screen), ils
+ * sont conservés SUR L'APPAREIL. Corrigé le 2026-10-04 : le site les perdait
+ * au rechargement et ne proposait que les opérateurs de Djibouti ; ils
+ * viennent désormais du marché courant (mobile-money.ts, miroir de l'app).
+ */
 export function PaymentMethodsView() {
+  const { user } = useAuth();
+  const country = useCountryOrDefault();
+  const storageKey = user ? `rivendy_payment_methods:${user.id}` : null;
+
+  const operators = useMemo(
+    () => (country ? getMobileMoneyForCountry(country.id).filter((m) => m.id !== "cash") : []),
+    [country],
+  );
+  const PAYMENT_TYPES: PaymentType[] = useMemo(() => [...operators.map((o) => o.name), CASH], [operators]);
+
   const [methods, setMethods] = useState<SavedMethod[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [selectedType, setSelectedType] = useState<PaymentType>("D-Money");
+  const [selectedType, setSelectedType] = useState<PaymentType>(CASH);
   const [nameValue, setNameValue] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Lecture des moyens enregistrés sur cet appareil, pour ce compte.
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      setMethods(raw ? (JSON.parse(raw) as SavedMethod[]) : []);
+    } catch {
+      setMethods([]);
+    }
+    setLoaded(true);
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!storageKey || !loaded) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(methods));
+    } catch {
+      /* stockage indisponible : la liste reste en mémoire */
+    }
+  }, [methods, storageKey, loaded]);
+
+  function getIcon(type: PaymentType) {
+    return type === CASH ? CreditCard : Smartphone;
+  }
+
+  function getColor(type: PaymentType) {
+    return operators.find((o) => o.name === type)?.color ?? (type === CASH ? "#6A5ACD" : "#007168");
+  }
 
   function handleAdd() {
     setError("");
@@ -71,7 +90,7 @@ export function PaymentMethodsView() {
       setError("Veuillez entrer le nom du titulaire");
       return;
     }
-    if (selectedType !== "Cash" && !phoneValue.trim()) {
+    if (selectedType !== CASH && !phoneValue.trim()) {
       setError("Veuillez entrer le numéro");
       return;
     }
@@ -80,12 +99,12 @@ export function PaymentMethodsView() {
       id: crypto.randomUUID(),
       type: selectedType,
       name: nameValue.trim(),
-      number: selectedType === "Cash" ? "Paiement en espèces" : phoneValue.trim(),
+      number: selectedType === CASH ? "Paiement en espèces" : phoneValue.trim(),
     };
     setMethods((prev) => [...prev, newMethod]);
     setNameValue("");
     setPhoneValue("");
-    setSelectedType("D-Money");
+    setSelectedType(CASH);
     setShowModal(false);
   }
 
@@ -220,7 +239,7 @@ export function PaymentMethodsView() {
             </div>
 
             {/* Phone */}
-            {selectedType !== "Cash" && (
+            {selectedType !== CASH && (
               <div className="mb-4">
                 <label className="mb-1 block text-sm font-semibold text-[#1A1A1A]">
                   Numéro {selectedType}
@@ -229,7 +248,7 @@ export function PaymentMethodsView() {
                   type="tel"
                   value={phoneValue}
                   onChange={(e) => setPhoneValue(e.target.value)}
-                  placeholder="+253 77 XX XX XX"
+                  placeholder={phoneHint(country?.id)}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
                 />
               </div>

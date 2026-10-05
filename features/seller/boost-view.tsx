@@ -190,7 +190,9 @@ export function BoostView({ product }: { product: Product }) {
     CASH_METHOD;
   const isCash = selectedMethod.id === "cash";
 
-  const reference = `BOOST-${product.id.slice(0, 8).toUpperCase()}-${selectedTier?.id.toUpperCase() ?? ""}`;
+  // Même référence que l'app (boost_screen.dart) : BOOST-<id produit>-<PLAN>.
+  // L'équipe la rapproche du paiement au dashboard, quel que soit le canal.
+  const reference = `BOOST-${product.id}-${selectedTier?.id.toUpperCase() ?? ""}`;
   function copyReference() {
     navigator.clipboard.writeText(reference);
     setCopied(true);
@@ -534,8 +536,8 @@ export function BoostView({ product }: { product: Product }) {
                   </p>
                 ) : (
                   <p className="text-sm text-slate-600">
-                    Contactez-nous sur WhatsApp pour convenir du paiement en
-                    espèces.
+                    Enregistrez votre demande : l&apos;équipe Rivendy vous
+                    contacte pour convenir du paiement en espèces.
                   </p>
                 )}
               </div>

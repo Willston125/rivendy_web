@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Banknote,
-  CheckCircle2,
   ChevronRight,
   Clock,
   ExternalLink,
@@ -19,38 +18,17 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { ProductStatusBadge } from "@/features/products/product-status-badge";
 import { supabase } from "@/lib/supabase/client";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { orderReference, sellerOrderChip, sellerOrderGroup } from "@/lib/utils/orders";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { cn } from "@/lib/utils/cn";
-import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
-
-/* ── Statuts commande vendeur ────────────────────────────────────── */
-const ORDER_STATUS: Partial<Record<OrderStatus, { label: string; bg: string; text: string }>> = {
-  pending_whatsapp:              { label: "En attente",     bg: "bg-amber-50",  text: "text-amber-700" },
-  confirmed_by_customer_service: { label: "Confirmée",      bg: "bg-blue-50",   text: "text-blue-700" },
-  payment_received_cash:         { label: "Paiement reçu",  bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
-  assigned_to_delivery:          { label: "Livreur assigné", bg: "bg-indigo-50", text: "text-indigo-700" },
-  accepted_by_agent:             { label: "Pris en charge",  bg: "bg-indigo-50", text: "text-indigo-700" },
-  picked_up:                     { label: "Récupérée",       bg: "bg-violet-50", text: "text-violet-700" },
-  en_route:                      { label: "En route",       bg: "bg-cyan-50",   text: "text-cyan-700" },
-  arrived:                       { label: "Livreur arrivé",  bg: "bg-amber-50",  text: "text-amber-800" },
-  code_generated:                { label: "Code envoyé",     bg: "bg-amber-50",  text: "text-amber-800" },
-  awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50", text: "text-amber-800" },
-  delivered_by_rider:            { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
-  delivered_confirmed:           { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
-  completed:                     { label: "Terminée ✓",     bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
-  cancelled:                     { label: "Annulée",         bg: "bg-red-50",    text: "text-red-600" },
-  delivered:                     { label: "Livrée ✓",        bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
-};
+import type { AppOrder, Country, Product } from "@/types/rivendy";
 
 /* ── Skeleton ────────────────────────────────────────────────────── */
 function DashboardSkeleton() {
-  
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10 space-y-6 animate-pulse">
       <div className="h-10 w-64 rounded-2xl bg-slate-100" />
@@ -83,32 +61,45 @@ function Metric({ icon: Icon, label, value, accent = false }: {
   );
 }
 
+type WalletRow = { balance: number | string | null; currency: string | null; country_id: string | null };
+
 /* ── Vue principale ─────────────────────────────────────────────── */
+/**
+ * Tableau de bord vendeur. Remis à plat le 2026-10-04 :
+ *  - plus de raccourcis « en un clic » qui créaient une demande d'abonnement
+ *    ou de boost SANS paiement : ils renvoient vers les vrais parcours ;
+ *  - plus de second formulaire de retrait (montant libre, sans seuil ni
+ *    verrou, bouton « via WhatsApp » qui n'ouvrait rien) : le retrait vit
+ *    dans le portefeuille, comme dans l'app ;
+ *  - solde dans la devise du PORTEFEUILLE, articles et commandes dans la
+ *    devise de leur marché ;
+ *  - statuts de commande groupés comme l'app (« À préparer », etc.).
+ */
 export function SellerDashboard() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile } = useAuth();
   const country = useCountryOrDefault();
+  const { countries } = useCountry();
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);
-  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [wallet, setWallet]               = useState<WalletRow | null>(null);
   const [loading, setLoading]             = useState(true);
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [message, setMessage]             = useState<{ text: string; type: "ok" | "err" } | null>(null);
+
+  const marketOf = useCallback(
+    (countryId?: string | null): Country | null =>
+      (countryId && countries.find((c) => c.id === countryId)) || country,
+    [countries, country],
+  );
 
   /* ── Chargement ─────────────────────────────────────────────────── */
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
     try {
-      // 2026-10-03 : hors articles supprimés. La suppression est « douce » (la
-      // ligne reste, marquée is_deleted / deleted_at / status 'deleted') et la
-      // RLS SELECT ne filtre pas le statut : l'article supprimé restait dans
-      // « Mes produits » (badge brut « deleted », lien Modifier) et dans
-      // « Produits publiés ».
       const [prodResp, orderResp, walletResp] = await Promise.all([
         supabase.from("products").select("*").eq("seller_id", user.id).eq("is_deleted", false).is("deleted_at", null).order("created_at", { ascending: false }),
         supabase.from("orders").select("*, order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false }).limit(50),
-        supabase.from("wallets").select("balance").eq("user_id", user.id).maybeSingle(),
+        supabase.from("wallets").select("balance, currency, country_id").eq("user_id", user.id).maybeSingle(),
       ]);
       setProducts(((prodResp.data ?? []) as Product[]).filter((p) => p.status !== "deleted"));
       setOrders(
@@ -116,11 +107,7 @@ export function SellerDashboard() {
           (row) => ({ ...row, items: row.order_items }) as AppOrder,
         ),
       );
-      if (walletResp?.data && walletResp.data.balance != null) {
-        setWalletBalance(Number(walletResp.data.balance));
-      } else {
-        setWalletBalance(0);
-      }
+      setWallet((walletResp?.data as WalletRow | null) ?? null);
     } catch {
       // ne pas bloquer l'UI si une requête échoue
     } finally {
@@ -158,77 +145,21 @@ export function SellerDashboard() {
   }, [user]);
 
   /* ── Calculs ────────────────────────────────────────────────────── */
-  const delivered = useMemo(
-    () => orders.filter((o) => ["completed", "delivered", "delivered_by_rider", "delivered_confirmed"].includes(o.status)),
-    [orders],
-  );
-  const earnings         = walletBalance;
+  // Solde confirmé : wallets.balance (serveur), dans la devise DU PORTEFEUILLE.
+  const walletCountry    = wallet?.country_id ? marketOf(wallet.country_id) : null;
+  const walletMoneyFmt   = walletCountry ?? (wallet?.currency ? { currency_symbol: wallet.currency, currency_code: wallet.currency } : country);
+  const earnings         = Number(wallet?.balance ?? 0);
   const pendingCount     = products.filter((p) => p.status === "pending").length;
+  const rejectedCount    = products.filter((p) => p.status === "rejected").length;
   const activeCount      = products.filter((p) => p.status === "active").length;
   const boostedCount     = products.filter((p) => p.status === "boosted").length;
-  const pendingOrders    = orders.filter((o) => !["completed", "delivered", "delivered_by_rider", "delivered_confirmed", "cancelled"].includes(o.status));
+  const toPrepareCount   = useMemo(() => orders.filter((o) => sellerOrderGroup(o.status) === "toPrepare").length, [orders]);
+  const pendingOrders    = useMemo(
+    () => orders.filter((o) => !["done", "cancelled"].includes(sellerOrderGroup(o.status))),
+    [orders],
+  );
 
   const firstBoostable   = useMemo(() => products.find((p) => p.status === "active" || p.status === "boosted"), [products]);
-
-  /* ── Actions ────────────────────────────────────────────────────── */
-  function notify(text: string, type: "ok" | "err" = "ok") {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 4000);
-  }
-
-  async function requestBoost(product: Product) {
-    if (!user) return;
-    // Parity Flutter boost_screen.dart — Bronze: 500 FDJ / 1250 KMF / 3 jours
-    const bronzePrice = country?.id === "KM" ? 1250 : 500;
-    const { error } = await supabase.from("boost_purchases").insert({
-      product_id: product.id, seller_id: user.id,
-      plan: "bronze", price_paid: bronzePrice, duration_days: 3,
-      status: "pending", payment_method: "cash", country_id: country?.id,
-      notes: "Demande boost depuis Rivendy Web",
-    });
-    notify(error ? error.message : "Demande de boost envoyée ✓", error ? "err" : "ok");
-  }
-
-  async function requestCertification() {
-    if (!user) return;
-    // Grille 2026-08-09 — Certifié mensuel : 1500 FDJ / 3000 KMF / 30 jours
-    const monthlyPrice = country?.id === "KM" ? 3000 : 1500;
-    const { error } = await supabase.from("seller_subscriptions").insert({
-      seller_id: user.id, plan: "monthly", tier: "certified", price_paid: monthlyPrice,
-      duration_days: 30, status: "pending", payment_method: "cash",
-      country_id: country?.id, notes: "Demande certification depuis Rivendy Web",
-    });
-    if (!error) await refreshProfile();
-    notify(error ? error.message : "Demande de certification envoyée ✓", error ? "err" : "ok");
-  }
-
-  async function requestPayout() {
-    if (!user || !country) return;
-    const amount = Number(withdrawAmount || earnings);
-    if (!amount) return notify("Indique un montant de retrait.", "err");
-
-    // `phone_number` est la destination du RETRAIT : le dashboard l'affiche
-    // à l'opérateur comme le numéro à créditer. Il ne peut donc jamais être
-    // celui de l'agence — sans numéro de vendeur, mieux vaut laisser vide et
-    // que l'opérateur le réclame, plutôt que d'afficher un numéro faux.
-    const { error } = await supabase.from("payout_requests").insert({
-      seller_id: user.id, country_id: country.id, amount,
-      currency_code: country.currency_code, method: "mobile_money",
-      phone_number: profile?.whatsapp_number || null,
-      status: "pending_director",
-      notes: `Demande web - ${delivered.length} commande(s) livrée(s)`,
-    });
-
-    // La demande vit dans le dashboard (Finances → Retraits), plus sur
-    // WhatsApp. L'ouverture qui suivait était redondante — et pouvait laisser
-    // croire la demande transmise alors que l'INSERT venait d'échouer.
-    notify(
-      error
-        ? `Demande de retrait non enregistrée : ${error.message}`
-        : "Demande de retrait enregistrée ✓ — l'équipe Rivendy la traite.",
-      error ? "err" : "ok",
-    );
-  }
 
   if (loading) return <DashboardSkeleton />;
 
@@ -269,9 +200,9 @@ export function SellerDashboard() {
 
       {/* ══ Métriques ════════════════════════════════════════════════ */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Metric icon={Wallet}    label="Gains confirmés"    value={formatMoney(earnings, country)} accent />
+        <Metric icon={Wallet}    label="Gains confirmés"    value={formatMoney(earnings, walletMoneyFmt)} accent />
         <Metric icon={Banknote}  label="Commandes reçues"   value={String(orders.length)} />
-        <Metric icon={ShoppingBag} label="En cours"         value={String(pendingOrders.length)} />
+        <Metric icon={ShoppingBag} label={toPrepareCount > 0 ? `En cours · ${toPrepareCount} à préparer` : "En cours"} value={String(pendingOrders.length)} />
         <Metric icon={Package}   label="Produits publiés"   value={String(products.length)} />
       </section>
 
@@ -292,17 +223,15 @@ export function SellerDashboard() {
             {pendingCount} en attente de validation
           </span>
         )}
+        {rejectedCount > 0 && (
+          <Link
+            href="/seller/sales"
+            className="flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 hover:underline"
+          >
+            {rejectedCount} refusé{rejectedCount > 1 ? "s" : ""} — voir le motif
+          </Link>
+        )}
       </div>
-
-      {/* Message retour */}
-      {message && (
-        <div className={cn(
-          "mt-4 rounded-2xl px-4 py-3 text-sm font-semibold",
-          message.type === "ok" ? "bg-[#E0F2F1] text-[#009688]" : "bg-red-50 text-red-700"
-        )}>
-          {message.text}
-        </div>
-      )}
 
       {/* ══ Corps principal ══════════════════════════════════════════ */}
       <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -333,46 +262,43 @@ export function SellerDashboard() {
             ) : (
               <div className="space-y-2">
                 {products.map((product) => (
-                  <div key={product.id} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                    {/* Miniature */}
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                      <Image
-                        src={firstPhoto(product)}
-                        alt={product.title}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
-                      />
-                    </div>
-
-                    {/* Infos */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold text-slate-900">{product.title}</p>
-                      <p className="text-xs text-slate-400">
-                        {formatMoney(product.price, country)} · Stock {product.stock_quantity ?? 0}
-                      </p>
-                    </div>
-
-                    {/* Statut + actions */}
-                    <div className="flex shrink-0 items-center gap-2">
-                      <ProductStatusBadge status={product.status} />
-                      <Link
-                        href={`/seller/products/${product.id}/edit`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-[#009688]/30 hover:text-[#009688]"
-                        title="Modifier"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Link>
-                      {(product.status === "active" || product.status === "boosted") && (
+                  <div key={product.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                        <Image src={firstPhoto(product)} alt={product.title} fill sizes="48px" className="object-cover" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-bold text-slate-900">{product.title}</p>
+                        <p className="text-xs text-slate-400">
+                          {formatMoney(product.price, marketOf(product.country_id))} · Stock {product.stock_quantity ?? 0}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <ProductStatusBadge status={product.status} />
                         <Link
-                          href={`/seller/boost/${product.id}`}
+                          href={`/seller/products/${product.id}/edit`}
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-[#009688]/30 hover:text-[#009688]"
-                          title="Booster"
+                          title="Modifier"
                         >
-                          <Zap className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Link>
-                      )}
+                        {(product.status === "active" || product.status === "boosted") && (
+                          <Link
+                            href={`/seller/boost/${product.id}`}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-[#009688]/30 hover:text-[#009688]"
+                            title="Booster"
+                          >
+                            <Zap className="h-3.5 w-3.5" />
+                          </Link>
+                        )}
+                      </div>
                     </div>
+                    {/* Motif de refus — comme « Mes ventes » de l'app */}
+                    {product.status === "rejected" && (
+                      <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
+                        Motif : {product.reject_reason?.trim() || "non précisé"} — modifiez l&apos;annonce pour la renvoyer en validation.
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -384,9 +310,9 @@ export function SellerDashboard() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black text-slate-900">
                 Commandes récentes
-                {pendingOrders.length > 0 && (
-                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-sm font-bold text-amber-700">
-                    {pendingOrders.length} en cours
+                {toPrepareCount > 0 && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-sm font-bold text-amber-800">
+                    {toPrepareCount} à préparer
                   </span>
                 )}
               </h2>
@@ -403,26 +329,26 @@ export function SellerDashboard() {
             ) : (
               <div className="space-y-2">
                 {orders.slice(0, 8).map((order) => {
-                  const cfg = ORDER_STATUS[order.status] ?? { label: order.status, bg: "bg-slate-50", text: "text-slate-600" };
-                  const shortRef = order.id.split("-")[0].toUpperCase();
-                  const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(new Date(order.created_at));
+                  const chip = sellerOrderChip(order.status);
+                  const fmtDate = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(new Date(order.created_at));
                   return (
                     <div key={order.id} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-mono text-xs font-black text-slate-500">#{shortRef}</p>
-                          <span className={cn("rounded-lg px-2 py-0.5 text-[10px] font-black", cfg.bg, cfg.text)}>
-                            {cfg.label}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-mono text-xs font-black text-slate-500">#{orderReference(order.id)}</p>
+                          <span className={cn("rounded-lg px-2 py-0.5 text-[10px] font-black", chip.className)}>
+                            {chip.label}
                           </span>
                         </div>
                         <p className="mt-0.5 text-xs text-slate-400">
                           {fmtDate}
                           {order.buyer_zone ? ` · ${order.buyer_zone}` : ""}
-                          {order.buyer_name ? ` · ${order.buyer_name}` : ""}
                         </p>
                       </div>
+                      {/* Ce que le vendeur encaisse : jamais le prix acheteur
+                          (qui inclut la commission) en repli. */}
                       <p className="shrink-0 font-black text-[#009688]">
-                        {formatMoney(order.total_seller_amount || order.total_price, country)}
+                        {formatMoney(order.total_seller_amount, marketOf(order.country_id))}
                       </p>
                     </div>
                   );
@@ -443,11 +369,17 @@ export function SellerDashboard() {
             {[
               { href: "/seller/sales",        icon: Truck,      label: "Mes ventes" },
               { href: "/seller/subscription", icon: BadgeCheck, label: "Abonnement & certification" },
-              { href: "/seller/promo",        icon: Rocket,     label: "Booster un produit" },
+              // « Booster un produit » menait à /seller/promo, la page publique
+              // « Bons plans » : il ouvre désormais le vrai parcours de boost.
+              {
+                href: firstBoostable ? `/seller/boost/${firstBoostable.id}` : "/seller/sales",
+                icon: Rocket,
+                label: "Booster un produit",
+              },
               { href: "/wallet",              icon: Wallet,     label: "Portefeuille" },
             ].map(({ href, icon: Icon, label }) => (
               <Link
-                key={href}
+                key={label}
                 href={href}
                 className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-[#E0F2F1] hover:text-[#009688]"
               >
@@ -460,7 +392,7 @@ export function SellerDashboard() {
             ))}
           </div>
 
-          {/* Certification */}
+          {/* Certification — vers le parcours de paiement complet */}
           {!profile?.is_certified && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <div className="flex items-center gap-2">
@@ -468,19 +400,18 @@ export function SellerDashboard() {
                 <p className="text-sm font-black text-amber-800">Devenir certifié</p>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-amber-700">
-                Le badge certifié augmente la confiance des acheteurs et booste tes ventes.
+                Le badge certifié augmente la confiance des acheteurs et inclut des boosts chaque mois.
               </p>
-              <button
-                type="button"
-                onClick={requestCertification}
+              <Link
+                href="/seller/subscription"
                 className="mt-3 flex h-9 w-full items-center justify-center rounded-xl bg-amber-500 text-xs font-black text-white transition hover:bg-amber-600"
               >
-                Demander la certification ({formatMoney(country?.id === "KM" ? 3000 : 1500, country)})
-              </button>
+                Voir les formules
+              </Link>
             </div>
           )}
 
-          {/* Boost rapide */}
+          {/* Boost — vers le parcours complet (plans, paiement, crédits inclus) */}
           {firstBoostable && (
             <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
@@ -488,46 +419,35 @@ export function SellerDashboard() {
                 <p className="text-sm font-black text-slate-900">Booster un produit</p>
               </div>
               <p className="mt-1 truncate text-xs text-slate-500">{firstBoostable.title}</p>
-              <button
-                type="button"
-                onClick={() => requestBoost(firstBoostable)}
+              <Link
+                href={`/seller/boost/${firstBoostable.id}`}
                 className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#009688] text-xs font-black text-white transition hover:bg-[#00796B]"
               >
                 <Zap className="h-3.5 w-3.5 fill-white" />
-                Boost Bronze — {formatMoney(country?.id === "KM" ? 1250 : 500, country)} / 3 jours
-              </button>
+                Choisir un boost
+              </Link>
             </div>
           )}
 
-          {/* Retrait */}
+          {/* Retrait — il vit dans le portefeuille (seuil, verrou, devise) */}
           <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <Banknote className="h-5 w-5 text-[#009688]" />
-              <p className="text-sm font-black text-slate-900">Demander un retrait</p>
+              <p className="text-sm font-black text-slate-900">Mes gains</p>
             </div>
             <div className="mt-1 flex items-center justify-between">
               <p className="text-xs text-slate-500">Disponible</p>
-              <p className="text-sm font-black text-[#009688]">{formatMoney(earnings, country)}</p>
+              <p className="text-sm font-black text-[#009688]">{formatMoney(earnings, walletMoneyFmt)}</p>
             </div>
-            <div className="mt-3 space-y-2">
-              <Input
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder={`Montant (max ${formatMoney(earnings, country)})`}
-                inputMode="decimal"
-              />
-              <button
-                type="button"
-                onClick={requestPayout}
-                disabled={earnings === 0}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] text-xs font-black text-white transition hover:bg-[#1da853] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Demander via WhatsApp
-              </button>
-            </div>
+            <Link
+              href="/wallet"
+              className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#009688] text-xs font-black text-white transition hover:bg-[#00796B]"
+            >
+              <Wallet className="h-4 w-4" />
+              Demander un retrait
+            </Link>
             <p className="mt-2 text-[10px] text-slate-400">
-              Le retrait est validé manuellement par l&apos;équipe Rivendy.
+              Le retrait est validé par l&apos;équipe Rivendy.
             </p>
           </div>
         </aside>

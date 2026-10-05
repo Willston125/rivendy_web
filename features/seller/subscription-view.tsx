@@ -504,8 +504,8 @@ export function SubscriptionView() {
                   </>
                 ) : (
                   <p>
-                    Contactez-nous sur WhatsApp pour convenir du paiement en
-                    espèces.
+                    Enregistrez votre demande : l&apos;équipe Rivendy vous
+                    contacte pour convenir du paiement en espèces.
                   </p>
                 )}
               </div>
@@ -541,8 +541,8 @@ export function SubscriptionView() {
                 4
               </div>
               <p className="text-sm text-slate-600">
-                Tape &quot;J&apos;ai payé&quot; — on t&apos;envoie sur WhatsApp
-                pour confirmer. Badge activé sous 2h.
+                Tape &quot;J&apos;ai payé&quot; : ta demande est enregistrée et
+                vérifiée par l&apos;équipe Rivendy, puis ton badge est activé.
               </p>
             </div>
 
@@ -553,7 +553,7 @@ export function SubscriptionView() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#009688] py-4 text-sm font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
             >
               <BadgeCheck className="h-5 w-5" />
-              J&apos;ai payé — Confirmer par WhatsApp
+              J&apos;ai payé — Enregistrer ma demande
             </button>
             <p className="mt-2 text-center text-xs text-slate-400">
               En confirmant, vous attestez avoir effectué le paiement.

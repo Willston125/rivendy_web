@@ -20,9 +20,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { deleteVideo } from "@/lib/video/video-service";
 import type { Product, AppOrder } from "@/types/rivendy";
 
 type Tab = "garde-robe" | "commandes" | "ventes" | "stats";
@@ -38,8 +39,13 @@ const SELLER_ORDER_STATUS: Record<string, { label: string; bg: string; text: str
   arrived:                       { label: "Livreur arrivé",  bg: "bg-amber-50",  text: "text-amber-800" },
   code_generated:                { label: "Code envoyé",     bg: "bg-amber-50",  text: "text-amber-800" },
   awaiting_customer_confirmation:{ label: "Livreur chez vous", bg: "bg-amber-50", text: "text-amber-800" },
-  delivered_by_rider:            { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
-  delivered_confirmed:           { label: "Livrée ✓",       bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
+  // Le livreur l'a déclarée livrée : les fonds attendent la confirmation de
+  // l'acheteur (parcours du 2026-10-02) — ce n'est pas encore « Livrée ✓ ».
+  delivered_by_rider:            { label: "Livrée — à confirmer", bg: "bg-amber-50", text: "text-amber-800" },
+  delivered_confirmed:           { label: "Réception confirmée ✓", bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
+  disputed:                      { label: "Litige en cours",  bg: "bg-orange-50", text: "text-orange-700" },
+  confirmed:                     { label: "Confirmée",      bg: "bg-blue-50",   text: "text-blue-700" },
+  in_delivery:                   { label: "En livraison",   bg: "bg-cyan-50",   text: "text-cyan-700" },
   completed:                     { label: "Terminée ✓",     bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
   cancelled:                     { label: "Annulée",         bg: "bg-red-50",    text: "text-red-600" },
   delivered:                     { label: "Livrée ✓",        bg: "bg-[#E0F2F1]", text: "text-[#009688]" },
@@ -62,6 +68,7 @@ function StatusPill({ status }: { status: string }) {
     pending: { label: "En attente",  cls: "bg-blue-50 text-blue-600" },
     sold:    { label: "Vendu",        cls: "bg-green-50 text-green-700" },
     validated:{ label: "Validé",     cls: "bg-green-50 text-green-700" },
+    rejected: { label: "Refusé",     cls: "bg-red-50 text-red-600" },
   };
   const cfg = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-500" };
   
@@ -95,6 +102,11 @@ const STORY_ERRORS: Record<string, string> = {
 export function SellerSalesView() {
   const { user, profile } = useAuth();
   const country = useCountryOrDefault();
+  const { countries } = useCountry();
+  // Devise du marché de l'ARTICLE ou de la COMMANDE, pas du marché affiché :
+  // un vendeur présent sur plusieurs marchés voyait tout dans une seule devise.
+  const marketOf = (countryId?: string | null) =>
+    (countryId && countries.find((c) => c.id === countryId)) || country;
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<AppOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,8 +140,11 @@ export function SellerSalesView() {
   useEffect(() => { load(); }, [load]);
 
   // ── Filtres ────────────────────────────────────────────────
+  // Les annonces refusées restent dans la Garde-Robe avec leur motif, comme
+  // dans l'app (my_sales_screen) : le vendeur corrige et renvoie. Avant le
+  // 2026-10-04 elles disparaissaient du site sans explication.
   const activeProducts = useMemo(
-    () => products.filter((p) => ["active","boosted","epuise","pending"].includes(p.status)),
+    () => products.filter((p) => ["active","boosted","epuise","pending","rejected"].includes(p.status)),
     [products],
   );
   const soldProducts = useMemo(
@@ -198,6 +213,16 @@ export function SellerSalesView() {
     // erreur, et l'article revenait au rechargement. Suppression « douce »,
     // même geste que l'app et le dashboard, et vérification qu'une ligne a
     // réellement été modifiée.
+    // 🎬 Vidéo relue AVANT l'archivage, comme l'app (ProductService.
+    // deleteProduct) : une vidéo laissée chez Cloudflare est facturée à vie
+    // (§1.9). Le site ne la supprimait jamais.
+    const { data: videoRow } = await supabase
+      .from("products")
+      .select("video_uid")
+      .eq("id", id)
+      .maybeSingle();
+    const videoUid = (videoRow as { video_uid?: string | null } | null)?.video_uid ?? null;
+
     const { data, error } = await supabase
       .from("products")
       .update({ status: "deleted", is_deleted: true, deleted_at: new Date().toISOString() })
@@ -206,6 +231,12 @@ export function SellerSalesView() {
     setDeleting(null);
     if (!error && data && data.length > 0) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      // Non bloquant : l'article est supprimé quoi qu'il arrive.
+      if (videoUid) {
+        void deleteVideo(videoUid).then((ok) => {
+          if (!ok) console.error("Vidéo non supprimée chez Cloudflare :", videoUid);
+        });
+      }
     } else {
       alert("Suppression impossible : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
     }
@@ -425,14 +456,20 @@ export function SellerSalesView() {
                     {/* Prix vendeur + commission */}
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="text-lg font-black text-[#009688]">
-                        {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, country)}
+                        {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, marketOf(product.country_id))}
                       </span>
                       {product.commission_amount > 0 && (
                         <span className="rounded-lg bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600">
-                          + {formatMoney(product.commission_amount, country)} comm.
+                          + {formatMoney(product.commission_amount, marketOf(product.country_id))} comm.
                         </span>
                       )}
                     </div>
+
+                    {product.status === "rejected" && (
+                      <p className="mt-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
+                        Motif : {product.reject_reason?.trim() || "non précisé"} — modifiez l&apos;annonce pour la renvoyer en validation.
+                      </p>
+                    )}
 
                     {/* Stats */}
                     <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
@@ -564,7 +601,7 @@ export function SellerSalesView() {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-black text-[#009688]">
-                              {formatMoney(item.subtotal, country)}
+                              {formatMoney(item.subtotal, marketOf(order.country_id))}
                             </p>
                           </div>
                         </div>
@@ -574,7 +611,7 @@ export function SellerSalesView() {
                     <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-3">
                       <p className="text-sm font-black text-[#1A1A1A]">Total à encaisser</p>
                       <p className="text-lg font-black text-[#009688]">
-                        {formatMoney(order.total_seller_amount, country)}
+                        {formatMoney(order.total_seller_amount, marketOf(order.country_id))}
                       </p>
                     </div>
 
@@ -650,13 +687,13 @@ export function SellerSalesView() {
                       </p>
                       <div className="mt-1 flex items-center gap-1.5 text-sm">
                         <span className="text-base font-black text-[#009688]">
-                          {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, country)}
+                          {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, marketOf(product.country_id))}
                         </span>
                         <span className="text-xs text-slate-400">encaissé</span>
                       </div>
                       {product.commission_amount > 0 && (
                         <p className="text-xs text-orange-600">
-                          {formatMoney(product.commission_amount, country)} versés à Rivendy
+                          {formatMoney(product.commission_amount, marketOf(product.country_id))} versés à Rivendy
                         </p>
                       )}
                     </div>
@@ -703,10 +740,10 @@ export function SellerSalesView() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right font-black text-[#009688]">
-                          {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, country)}
+                          {formatMoney(product.seller_price > 0 ? product.seller_price : product.price, marketOf(product.country_id))}
                         </td>
                         <td className="px-4 py-3 text-right text-xs font-semibold text-orange-600">
-                          {product.commission_amount > 0 ? formatMoney(product.commission_amount, country) : "—"}
+                          {product.commission_amount > 0 ? formatMoney(product.commission_amount, marketOf(product.country_id)) : "—"}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-1 text-[11px] font-black text-green-700">
