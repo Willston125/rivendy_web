@@ -305,7 +305,12 @@ export default async function HomePage({
 
           {/* ── Navigation : grille d'univers (Tout) OU retour + libellé ── */}
           {!category ? (
-            <UniverseGrid countryId={countryId} q={q} />
+            <>
+              {/* Titre de page pour les lecteurs d'écran et le référencement : l'accueil
+                  n'en avait aucun (une seule page sur deux avait son h1). */}
+              <h1 className="sr-only">Rivendy — acheter et vendre près de chez vous</h1>
+              <UniverseGrid countryId={countryId} q={q} />
+            </>
           ) : (
             <div className="flex items-center gap-3">
               <Link

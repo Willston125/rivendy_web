@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,9 +53,28 @@ if (!productPage.includes("isProductPublished(product)")) {
   failures.push("La fiche produit doit rester accessible quand le stock atteint zéro.");
 }
 
+// Redirections et liens sortants (audit du 2026-10-06) : une adresse venue de
+// l'extérieur n'est jamais reprise telle quelle comme destination.
+const loginForm = read("features/auth/login-form.tsx");
+if (!loginForm.includes("safeInternalPath(") || /router\.(push|replace)\(\s*params\.get\(/.test(loginForm)) {
+  failures.push("La redirection après connexion (?next=) doit passer par safeInternalPath.");
+}
+const adLink = read("features/ads/ad-link.ts");
+if (!adLink.includes("safeExternalUrl(") || /link_type === "external"[^\n]*return ad\.link_value;/.test(adLink)) {
+  failures.push("Un lien publicitaire externe doit passer par safeExternalUrl (http/https seulement).");
+}
+
+// Aucun journal suivi par git : dev-server.*.log vivait dans un dépôt public.
+const trackedLogs = execSync("git ls-files", { cwd: root, encoding: "utf8" })
+  .split("\n")
+  .filter((file) => file.endsWith(".log"));
+if (trackedLogs.length > 0) {
+  failures.push(`Fichiers journal suivis par git : ${trackedLogs.join(", ")}.`);
+}
+
 if (failures.length > 0) {
   for (const failure of failures) console.error(`✗ ${failure}`);
   process.exit(1);
 }
 
-console.log("✓ Contrats de sécurité web conformes (prix, modération, commentaires, stock). ");
+console.log("✓ Contrats de sécurité web conformes (prix, modération, commentaires, stock, redirections, liens).");

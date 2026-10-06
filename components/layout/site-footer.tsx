@@ -42,12 +42,12 @@ function FooterColumn({ title, links }: { title: string; links: { href: string; 
   return (
     <div>
       <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">{title}</h3>
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-2 space-y-0.5">
         {links.map((l) => (
           <li key={l.href + l.label}>
             <Link
               href={l.href}
-              className="text-sm text-slate-600 transition-colors hover:text-[#009688]"
+              className="block w-fit py-1.5 text-sm text-slate-600 transition-colors hover:text-[#009688]"
             >
               {l.label}
             </Link>
@@ -104,12 +104,12 @@ export function SiteFooter() {
           {/* Catégories */}
           <div>
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Catégories</h3>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-2 space-y-0.5">
               {TOP_CATEGORIES.map((c) => (
                 <li key={c.id}>
                   <Link
                     href={`/?category=${c.id}`}
-                    className="text-sm text-slate-600 transition-colors hover:text-[#009688]"
+                    className="block w-fit py-1.5 text-sm text-slate-600 transition-colors hover:text-[#009688]"
                   >
                     {c.label}
                   </Link>
