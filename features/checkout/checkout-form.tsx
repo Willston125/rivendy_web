@@ -26,6 +26,7 @@ import { useCountry } from "@/features/country/country-provider";
 import { formatMoney, isOrderable, orderId } from "@/lib/utils/format";
 import { compressImage } from "@/services/image-upload";
 import { phoneHint } from "@/lib/utils/phone-validator";
+import { pricedZonesFor } from "@/lib/utils/delivery-zones";
 import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import { loadSavedAddresses, saveAddress, type SavedAddress } from "./saved-addresses";
 import { orderFailureMessage } from "@/lib/utils/order-errors";
@@ -200,6 +201,11 @@ export function CheckoutForm() {
   // Région → Localité → Quartier, avec tarif. Les autres marchés conservent
   // exactement le comportement précédent (texte libre, aucun frais).
   const usesStructuredAddress = isStructuredDeliveryMarket(country?.id);
+  // Zones payantes hors parcours structuré (Djibouti) — mêmes tarifs que
+  // l'app, enregistrés dans la commande (DEC-2, 2026-10-06).
+  const pricedZones = usesStructuredAddress ? [] : pricedZonesFor(country?.id);
+  const [selectedZoneId, setSelectedZoneId] = useState("");
+  const selectedZone = pricedZones.find((z) => z.id === selectedZoneId) ?? null;
 
   const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddress | null>(null);
 
@@ -222,9 +228,10 @@ export function CheckoutForm() {
   }, [user, usesStructuredAddress]);
 
   const deliveryFee = useMemo(() => {
-    if (deliveryMode !== "delivery" || !usesStructuredAddress) return 0;
+    if (deliveryMode !== "delivery") return 0;
+    if (!usesStructuredAddress) return selectedZone?.fee ?? 0;
     return deliveryAddress?.deliveryFeeKmf ?? 0;
-  }, [deliveryMode, usesStructuredAddress, deliveryAddress]);
+  }, [deliveryMode, usesStructuredAddress, deliveryAddress, selectedZone]);
 
   /** Total réellement dû par l'acheteur : produits + livraison. */
   const amountDue = totalAmount + deliveryFee;
@@ -234,28 +241,30 @@ export function CheckoutForm() {
     if (deliveryMode === "delivery") {
       // `buyer_zone` reste alimenté même en mode structuré : le dashboard et
       // l'écran d'affectation des livreurs le lisent en repli.
-      return usesStructuredAddress
-        ? deliveryAddress
-          ? fullAddressLabel(deliveryAddress)
-          : ""
-        : buyerZone.trim();
+      if (usesStructuredAddress) {
+        return deliveryAddress ? fullAddressLabel(deliveryAddress) : "";
+      }
+      const details = buyerZone.trim();
+      if (selectedZone) return details ? `${selectedZone.label} — ${details}` : selectedZone.label;
+      return details;
     }
     if (deliveryMode === "pickup") return "Retrait personnel";
     return "";
-  }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress]);
+  }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress, selectedZone]);
 
   // Livraison prête ?
   const isDeliveryReady = useMemo(() => {
     if (deliveryMode === "delivery") {
       // En mode structuré, on exige une adresse exploitable par un livreur :
       // quartier (choisi ou saisi) ET point de repère.
-      return usesStructuredAddress
-        ? isDeliverable(deliveryAddress)
-        : buyerZone.trim().length > 0;
+      if (usesStructuredAddress) return isDeliverable(deliveryAddress);
+      // Marché à grille (Djibouti) : la zone fixe le tarif, elle est exigée.
+      if (pricedZones.length > 0 && !selectedZone) return false;
+      return buyerZone.trim().length > 0;
     }
     if (deliveryMode === "pickup") return true;
     return false;
-  }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress]);
+  }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress, pricedZones.length, selectedZone]);
 
   // Formulaire complet ?
   const isFormValid =
@@ -423,6 +432,10 @@ export function CheckoutForm() {
         // ce qui couvre le retrait et les marchés non couverts.
         const structuredAddress =
           deliveryMode === "delivery" && usesStructuredAddress ? deliveryAddress : null;
+        // Tarif de zone (Djibouti) : porté, lui aussi, par la PREMIÈRE
+        // commande réellement créée.
+        const zoneFee =
+          deliveryMode === "delivery" && !usesStructuredAddress ? selectedZone?.fee ?? 0 : 0;
         const snapshot = structuredAddress
           ? {
               ...orderSnapshotParams(structuredAddress),
@@ -430,7 +443,9 @@ export function CheckoutForm() {
                 ? 0
                 : structuredAddress.deliveryFeeKmf,
             }
-          : {};
+          : zoneFee > 0
+            ? { p_delivery_fee_kmf: deliveryFeeAssigned ? 0 : zoneFee }
+            : {};
 
         // Appeler le RPC sécurisé pour créer la commande et les articles.
         // Une nouvelle tentative avec une nouvelle référence si le serveur
@@ -475,7 +490,7 @@ export function CheckoutForm() {
         // Le tarif n'est porté que par la PREMIÈRE commande réellement créée :
         // posé avant l'appel, un premier vendeur en échec l'aurait fait perdre
         // à toutes les autres.
-        if (structuredAddress) deliveryFeeAssigned = true;
+        if (structuredAddress || zoneFee > 0) deliveryFeeAssigned = true;
         orderIds.push(id);
         orderedGroups.push(group);
       }
@@ -722,6 +737,27 @@ export function CheckoutForm() {
                 </div>
               ) : (
                 <div className="space-y-1.5">
+                  {pricedZones.length > 0 && (
+                    <div className="mb-3 space-y-1.5">
+                      <Label htmlFor="deliveryZone" className="text-sm font-bold text-slate-700">
+                        Zone de livraison
+                      </Label>
+                      <select
+                        id="deliveryZone"
+                        value={selectedZoneId}
+                        onChange={(e) => setSelectedZoneId(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:border-[#009688] focus:outline-none"
+                        required
+                      >
+                        <option value="">Choisissez votre zone</option>
+                        {pricedZones.map((z) => (
+                          <option key={z.id} value={z.id}>
+                            {z.label} — +{formatMoney(z.fee, country)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <Label htmlFor="buyerZone" className="text-sm font-bold text-slate-700">
                     Votre quartier / zone de livraison
                   </Label>
@@ -938,7 +974,7 @@ export function CheckoutForm() {
               <div className="mt-1 flex justify-between">
                 <span className="text-slate-500">Frais de livraison</span>
                 <span className="font-bold text-[#009688]">
-                  + {formatKmf(deliveryFee)}
+                  + {usesStructuredAddress ? formatKmf(deliveryFee) : formatMoney(deliveryFee, country)}
                 </span>
               </div>
               <div className="mt-2 flex justify-between border-t border-slate-100 pt-2">
