@@ -15,6 +15,7 @@ import {
 import { DEFAULT_COUNTRY_ID } from "@/types/rivendy";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StoreOwnerBar } from "@/features/store/store-owner-bar";
+import { FlyerGenerator } from "@/features/store/flyer/flyer-generator";
 import { StoreHero } from "@/features/store/store-hero";
 import { StoreTrustBar } from "@/features/store/store-trust-bar";
 import { VoiceNotePlayer } from "@/features/store/voice-note-player";
@@ -168,6 +169,18 @@ export default async function StorePage({
                   )}
                 </h2>
                 <PrintCatalog seller={seller} products={products} country={country} storeUrl={shareUrl} />
+                {/* Flyer WhatsApp — ouvert depuis « Gérer ma boutique » (propriétaire). */}
+                <FlyerGenerator
+                  sellerId={seller.id}
+                  sellerName={sellerName}
+                  avatarUrl={seller.avatar_url ?? ""}
+                  isCertified={Boolean(seller.is_certified)}
+                  rating={trust.score}
+                  reviews={trust.totalReviews}
+                  products={activeProducts}
+                  country={country}
+                  storeUrl={shareUrl}
+                />
               </div>
 
               {activeProducts.length > 0 ? (

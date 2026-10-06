@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, ChevronDown, Pencil, Plus, LayoutGrid, BarChart3, Printer, Share2 } from "lucide-react";
+import { Eye, EyeOff, ChevronDown, Pencil, Plus, LayoutGrid, BarChart3, Printer, Share2, ImageIcon } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { PRINT_CATALOG_EVENT } from "@/features/store/print-catalog";
+import { OPEN_FLYER_EVENT } from "@/features/store/flyer/flyer-generator";
 
 interface OwnerBarProps {
   sellerId: string;
@@ -175,6 +176,18 @@ export function StoreOwnerBar({ sellerId, sellerName, completenessPct, missing }
                 >
                   <Printer className="h-4 w-4 text-slate-400" />
                   Imprimer le catalogue
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // FlyerGenerator (page boutique) écoute l'événement.
+                    setMenuOpen(false);
+                    window.dispatchEvent(new Event(OPEN_FLYER_EVENT));
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <ImageIcon className="h-4 w-4 text-slate-400" />
+                  Créer un flyer WhatsApp
                 </button>
               </div>
             </>
