@@ -7,18 +7,23 @@ const scriptSources = [
   ...(isDevelopment ? ["'unsafe-eval'"] : []),
 ].join(" ");
 
-// Content-Security-Policy en mode REPORT-ONLY (RIV-008). Ne bloque RIEN : le
-// navigateur signale seulement les violations dans la console. C'est l'étape
-// d'observation avant un éventuel passage en mode bloquant (qui nécessitera
-// des nonces avec Next/Turbopack). 'unsafe-inline' reste toléré ici car Next
-// injecte du style/script inline sans nonce ; connect-src autorise l'API +
-// le Realtime (wss) Supabase.
+// Content-Security-Policy BLOQUANTE depuis le 2026-10-07 (audit n°2, S-5 a).
+// Elle a tourné en REPORT-ONLY de juillet à octobre ; relevé du 2026-10-07 sur
+// www.rivendy.com (accueil, fiche, boutique, recherche, connexion, légal,
+// hôtels) : aucune violation, et toutes les images en base viennent de
+// Supabase. 'unsafe-inline' reste toléré car Next injecte du script/style
+// inline sans nonce — les nonces imposeraient le rendu dynamique de TOUTES
+// les pages. Ce qui est désormais BLOQUÉ : tout script, image, cadre ou appel
+// réseau vers un domaine non listé, les plugins (object-src), et le
+// détournement de <base> ou des formulaires.
+// ⚠️ Ajouter un service tiers (analytics, carte, paiement) = l'ajouter ICI,
+// sinon il est bloqué en silence (visible seulement dans la console).
 // Cloudflare Stream : miniatures, lecteur (iframe) et envoi direct des vidéos
 // depuis le navigateur (parité vidéo app/site du 2026-10-04).
 const STREAM_HOST = "https://customer-22iqkw4cwdg7uf5h.cloudflarestream.com";
 const STREAM_UPLOAD = "https://upload.cloudflarestream.com https://upload.videodelivery.net";
 
-const cspReportOnly = [
+const csp = [
   "default-src 'self'",
   `img-src 'self' data: blob: ${SUPABASE_HOST} ${STREAM_HOST}`,
   // Notes vocales (Storage Supabase) et préécoute d'un enregistrement (blob:).
@@ -31,12 +36,13 @@ const cspReportOnly = [
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",
+  "object-src 'none'",
 ].join("; ");
 
 // En-têtes de sécurité appliqués à toutes les routes.
 const securityHeaders = [
-  // CSP d'observation (non bloquante) — voir cspReportOnly ci-dessus.
-  { key: "Content-Security-Policy-Report-Only", value: cspReportOnly },
+  // CSP bloquante — voir csp ci-dessus.
+  { key: "Content-Security-Policy", value: csp },
   // Anti-clickjacking : le site ne peut être embarqué que par lui-même.
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   // Empêche le navigateur de "deviner" le type MIME (anti-sniffing).
