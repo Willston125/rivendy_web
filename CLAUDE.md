@@ -87,8 +87,9 @@ jamais faire transiter un fichier par une route Vercel.
 ## Vérifications avant de livrer
 
 `npx tsc --noEmit` → **0 erreur** (obligatoire)
-`npm run lint` → ~54 problèmes = niveau de référence. Comparer à l'existant, ne
-pas viser 0 (dette de typage `as any` assumée).
+`npm run lint` → **0 problème** depuis le 2026-10-08 (33 avertissements levés :
+imports morts, navigations `window.location`). Toute nouvelle alerte est à
+corriger, pas à absorber.
 
 **Ne pas lancer `npm run build`** sans demande explicite du propriétaire.
 
