@@ -83,6 +83,12 @@ function emptyProduct(): StoreProduct {
 
 type Step = 0 | 1 | 2 | 3;
 
+/** Prix vendeur saisi : nombre fini strictement positif. */
+function hasValidPrice(raw: string): boolean {
+  const n = Number(raw);
+  return raw.trim() !== "" && Number.isFinite(n) && n > 0;
+}
+
 // ── Composant principal ─────────────────────────────────────
 export function CreateStoreForm() {
   const { user } = useAuth();
@@ -108,8 +114,10 @@ export function CreateStoreForm() {
   const filledCount = products.filter((p) => p.file !== null).length;
   const canGoToStep1 = filledCount >= MIN_PRODUCTS;
   const productsWithPhoto = products.filter((p) => p.file !== null);
+  // Prix STRICTEMENT positif, contrôlé dès la saisie (parité app 1.2.4) :
+  // un « 0 » passait au récapitulatif et n'était refusé qu'à la publication.
   const canGoToReview = productsWithPhoto.every(
-    (p) => p.title.trim() && p.price.trim(),
+    (p) => p.title.trim() && hasValidPrice(p.price),
   );
 
   function updateProduct(index: number, patch: Partial<StoreProduct>) {
@@ -440,8 +448,15 @@ export function CreateStoreForm() {
             value={current.price}
             onChange={(e) => updateProduct(globalIdx, { price: e.target.value })}
             placeholder="Ex : 3500"
+            min={1}
+            aria-invalid={current.price.trim() !== "" && !hasValidPrice(current.price)}
             className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#007168] focus:ring-2 focus:ring-[#009688]/20"
           />
+          {current.price.trim() !== "" && !hasValidPrice(current.price) && (
+            <p className="mt-1.5 text-xs font-semibold text-red-600">
+              Le prix doit être supérieur à 0.
+            </p>
+          )}
           {commission && parseFloat(current.price) > 0 && (
             <div className="mt-2 rounded-xl border border-[#00C4B4]/30 bg-[#00C4B4]/5 p-3 text-xs">
               <div className="flex justify-between text-slate-500">
