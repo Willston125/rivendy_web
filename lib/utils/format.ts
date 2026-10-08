@@ -6,8 +6,14 @@ export function categoryLabel(category: string) {
 
 export function formatMoney(value: number | null | undefined, country?: Pick<Country, "currency_symbol" | "currency_code"> | null) {
   const amount = Number(value ?? 0);
+  // Centimes en euro seulement, et toujours par deux (« 2,50 € », jamais
+  // « 2,5 € ») — même règle que CurrencyManager.format() côté app. Les autres
+  // devises n'ont pas de centimes en usage : arrondi à l'unité.
+  const code = (country?.currency_code ?? "").toUpperCase();
+  const digits = (code === "EUR" || code === "USD") && Math.round(amount * 100) % 100 !== 0 ? 2 : 0;
   const formatted = new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   }).format(amount);
   return `${formatted} ${country?.currency_symbol || country?.currency_code || "FDJ"}`;
 }

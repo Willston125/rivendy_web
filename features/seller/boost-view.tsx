@@ -8,6 +8,7 @@ import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
+import { boostPriceFor } from "@/lib/utils/seller-offer-prices";
 import type { BoostPurchaseInput, Product } from "@/types/rivendy";
 
 /* ── Tiers ─────────────────────────────────────────────────── */
@@ -16,8 +17,6 @@ interface BoostTier {
   id: "bronze" | "argent" | "or";
   name: string;
   emoji: string;
-  priceFDJ: number;
-  priceKMF: number;
   durationDays: number;
   color: string;
   bgColor: string;
@@ -25,9 +24,10 @@ interface BoostTier {
   benefits: string[];
 }
 
-// Parity Flutter boost_screen.dart — priceForMarket(marketId)
-function priceForMarket(tier: BoostTier, countryId: string): number {
-  return countryId === "KM" ? tier.priceKMF : tier.priceFDJ;
+// Parité app boost_screen.dart — priceForMarket(marketId).
+// Grille par devise (D-1, 2026-10-08) : lib/utils/seller-offer-prices.ts.
+function priceForMarket(tier: BoostTier, countryId: string | null | undefined): number {
+  return boostPriceFor(tier.durationDays, countryId);
 }
 
 const TIERS: BoostTier[] = [
@@ -35,8 +35,6 @@ const TIERS: BoostTier[] = [
     id: "bronze",
     name: "Bronze",
     emoji: "🥉",
-    priceFDJ: 500,
-    priceKMF: 1250,
     durationDays: 3,
     color: "#CD7F32",
     bgColor: "#FFF8F0",
@@ -50,8 +48,6 @@ const TIERS: BoostTier[] = [
     id: "argent",
     name: "Argent",
     emoji: "🥈",
-    priceFDJ: 1500,
-    priceKMF: 3750,
     durationDays: 7,
     color: "#9E9E9E",
     bgColor: "#F8F8F8",
@@ -67,8 +63,6 @@ const TIERS: BoostTier[] = [
     id: "or",
     name: "Or",
     emoji: "🥇",
-    priceFDJ: 3000,
-    priceKMF: 7500,
     durationDays: 15,
     color: "#FFB800",
     bgColor: "#FFFBEB",
@@ -404,9 +398,7 @@ export function BoostView({ product }: { product: Product }) {
                 {formatMoney(priceForMarket(tier, country?.id), country)}
               </p>
               <p className="text-xs text-slate-400">
-                soit{" "}
-                {Math.round(priceForMarket(tier, country?.id) / tier.durationDays).toLocaleString("fr-FR")}{" "}
-                {country?.currency_symbol}/jour
+                soit {formatMoney(priceForMarket(tier, country?.id) / tier.durationDays, country)}/jour
               </p>
             </div>
 

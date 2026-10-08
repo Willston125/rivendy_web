@@ -12,7 +12,8 @@
     "check:security": "node scripts/check-security-contracts.mjs",
     "check:classes": "node scripts/check-dead-classes.mjs",
     "check:commission": "node scripts/check-commission-grid.mjs",
-    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission && npm run check:listings",
+    "check:offers": "node scripts/check-seller-offer-prices.mjs",
+    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission && npm run check:offers && npm run check:listings",
     "check:listings": "node scripts/sync-listings-from-app.mjs --check"
   },
   "dependencies": {

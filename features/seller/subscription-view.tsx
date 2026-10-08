@@ -7,6 +7,7 @@ import { useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
+import { subscriptionPriceFor } from "@/lib/utils/seller-offer-prices";
 import type { SellerSubscriptionInput } from "@/types/rivendy";
 
 /* ── Plans ─────────────────────────────────────────────────── */
@@ -20,8 +21,6 @@ interface Plan {
   dbPlan: "monthly" | "yearly";
   label: string;
   emoji: string;
-  priceFDJ: number;
-  priceKMF: number;
   durationDays: number;
   durationLabel: string;
   buttonLabel: string;
@@ -32,9 +31,10 @@ interface Plan {
   features: string[];
 }
 
-// Parity Flutter subscription_screen.dart — priceForMarket(marketId)
-function priceForMarket(plan: Plan, countryId: string): number {
-  return countryId === "KM" ? plan.priceKMF : plan.priceFDJ;
+// Parité app subscription_screen.dart — priceForMarket(marketId).
+// Grille par devise (D-1, 2026-10-08) : lib/utils/seller-offer-prices.ts.
+function priceForMarket(plan: Plan, countryId: string | null | undefined): number {
+  return subscriptionPriceFor(plan.tier, plan.dbPlan, countryId);
 }
 
 function tierLabel(tier: SubscriptionTier): string {
@@ -70,8 +70,6 @@ const PLANS: Plan[] = [
     dbPlan: "monthly",
     label: "Mensuel",
     emoji: "📅",
-    priceFDJ: 1500,
-    priceKMF: 3000,
     durationDays: 30,
     durationLabel: "30 jours",
     buttonLabel: "S'abonner 30 jours",
@@ -86,8 +84,6 @@ const PLANS: Plan[] = [
     dbPlan: "yearly",
     label: "Annuel",
     emoji: "🏆",
-    priceFDJ: 15000,
-    priceKMF: 30000,
     durationDays: 365,
     durationLabel: "1 an",
     buttonLabel: "S'abonner 1 an",
@@ -102,8 +98,6 @@ const PLANS: Plan[] = [
     dbPlan: "monthly",
     label: "Mensuel",
     emoji: "🚀",
-    priceFDJ: 3500,
-    priceKMF: 7500,
     durationDays: 30,
     durationLabel: "30 jours",
     buttonLabel: "S'abonner 30 jours",
@@ -115,8 +109,6 @@ const PLANS: Plan[] = [
     dbPlan: "yearly",
     label: "Annuel",
     emoji: "🏆",
-    priceFDJ: 35000,
-    priceKMF: 75000,
     durationDays: 365,
     durationLabel: "1 an",
     buttonLabel: "S'abonner 1 an",
@@ -319,7 +311,7 @@ export function SubscriptionView() {
         {visiblePlans.map((plan) => {
           const displaySavings = plan.savingsLabel
             ? plan.dbPlan === "yearly"
-              ? `${plan.savingsLabel} — soit ~${Math.round(priceForMarket(plan, country?.id) / 12).toLocaleString("fr-FR")} ${country?.currency_symbol}/mois`
+              ? `${plan.savingsLabel} — soit ~${formatMoney(priceForMarket(plan, country?.id) / 12, country)}/mois`
               : plan.savingsLabel
             : null;
 
