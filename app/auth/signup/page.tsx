@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 
 export default function SignupPage() {
   return (
-    <div className="mx-auto grid min-h-[80vh] max-w-6xl gap-8 px-4 py-10 md:grid-cols-[1fr_480px] md:px-6">
+    <div className="mx-auto grid min-h-[80vh] max-w-6xl gap-8 px-4 py-10 lg:grid-cols-[minmax(0,1fr)_480px] md:px-6">
 
       {/* ── Panneau gauche — marketing ─────────────────────────────── */}
-      <section className="hidden flex-col justify-between rounded-3xl bg-[#007168] p-10 text-white md:flex">
+      <section className="hidden flex-col justify-between rounded-3xl bg-[#007168] p-10 text-white lg:flex">
         <div>
           <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-black tracking-wider text-white">
             RIVENDY

@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { isAdLive } from "@/features/ads/ad-window";
 import {
@@ -126,7 +127,14 @@ function normalizeAd(row: Record<string, unknown>): Advertisement {
   };
 }
 
-export async function getCountries() {
+/**
+ * Marchés actifs. Décision D-2 du 2026-10-07 : JAMAIS de repli.
+ * Si la lecture échoue, la page lève une erreur (écran « Réessayer » de
+ * app/error.tsx). Avant, le site affichait « Djibouti seul » — devise et
+ * numéro d'agence de Djibouti montrés à un Comorien, sans aucun signal.
+ * Même règle que l'app (sélection obligatoire, aucun pays par défaut).
+ */
+export async function getCountries(): Promise<Country[]> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from("countries")
@@ -134,24 +142,22 @@ export async function getCountries() {
     .eq("is_active", true)
     .order("name");
 
-  if (error || !data?.length) {
-    return [
-      {
-        id: "DJ",
-        name: "Djibouti",
-        currency_code: "FDJ",
-        currency_symbol: "FDJ",
-        whatsapp_number: process.env.NEXT_PUBLIC_RIVENDY_WHATSAPP_FALLBACK || "+25377145306",
-        is_active: true,
-      },
-    ] satisfies Country[];
-  }
+  if (error) throw new Error(`Marchés indisponibles : ${error.message}`);
+  if (!data?.length) throw new Error("Marchés indisponibles : aucun marché actif.");
   return data as Country[];
 }
 
-export async function getCountry(countryId = DEFAULT_COUNTRY_ID) {
+/**
+ * Le marché demandé. Un code inconnu ou inactif donne une page 404 : avant,
+ * il retombait sur le premier pays de la liste alphabétique (Burkina Faso),
+ * avec sa devise et son numéro d'agence.
+ */
+export async function getCountry(countryId = DEFAULT_COUNTRY_ID): Promise<Country> {
   const countries = await getCountries();
-  return countries.find((country) => country.id === countryId) ?? countries[0];
+  const id = countryId.trim().toUpperCase();
+  const country = countries.find((c) => c.id === id);
+  if (!country) notFound();
+  return country;
 }
 
 export async function getPaymentMethods(countryId = DEFAULT_COUNTRY_ID) {

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { phoneHint } from "@/lib/utils/phone-validator";
+import { safeInternalPath } from "@/lib/utils/safe-url";
 
 export function LoginForm() {
   const router = useRouter();
@@ -16,7 +17,9 @@ export function LoginForm() {
   // Après connexion on rentre à l'ACCUEIL, pas sur le profil (décision
   // propriétaire, 2026-09-11). `next` n'est suivi que s'il a été posé par
   // une page qui exigeait d'être connecté.
-  const next = params.get("next") || "/";
+  // Chemin INTERNE seulement : `?next=https://…` renvoyait l'utilisateur, juste
+  // connecté, sur un site tiers (redirection ouverte, audit du 2026-10-06).
+  const next = safeInternalPath(params.get("next"));
   const { signInWithPhone } = useAuth();
   // Exemple de format du marché choisi — l'ancien placeholder était le
   // numéro de l'agence de Djibouti, sur tous les marchés.

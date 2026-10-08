@@ -7,3 +7,6 @@ dist/
 !.env.local.example
 
 .vercel
+
+# Journaux du serveur de dev (vides, ne pas suivre)
+*.log

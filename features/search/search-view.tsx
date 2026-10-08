@@ -95,6 +95,7 @@ export function SearchView() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <h1 className="sr-only">Rechercher sur Rivendy</h1>
 
       {/* ── Header fixe ─────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 bg-white px-4 pb-3 pt-4 shadow-sm md:px-6">
@@ -104,6 +105,7 @@ export function SearchView() {
           <input
             ref={inputRef}
             type="search"
+            aria-label="Rechercher un produit ou une boutique"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher un produit, une boutique..."

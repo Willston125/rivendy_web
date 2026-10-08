@@ -100,7 +100,7 @@ export function AppHeader() {
         </Link>
 
         {/* Barre de recherche — desktop */}
-        <form onSubmit={onSearch} className="relative hidden flex-1 md:block lg:max-w-xl xl:max-w-2xl">
+        <form onSubmit={onSearch} className="relative hidden min-w-0 flex-1 xl:block xl:max-w-xl 2xl:max-w-2xl">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
           <input
             type="search"
@@ -114,7 +114,7 @@ export function AppHeader() {
         </form>
 
         {/* Nav desktop — liens texte */}
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-1 xl:flex">
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             return (
@@ -122,7 +122,7 @@ export function AppHeader() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "whitespace-nowrap rounded-lg px-3.5 py-2 text-[13.5px] font-semibold transition-colors",
+                  "whitespace-nowrap rounded-lg px-2 py-2 text-[13.5px] font-semibold transition-colors 2xl:px-3.5",
                   active
                     ? "bg-[#E0F2F1] text-[#009688]"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
@@ -135,7 +135,9 @@ export function AppHeader() {
         </nav>
 
         {/* Spacer */}
-        <div className="hidden flex-1 lg:block" />
+        {/* Espaceur : seulement très grand écran — plus bas il se partageait le reste
+            de la place avec la recherche et la réduisait de moitié. */}
+        <div className="hidden flex-1 2xl:block" />
 
         {/* ── Icônes d'action ─────────────────────────────────────── */}
         <div className="flex items-center gap-1">
@@ -143,19 +145,21 @@ export function AppHeader() {
           {/* Bouton Vendre — CTA proéminent (desktop) */}
           <Link
             href="/sell"
-            className="mr-1.5 hidden h-10 items-center gap-1.5 rounded-full bg-[#009688] px-4 text-sm font-bold text-white shadow-sm shadow-[#009688]/20 transition hover:bg-[#00796B] md:flex"
+            aria-label="Vendre un article"
+            className="mr-1.5 hidden h-10 items-center gap-1.5 rounded-full bg-[#009688] px-3 text-sm font-bold text-white shadow-sm shadow-[#009688]/20 transition hover:bg-[#00796B] xl:flex 2xl:px-4"
           >
             <Plus className="h-4 w-4" />
-            Vendre
+            <span className="hidden 2xl:inline">Vendre</span>
           </Link>
 
           {/* Sélecteur de pays — desktop */}
-          <div className="relative hidden items-center md:flex mr-1.5">
-            <Globe className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="relative hidden items-center xl:flex mr-1.5">
+            <Globe className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 2xl:left-3.5" />
             <select
               value={countryId}
               onChange={(e) => changeCountry(e.target.value)}
-              className="h-10 appearance-none rounded-full border border-slate-200 bg-slate-50 pl-9 pr-8 text-xs font-bold text-slate-700 outline-none transition hover:border-[#009688] focus:border-[#009688] focus:bg-white cursor-pointer"
+              aria-label="Marché"
+              className="h-10 w-[7rem] cursor-pointer appearance-none rounded-full border border-slate-200 bg-slate-50 pl-8 pr-7 text-xs font-bold text-slate-700 outline-none transition hover:border-[#009688] focus:border-[#009688] focus:bg-white 2xl:w-auto"
             >
               {needsMarketSelection && (
                 <option value="" disabled>Choisir un marché…</option>
@@ -170,7 +174,7 @@ export function AppHeader() {
           {/* Favoris */}
           <Link
             href="/favorites"
-            className="hidden h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 md:flex"
+            className="hidden h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 xl:flex"
             aria-label="Favoris"
           >
             <Heart className="h-[20px] w-[20px]" />
@@ -193,14 +197,14 @@ export function AppHeader() {
           {/* Messages */}
           <Link
             href="/help"
-            className="hidden h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 md:flex"
+            className="hidden h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 2xl:flex"
             aria-label="Messages"
           >
             <MessageCircle className="h-[20px] w-[20px]" />
           </Link>
 
           {/* Notifications */}
-          <div ref={notifRef} className="relative hidden md:block">
+          <div ref={notifRef} className="relative hidden xl:block">
             <button
               type="button"
               onClick={() => {
@@ -316,11 +320,11 @@ export function AppHeader() {
           </div>
 
           {/* Séparateur vertical */}
-          <div className="mx-1.5 hidden h-8 w-px bg-slate-200 md:block" />
+          <div className="mx-1.5 hidden h-8 w-px bg-slate-200 xl:block" />
 
           {/* Profil utilisateur — desktop */}
           {user ? (
-            <div className="relative hidden md:block">
+            <div className="relative hidden xl:block">
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen((v) => !v)}
@@ -334,7 +338,7 @@ export function AppHeader() {
                     initials
                   )}
                 </span>
-                <span className="hidden text-sm font-semibold text-slate-700 xl:block">
+                <span className="hidden text-sm font-semibold text-slate-700 2xl:block">
                   {displayName}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
@@ -396,7 +400,7 @@ export function AppHeader() {
           ) : (
             <Link
               href="/auth/login"
-              className="hidden h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-[#009688] hover:text-[#009688] md:flex"
+              className="hidden h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-bold text-slate-700 transition hover:border-[#009688] hover:text-[#009688] xl:flex 2xl:px-5"
             >
               <UserRound className="h-4 w-4" />
               Connexion
@@ -410,7 +414,7 @@ export function AppHeader() {
             aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
             aria-expanded={menuOpen}
             aria-controls="mobile-navigation"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 md:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 xl:hidden"
           >
             {menuOpen
               ? <X className="h-5 w-5" />
@@ -421,7 +425,7 @@ export function AppHeader() {
       </div>
 
       {/* ── Barre de recherche mobile ──────────────────────────────── */}
-      <div className="px-4 pb-2.5 md:hidden">
+      <div className="px-4 pb-2.5 xl:hidden">
         <form onSubmit={onSearch} className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -438,7 +442,7 @@ export function AppHeader() {
 
       {/* ── Menu mobile déroulant ──────────────────────────────────── */}
       {menuOpen && (
-        <div id="mobile-navigation" className="border-t border-slate-100 bg-white px-4 pb-4 pt-3 md:hidden">
+        <div id="mobile-navigation" className="border-t border-slate-100 bg-white px-4 pb-4 pt-3 xl:hidden">
 
           {/* Bouton Vendre — CTA proéminent */}
           <Link
@@ -456,6 +460,7 @@ export function AppHeader() {
             <select
               value={countryId}
               onChange={(e) => changeCountry(e.target.value)}
+              aria-label="Marché"
               className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-9 pr-4 text-sm font-bold text-slate-700 outline-none"
             >
               {needsMarketSelection && (
