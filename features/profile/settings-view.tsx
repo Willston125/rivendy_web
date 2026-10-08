@@ -18,7 +18,6 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 
 // ── Types ──────────────────────────────────────────────────
@@ -76,7 +75,7 @@ function SettingsRow({ item, isLast }: { item: SettingsItem; isLast: boolean }) 
 
 // ── Composant principal ────────────────────────────────────
 export function SettingsView() {
-  const { user, profile, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const router = useRouter();
 
   async function handleSignOut() {

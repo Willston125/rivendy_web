@@ -37,7 +37,6 @@ import {
   ShoppingBag,
   Truck,
   XCircle,
-  KeyRound,
   Timer
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";

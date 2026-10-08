@@ -94,7 +94,6 @@ export function VoiceNotePlayer({
 
   return (
     <div className="flex h-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
       <button

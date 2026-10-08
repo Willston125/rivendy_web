@@ -90,6 +90,9 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
           <div className="space-y-2 max-w-[70%]">
             <div className="flex items-center gap-3">
               {seller.avatar_url && (
+                // <img> voulu : une image next/image chargée en différé peut manquer à
+                // l'impression (window.print). Même raison pour les photos ci-dessous.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={seller.avatar_url}
                   alt={sellerName}
@@ -137,6 +140,7 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
                   {/* Photo produit */}
                   <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-100/50">
                     {mainPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={mainPhoto}
                         alt={product.title}

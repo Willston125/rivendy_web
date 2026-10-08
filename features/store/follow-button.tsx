@@ -35,7 +35,7 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
         .maybeSingle();
 
       setFollowing(!!data);
-    } catch (_) {}
+    } catch {}
     setLoading(false);
   }, [user, sellerId]);
 
@@ -80,7 +80,7 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
         setFollowing(true);
         if (onFollowChanged) onFollowChanged(true);
       }
-    } catch (_) {
+    } catch {
       // Échec silencieux — pas d'alert() bloquant
     } finally {
       setToggling(false);

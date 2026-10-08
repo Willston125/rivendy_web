@@ -7,9 +7,7 @@ import {
   Baby,
   Eye,
   EyeOff,
-  Globe,
   Mail,
-  MessageSquare,
   Package,
   ShoppingBag,
   ShoppingCart,
@@ -23,7 +21,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils/cn";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";

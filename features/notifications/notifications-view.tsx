@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -21,7 +20,6 @@ import {
   useNotifications,
 } from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
-import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 export function NotificationsView() {

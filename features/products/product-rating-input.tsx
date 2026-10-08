@@ -33,7 +33,7 @@ export function ProductRatingInput({ productId, onRatingChanged }: ProductRating
       if (data) {
         setRating(data.rating);
       }
-    } catch (_) {}
+    } catch {}
   }, [user, productId]);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function ProductRatingInput({ productId, onRatingChanged }: ProductRating
 
       // Masquer le badge succès après 3 secondes
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
+    } catch {
       setErrorMsg("Impossible d'enregistrer votre note.");
     } finally {
       setSubmitting(false);

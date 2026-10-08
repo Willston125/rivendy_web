@@ -53,13 +53,6 @@ const SELLER_ORDER_STATUS: Record<string, { label: string; bg: string; text: str
   shipped:                       { label: "Expédiée",       bg: "bg-cyan-50",   text: "text-cyan-700" },
 };
 
-const MONTHS = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
-function formatDate(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-}
-
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
     active:  { label: "En ligne",    cls: "bg-[#E0F2F1] text-[#009688]" },
