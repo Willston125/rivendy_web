@@ -394,7 +394,7 @@ export function ProfileDashboard() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[12px] font-bold text-slate-900">{product.title}</p>
                       <p className="text-[11px] font-semibold text-[#009688]">
-                        {formatMoney(product.price, country)}
+                        {formatMoney(product.price, orderCountry(product.country_id, countries, country))}
                       </p>
                     </div>
                   </Link>

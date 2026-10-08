@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
-import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { firstPhoto, formatMoney, formatMoneySums } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import { deleteVideo } from "@/lib/video/video-service";
 import type { Product, AppOrder } from "@/types/rivendy";
@@ -288,10 +288,6 @@ export function SellerSalesView() {
   }
 
   // ── Stats ──────────────────────────────────────────────────
-  const totalRevenue = soldProducts.reduce(
-    (sum, p) => sum + (p.seller_price > 0 ? p.seller_price : p.price),
-    0,
-  );
   const totalCommissions = soldProducts.reduce((sum, p) => sum + p.commission_amount, 0);
   const top5 = useMemo(
     () => [...products].sort((a, b) => b.views_count - a.views_count).slice(0, 5),
@@ -632,13 +628,13 @@ export function SellerSalesView() {
                 {soldProducts.length} vente{soldProducts.length > 1 ? "s" : ""} confirmée{soldProducts.length > 1 ? "s" : ""}
               </div>
               <p className="mt-2 text-3xl font-black">
-                {formatMoney(totalRevenue, country)}
+                {formatMoneySums(soldProducts.map((p) => [p.seller_price > 0 ? p.seller_price : p.price, marketOf(p.country_id)]), country)}
               </p>
               <p className="mt-0.5 text-xs text-white/60">Total encaissé (hors commission)</p>
               {totalCommissions > 0 && (
                 <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-semibold text-white/80">
                   <span>%</span>
-                  {formatMoney(totalCommissions, country)} versés à Rivendy
+                  {formatMoneySums(soldProducts.map((p) => [p.commission_amount, marketOf(p.country_id)]), country)} versés à Rivendy
                 </div>
               )}
             </div>
@@ -760,7 +756,7 @@ export function SellerSalesView() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatCard
               label="Revenus encaissés"
-              value={formatMoney(totalRevenue, country)}
+              value={formatMoneySums(soldProducts.map((p) => [p.seller_price > 0 ? p.seller_price : p.price, marketOf(p.country_id)]), country)}
               color="text-[#009688]"
             />
             <StatCard
@@ -775,7 +771,7 @@ export function SellerSalesView() {
             />
             <StatCard
               label="Commissions Rivendy"
-              value={totalCommissions > 0 ? formatMoney(totalCommissions, country) : "—"}
+              value={totalCommissions > 0 ? formatMoneySums(soldProducts.map((p) => [p.commission_amount, marketOf(p.country_id)]), country) : "—"}
               color="text-orange-500"
             />
           </div>

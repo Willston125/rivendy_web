@@ -18,6 +18,25 @@ export function formatMoney(value: number | null | undefined, country?: Pick<Cou
   return `${formatted} ${country?.currency_symbol || country?.currency_code || "FDJ"}`;
 }
 
+/**
+ * Somme de montants de plusieurs marchés, SANS addition entre devises :
+ * « 12 000 FC · 3 000 FDJ ». Un seul marché : un seul montant. Miroir de
+ * `formatSumsByMarket` côté app (audit des devises du 2026-10-08).
+ */
+export function formatMoneySums(
+  entries: Array<[number, Pick<Country, "currency_symbol" | "currency_code"> | null | undefined]>,
+  fallback?: Pick<Country, "currency_symbol" | "currency_code"> | null,
+) {
+  const sums = new Map<string, { amount: number; country: Pick<Country, "currency_symbol" | "currency_code"> | null | undefined }>();
+  for (const [amount, country] of entries) {
+    const key = country?.currency_code ?? country?.currency_symbol ?? "";
+    const cur = sums.get(key);
+    sums.set(key, { amount: (cur?.amount ?? 0) + amount, country: cur?.country ?? country });
+  }
+  if (sums.size === 0) return formatMoney(0, fallback);
+  return [...sums.values()].map((s) => formatMoney(s.amount, s.country ?? fallback)).join(" · ");
+}
+
 export function firstPhoto(product?: Pick<Product, "photos"> | null) {
   return product?.photos?.find(Boolean) || "/brand/rivendy-logo-square.png";
 }
