@@ -65,9 +65,27 @@ for (const [market, v] of Object.entries(expected)) {
 }
 if (!/YEARLY_PAID_MONTHS = 10\b/.test(source)) failures.push("annuel ≠ 10 mois payés");
 
+// Retrait minimum (DV-1, 2026-10-08) : miroir de l'app et du serveur.
+const minExpected = {
+  KM: 5000, DJ: 2000, SN: 7000, CI: 7000, ML: 7000, BF: 7000, CM: 7000,
+  FR: 10, RE: 10, YT: 10, MG: 50000, KE: 1500, ET: 1500, TZ: 30000, MR: 500, SO: 7000,
+};
+const minStart = source.indexOf("export const MIN_WITHDRAWAL_BY_MARKET");
+if (minStart < 0) {
+  failures.push("MIN_WITHDRAWAL_BY_MARKET introuvable");
+} else {
+  const open = source.indexOf("{", minStart);
+  const close = source.indexOf("};", open);
+  const minGrid = new Function("return " + source.slice(open, close + 1) + ";")();
+  for (const [m, v] of Object.entries(minExpected)) {
+    if (minGrid[m] !== v) failures.push(`retrait minimum ${m} : ${minGrid[m]} ≠ ${v}`);
+  }
+  if (Object.keys(minGrid).length !== 16) failures.push(`retrait minimum : ${Object.keys(minGrid).length} marchés ≠ 16`);
+}
+
 if (failures.length) {
   console.error("✗ Grille des offres vendeur : écart avec la grille validée le 2026-10-08");
   for (const f of failures) console.error(`  - ${f}`);
   process.exit(1);
 }
-console.log("OK : grille des offres vendeur alignée (16 marchés, abonnements + boosts, annuel = 10 mois).");
+console.log("OK : grille des offres vendeur alignée (16 marchés, abonnements + boosts, annuel = 10 mois, retrait minimum).");

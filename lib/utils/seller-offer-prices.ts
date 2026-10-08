@@ -77,3 +77,20 @@ export function boostPriceFor(durationDays: number, countryId: string | null | u
   if (durationDays === 15) return p.boost15Days;
   throw new Error(`Durée de boost inconnue : ${durationDays} jours`);
 }
+
+/**
+ * Retrait minimum par marché (décision DV-1 du 2026-10-08) : ~10 € dans la
+ * devise du PORTEFEUILLE. Avant : 5 000 aux Comores, 2 000 partout ailleurs
+ * (2 000 € en France). Miroir EXACT de `kMinWithdrawalByMarket` (app) et du
+ * contrôle serveur `guard_payout_insert()`. Marché inconnu : 0 (le serveur tranche).
+ */
+export const MIN_WITHDRAWAL_BY_MARKET: Record<string, number> = {
+  KM: 5000, DJ: 2000,
+  SN: 7000, CI: 7000, ML: 7000, BF: 7000, CM: 7000,
+  FR: 10, RE: 10, YT: 10,
+  MG: 50000, KE: 1500, ET: 1500, TZ: 30000, MR: 500, SO: 7000,
+};
+
+export function minWithdrawalFor(countryId: string | null | undefined): number {
+  return MIN_WITHDRAWAL_BY_MARKET[(countryId ?? "").trim().toUpperCase()] ?? 0;
+}

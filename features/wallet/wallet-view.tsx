@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { minWithdrawalFor } from "@/lib/utils/seller-offer-prices";
 import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { AppOrder, Country } from "@/types/rivendy";
 
@@ -157,7 +158,8 @@ export function WalletView() {
 
   // Seuil : 5 000 KMF aux Comores, 2 000 ailleurs (décision du 2026-08-11),
   // selon le pays DU PORTEFEUILLE.
-  const MIN_WITHDRAW = walletCountryId === "KM" ? 5000 : 2000;
+  // ~10 € dans la devise du portefeuille (DV-1, 2026-10-08) — miroir app + serveur.
+  const MIN_WITHDRAW = minWithdrawalFor(walletCountryId);
   const canWithdraw = !!wallet && !!walletCountryId && availableToWithdraw >= MIN_WITHDRAW;
   const withdrawalMethods = walletCountryId
     ? getMobileMoneyForCountry(walletCountryId).filter((m) => m.id !== "cash")

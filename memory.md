@@ -4,7 +4,7 @@
 Rivendy est une plateforme de marketplace (Mise en relation Acheteurs/Vendeurs) opérant de façon multi-marchés (Comores, Djibouti, etc.), disposant d'une application mobile (Flutter) et d'une version web (Next.js). L'objectif est d'avoir une **parité parfaite** entre les fonctionnalités de l'App mobile et du Site Web.
 
 ## Technologies
-- **Frontend** : Next.js 16.2.10 (App Router), React 19, Tailwind CSS, Lucide React
+- **Frontend** : Next.js 16.3.8 (App Router, depuis le 2026-10-08), React 19, Tailwind CSS, Lucide React
 - **Backend / BDD** : Supabase (PostgreSQL, Authentification, Storage)
 - **Déploiement** : Vercel (Front) & GitHub (Code source)
 
