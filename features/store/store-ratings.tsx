@@ -21,7 +21,7 @@ interface StoreRatingsProps {
 }
 
 export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [reviews, setReviews] = useState<StoreReview[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,7 +73,7 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
         });
         setReviews(formatted);
       }
-    } catch (_) {}
+    } catch {}
     setLoading(false);
   }, [sellerId]);
 
@@ -92,7 +92,7 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
         setUserRating(data.rating);
         setComment(data.comment ?? "");
       }
-    } catch (_) {}
+    } catch {}
   }, [user, sellerId]);
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
       setSuccessMsg("Votre avis a été enregistré avec succès !");
       fetchReviews();
       if (onRatingSubmitted) onRatingSubmitted();
-    } catch (err) {
+    } catch {
       setErrorMsg("Une erreur s'est produite lors de l'enregistrement de votre avis.");
     } finally {
       setSubmitting(false);

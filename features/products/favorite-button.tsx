@@ -2,12 +2,14 @@
 
 import { Heart } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 
 export function FavoriteButton({ productId, className }: { productId: string; className?: string }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [favorite, setFavorite] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +29,7 @@ export function FavoriteButton({ productId, className }: { productId: string; cl
 
   async function toggle() {
     if (!user) {
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
       return;
     }
     setBusy(true);

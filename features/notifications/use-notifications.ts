@@ -109,7 +109,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [userId, load, refreshUnreadCount]);
 
   // Déconnexion : rien ne doit survivre du compte précédent.
-  const visible = userId ? notifications : [];
+  const visible = useMemo(() => (userId ? notifications : []), [userId, notifications]);
   const visibleUnread = userId ? unreadCount : 0;
 
   const markRead = useCallback(

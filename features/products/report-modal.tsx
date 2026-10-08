@@ -48,7 +48,7 @@ export function ReportModal({ targetId, type, isOpen, onClose }: ReportModalProp
         .limit(1);
 
       setAlreadyReported((data ?? []).length > 0);
-    } catch (_) {}
+    } catch {}
     setChecking(false);
   }, [user, targetId, type, isOpen]);
 
@@ -111,7 +111,7 @@ export function ReportModal({ targetId, type, isOpen, onClose }: ReportModalProp
       setTimeout(() => {
         onClose();
       }, 2000);
-    } catch (err) {
+    } catch {
       setErrorMsg("Erreur lors de l'envoi du signalement. Veuillez réessayer.");
     } finally {
       setLoading(false);

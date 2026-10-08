@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { DEFAULT_COUNTRY_ID, type Country, type PaymentMethod } from "@/types/rivendy";
+import type { Country, PaymentMethod } from "@/types/rivendy";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

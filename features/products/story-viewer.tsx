@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
   ChevronLeft,
@@ -306,8 +307,6 @@ export function StoryViewer({ stories, initialIndex, onClose, onSellerViewed }: 
         {commentsOpen && (
           <CommentsPanel
             productId={product.id}
-            productImage={photo}
-            sellerId={seller.sellerId}
             onPosted={() =>
               setPostedComments((prev) => ({
                 ...prev,
@@ -329,6 +328,7 @@ export function StoryViewer({ stories, initialIndex, onClose, onSellerViewed }: 
 ════════════════════════════════════════════════════════════════ */
 function LikeButton({ productId, initialCount }: { productId: string; initialCount: number }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount ?? 0);
   const [busy, setBusy] = useState(false);
@@ -354,7 +354,7 @@ function LikeButton({ productId, initialCount }: { productId: string; initialCou
 
   async function toggle() {
     if (!user) {
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
       return;
     }
     if (busy) return;
@@ -436,19 +436,16 @@ interface Comment {
 
 function CommentsPanel({
   productId,
-  productImage,
-  sellerId,
   onPosted,
   onClose,
 }: {
   productId: string;
-  productImage: string;
-  sellerId: string;
   /** Appelé après un envoi réussi — compteur local du bouton seulement. */
   onPosted: () => void;
   onClose: () => void;
 }) {
   const { user, profile } = useAuth();
+  const router = useRouter();
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -477,7 +474,7 @@ function CommentsPanel({
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     if (!user) {
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
       return;
     }
     // Même filtre que les commentaires de la fiche produit et que l'app
