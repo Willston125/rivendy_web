@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { ContentFilter } from "@/lib/utils/content-filter";
 import { cn } from "@/lib/utils/cn";
+import { fetchProfilesShowcase } from "@/lib/supabase/profiles-showcase";
 
 export type StoreReview = {
   rating: number;
@@ -39,30 +40,23 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
     try {
       const { data, error } = await supabase
         .from("store_ratings")
-        .select(`
-          rating,
-          comment,
-          created_at,
-          profiles:user_id (
-            full_name,
-            avatar_url
-          )
-        `)
+        .select("rating, comment, created_at, user_id")
         .eq("seller_id", sellerId)
         .order("created_at", { ascending: false })
         .limit(20);
 
       if (!error && data) {
-        const formatted = (data as unknown as Array<{
+        const rows = data as Array<{
           rating: number;
           comment: string | null;
           created_at: string;
-          profiles: {
-            full_name: string | null;
-            avatar_url: string | null;
-          } | null;
-        }>).map((row) => {
-          const prof = row.profiles;
+          user_id: string;
+        }>;
+        // Vitrine par RPC : connecté, la jointure sur profiles rendait null et
+        // chaque auteur devenait « Acheteur Rivendy » (parcours du 2026-10-10).
+        const authors = await fetchProfilesShowcase(supabase, rows.map((r) => r.user_id));
+        const formatted = rows.map((row) => {
+          const prof = authors.get(row.user_id);
           return {
             rating: row.rating,
             comment: row.comment ?? "",
