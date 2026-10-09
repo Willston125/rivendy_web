@@ -6,17 +6,15 @@ import { KeyRound, X, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
-import { normalizePhoneForWhatsApp } from "@/lib/utils/format";
 import type { Product } from "@/types/rivendy";
 
-type Outcome =
-  | { kind: "recorded"; ref: string | null; whatsapp: boolean }
-  | { kind: "whatsapp_only" };
+type Outcome = { kind: "recorded"; ref: string | null };
 
 /**
  * Demande de location (parité RentalRequestSheet Flutter). La demande est
- * ENREGISTRÉE pour Rivendy (dashboard → Demandes location), puis WhatsApp
- * s'ouvre vers l'AGENCE — jamais le propriétaire du bien.
+ * ENREGISTRÉE pour Rivendy (dashboard → Demandes location), et c'est tout :
+ * depuis le 2026-10-09, plus aucune demande ne passe par WhatsApp. Rivendy
+ * rappelle le client au numéro saisi.
  *
  * Corrigé le 2026-10-04 (audit de parité) :
  *  - l'enregistrement relisait la ligne (`insert().select()`) alors que
@@ -45,7 +43,6 @@ export function RentalRequestForm({ product }: { product: Product }) {
   const [error, setError] = useState("");
 
   const valid = name.trim() !== "" && phone.trim() !== "";
-  const agency = normalizePhoneForWhatsApp(country?.whatsapp_number ?? "");
 
   async function record(): Promise<{ ok: boolean; ref: string | null }> {
     const params = {
@@ -89,36 +86,11 @@ export function RentalRequestForm({ product }: { product: Product }) {
     setSending(true);
     setError("");
 
-    // Onglet ouvert DANS le clic : ouvert après un await, il est bloqué par
-    // la plupart des navigateurs.
-    const waWindow = agency ? window.open("about:blank", "_blank") : null;
-
     const { ok, ref } = await record();
-
-    const fmt = (d: string) => (d ? d.split("-").reverse().join("/") : "");
-    const lines = [
-      "🔑 *Demande de location Rivendy*",
-      ...(ref ? [`📋 Réf : ${ref}`] : []),
-      `Bien : ${product.title}`,
-      ...(start ? [`Début : ${fmt(start)}`] : []),
-      ...(end ? [`Fin : ${fmt(end)}`] : []),
-      ...(duration.trim() ? [`Durée : ${duration.trim()}`] : []),
-      `Client : ${name.trim()}`,
-      `Téléphone : ${phone.trim()}`,
-      ...(message.trim() ? [`Message : ${message.trim()}`] : []),
-    ];
-
-    let whatsappOpened = false;
-    if (waWindow) {
-      waWindow.location.href = `https://wa.me/${agency}?text=${encodeURIComponent(lines.join("\n"))}`;
-      whatsappOpened = true;
-    }
 
     setSending(false);
     if (ok) {
-      setOutcome({ kind: "recorded", ref, whatsapp: whatsappOpened });
-    } else if (whatsappOpened) {
-      setOutcome({ kind: "whatsapp_only" });
+      setOutcome({ kind: "recorded", ref });
     } else {
       setError("La demande n'a pas pu être envoyée. Réessayez dans un moment.");
     }
@@ -163,16 +135,10 @@ export function RentalRequestForm({ product }: { product: Product }) {
             ) : outcome ? (
               <div className="space-y-3 py-4 text-center">
                 <p className="text-sm font-bold text-[#007168]">
-                  {outcome.kind === "recorded"
-                    ? outcome.ref
-                      ? `Demande ${outcome.ref} enregistrée ✓`
-                      : "Votre demande est enregistrée ✓"
-                    : "Votre demande part sur WhatsApp : envoyez le message pour la confirmer."}
+                  {outcome.ref ? `Demande ${outcome.ref} enregistrée ✓` : "Votre demande est enregistrée ✓"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {outcome.kind === "recorded" && !outcome.whatsapp
-                    ? "Rivendy vous contactera pour confirmer la disponibilité."
-                    : "Rivendy vous confirmera la disponibilité rapidement."}
+                  Rivendy vous contactera pour confirmer la disponibilité.
                 </p>
                 <button onClick={() => { setOpen(false); setOutcome(null); }} className="mt-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600">Fermer</button>
               </div>

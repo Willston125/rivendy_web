@@ -15,7 +15,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
-import { formatMoney, normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { formatMoney } from "@/lib/utils/format";
 import { minWithdrawalFor } from "@/lib/utils/seller-offer-prices";
 import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { AppOrder, Country } from "@/types/rivendy";
@@ -291,15 +291,14 @@ export function WalletView() {
             )}
             Retirer
           </button>
-          <a
-            href={`https://wa.me/${normalizePhoneForWhatsApp(walletCountry?.whatsapp_number || country.whatsapp_number)}?text=${encodeURIComponent("Bonjour Rivendy, j'ai besoin d'aide avec mon portefeuille.")}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          {/* Plus de WhatsApp (2026-10-09) : l'aide passe par la page Aide. */}
+          <Link
+            href="/help"
             className="flex items-center justify-center gap-2 rounded-2xl bg-white/20 py-3 text-sm font-black text-white transition hover:bg-white/30"
           >
             <MessageCircle className="h-4 w-4" />
             Support
-          </a>
+          </Link>
         </div>
       </div>
 

@@ -1,9 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { ChevronDown, Mail, MessageCircle } from "lucide-react";
-import { useCountryOrDefault } from "@/features/country/country-provider";
-import { normalizePhoneForWhatsApp } from "@/lib/utils/format";
+import { ChevronDown, Mail } from "lucide-react";
 
 const FAQS = [
   {
@@ -28,7 +26,7 @@ const FAQS = [
   },
   {
     q: "Que faire si je n'ai pas reçu mon article ?",
-    a: "Contactez notre support via WhatsApp ou email avec la référence de votre commande (CMD-…). Notre équipe fait le suivi de toutes les commandes et vous assistera dans la résolution du problème.",
+    a: "Depuis « Mes commandes », utilisez « Signaler un problème » sur la commande concernée, ou écrivez-nous par email avec sa référence (CMD-…). Notre équipe fait le suivi de toutes les commandes et vous assistera dans la résolution du problème.",
   },
   {
     q: "Comment fonctionne le portefeuille Rivendy ?",
@@ -46,13 +44,6 @@ const FAQS = [
 
 export function HelpView() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const countryNullable = useCountryOrDefault();
-  if (!countryNullable) return null;
-  const country = countryNullable;
-
-  const whatsapp = normalizePhoneForWhatsApp(country.whatsapp_number);
-  const waMsg = encodeURIComponent("Bonjour, j'ai besoin d'aide avec Rivendy.");
-  const waUrl = `https://wa.me/${whatsapp}?text=${waMsg}`;
   const emailUrl = `mailto:support@rivendy.com?subject=Aide%20Rivendy&body=Bonjour%2C%20j'ai%20besoin%20d'aide%20avec%20Rivendy.`;
 
   return (
@@ -69,19 +60,12 @@ export function HelpView() {
         <p className="mt-1 text-sm text-white/80">
           Notre équipe est disponible 7j/7 de 8h à 22h
         </p>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white py-3 text-sm font-black text-[#009688] transition hover:bg-white/90"
-          >
-            <MessageCircle className="h-4 w-4" />
-            WhatsApp
-          </a>
+        {/* Plus de WhatsApp depuis le 2026-10-09 : les demandes arrivent chez
+            Rivendy, jamais sur une messagerie. */}
+        <div className="mt-5">
           <a
             href={emailUrl}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white/20 py-3 text-sm font-black text-white transition hover:bg-white/30"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-white py-3 text-sm font-black text-[#009688] transition hover:bg-white/90"
           >
             <Mail className="h-4 w-4" />
             Email
@@ -140,12 +124,10 @@ export function HelpView() {
           Contactez-nous directement.
         </p>
         <a
-          href={waUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={emailUrl}
           className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#E0F2F1] px-6 py-3 text-sm font-black text-[#009688] transition hover:bg-[#009688] hover:text-white"
         >
-          <MessageCircle className="h-4 w-4" />
+          <Mail className="h-4 w-4" />
           Contacter le support
         </a>
         <p className="mt-3 text-xs text-slate-400">

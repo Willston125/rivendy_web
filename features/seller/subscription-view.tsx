@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { BadgeCheck, Copy, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
@@ -389,8 +390,8 @@ export function SubscriptionView() {
       <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
         Paiement vérifié manuellement sous 2h
         <br />
-        {/* Jamais de numéro en dur — source unique : le pays actif. */}
-        Support : WhatsApp {country.whatsapp_number}
+        {/* Plus de WhatsApp (2026-10-09) : la demande est suivie dans le dashboard. */}
+        Une question ? <Link href="/help" className="font-semibold text-[#009688] hover:underline">Aide & support</Link>
       </p>
 
       {/* Payment modal overlay */}
