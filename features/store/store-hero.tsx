@@ -8,6 +8,7 @@ import { StoreCoverEditButton, StoreAvatarEditButton, StoreCoverVideoButton } fr
 import { StoreHeroCta } from "@/features/store/store-hero-cta";
 import { distinctCategories } from "@/features/store/store-helpers";
 import { ProductVideoPlayer } from "@/features/products/product-video-player";
+import { usableImageUrl } from "@/lib/utils/image-url";
 
 interface TrustSummary {
   score: number;
@@ -63,7 +64,7 @@ export function StoreHero({
   shareUrl: string;
 }) {
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
-  const bannerSrc = seller.store_banner_url;
+  const bannerSrc = usableImageUrl(seller.store_banner_url);
   const hasReadyCoverVideo = Boolean(
     seller.is_certified && seller.cover_video_uid && seller.cover_video_status === "ready",
   );

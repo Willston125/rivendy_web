@@ -25,6 +25,7 @@ import { useCart } from "@/features/cart/cart-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { notificationDestination, useNotifications } from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
+import { useDialogs } from "@/features/ui/dialogs";
 
 const navItems = [
   { href: "/", label: "Explorer" },
@@ -48,6 +49,7 @@ export function AppHeader() {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  const dialogs = useDialogs();
 
   const displayName = useMemo(() => {
     return profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Mon compte";
@@ -384,9 +386,9 @@ export function AppHeader() {
 
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setProfileMenuOpen(false);
-                        if (confirm("Voulez-vous vraiment vous déconnecter ?")) signOut();
+                        if (await dialogs.confirm({ title: "Se déconnecter ?", confirmLabel: "Se déconnecter" })) signOut();
                       }}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-500 transition hover:bg-red-50"
                     >

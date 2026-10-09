@@ -16,6 +16,7 @@ import { HotelRoomCard } from "@/features/products/hotel-room-card";
 import { HotelReservationForm } from "@/features/products/hotel-reservation-form";
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { MarketHint } from "@/features/country/market-hint";
+import { usableImageUrl } from "@/lib/utils/image-url";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -69,7 +70,7 @@ export default async function HotelDetailPage({
 
   const name = seller.store_name || seller.full_name || "Hôtel Rivendy";
   const rating = Number(trust.score ?? 0);
-  const bannerSrc = seller.store_banner_url;
+  const bannerSrc = usableImageUrl(seller.store_banner_url);
 
   let locality = "";
   const amenities: string[] = [];

@@ -7,9 +7,11 @@ import { CountryProvider } from "@/features/country/country-provider";
 import { MarketSelectorModal } from "@/features/country/market-selector-modal";
 import { MarketUrlSync } from "@/features/country/market-url-sync";
 import { NotificationsProvider } from "@/features/notifications/use-notifications";
+import { DialogsProvider } from "@/features/ui/dialogs";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
+    <DialogsProvider>
     <AuthProvider>
       <NotificationsProvider>
       <CountryProvider>
@@ -23,5 +25,6 @@ export function Providers({ children }: { children: ReactNode }) {
       </CountryProvider>
       </NotificationsProvider>
     </AuthProvider>
+    </DialogsProvider>
   );
 }

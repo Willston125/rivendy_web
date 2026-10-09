@@ -15,6 +15,7 @@ import {
 import { CONSTRUCTION_MATERIALS, constructionMaterialLabel } from "@/features/products/construction-listings";
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { MarketHint } from "@/features/country/market-hint";
+import { usableImageUrl } from "@/lib/utils/image-url";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -93,7 +94,7 @@ export default async function ConstructionCatalogPage({
     if (specialties.length >= 3) break;
   }
 
-  const bannerSrc = seller.store_banner_url;
+  const bannerSrc = usableImageUrl(seller.store_banner_url);
   const sections = buildSections(active);
 
   return (

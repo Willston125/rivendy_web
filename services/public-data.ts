@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { isAdLive } from "@/features/ads/ad-window";
+import { usableImageUrl } from "@/lib/utils/image-url";
 import {
   DEFAULT_COUNTRY_ID,
   type Advertisement,
@@ -542,7 +543,7 @@ export async function getStoreBannersFor(
   if (error || !data) return {};
   const out: Record<string, string> = {};
   for (const row of data) {
-    const url = String(row.store_banner_url ?? "").trim();
+    const url = usableImageUrl(row.store_banner_url as string | null | undefined);
     if (url) out[String(row.id)] = url;
   }
   return out;

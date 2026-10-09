@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
+import { useDialogs } from "@/features/ui/dialogs";
 
 // ── Types ──────────────────────────────────────────────────
 interface SettingsItem {
@@ -77,9 +78,10 @@ function SettingsRow({ item, isLast }: { item: SettingsItem; isLast: boolean }) 
 export function SettingsView() {
   const { profile, signOut } = useAuth();
   const router = useRouter();
+  const dialogs = useDialogs();
 
   async function handleSignOut() {
-    if (!confirm("Voulez-vous vraiment vous déconnecter ?")) return;
+    if (!(await dialogs.confirm({ title: "Se déconnecter ?", confirmLabel: "Se déconnecter" }))) return;
     await signOut();
     router.push("/");
   }

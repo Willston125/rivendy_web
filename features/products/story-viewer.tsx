@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { ContentFilter } from "@/lib/utils/content-filter";
 import type { Product } from "@/types/rivendy";
+import { useDialogs } from "@/features/ui/dialogs";
 
 /** Sous-domaine de lecture Cloudflare Stream (public) — même que l'app. */
 const STREAM_SUBDOMAIN = "customer-22iqkw4cwdg7uf5h.cloudflarestream.com";
@@ -446,6 +447,7 @@ function CommentsPanel({
 }) {
   const { user, profile } = useAuth();
   const router = useRouter();
+  const { notify } = useDialogs();
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -480,7 +482,7 @@ function CommentsPanel({
     // Même filtre que les commentaires de la fiche produit et que l'app
     // (story_comments_sheet) : les commentaires de story passaient sans.
     if (!ContentFilter.isClean(trimmed)) {
-      alert(ContentFilter.errorMessage);
+      notify(ContentFilter.errorMessage, "error");
       return;
     }
     setSending(true);

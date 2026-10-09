@@ -8,6 +8,7 @@ import { useCart } from "@/features/cart/cart-provider";
 import { CartNotice } from "@/features/cart/cart-notice";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { useDialogs } from "@/features/ui/dialogs";
 
 export function CartView() {
   const {
@@ -24,6 +25,7 @@ export function CartView() {
   } = useCart();
   const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const country = useCountryOrDefault();
+  const dialogs = useDialogs();
 
   // Ouvrir le panier relit ses articles en base : un article supprimé, vendu
   // ou épuisé depuis son ajout en sort, avec un avis (2026-10-04).
@@ -71,9 +73,15 @@ export function CartView() {
           </div>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               // Confirmation, comme l'app (cart_bottom_sheet) : un clic perdait tout.
-              if (confirm("Vider le panier ? Tous les articles seront retirés.")) clearCart();
+              const ok = await dialogs.confirm({
+                title: "Vider le panier ?",
+                message: "Tous les articles seront retirés.",
+                confirmLabel: "Vider le panier",
+                danger: true,
+              });
+              if (ok) clearCart();
             }}
             className="text-sm font-bold text-slate-400 transition hover:text-red-500"
           >

@@ -25,6 +25,7 @@ import { firstPhoto, formatMoney, formatMoneySums } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import { deleteVideo } from "@/lib/video/video-service";
 import type { Product, AppOrder } from "@/types/rivendy";
+import { useDialogs } from "@/features/ui/dialogs";
 
 type Tab = "garde-robe" | "commandes" | "ventes" | "stats";
 
@@ -96,6 +97,7 @@ export function SellerSalesView() {
   const { user, profile } = useAuth();
   const country = useCountryOrDefault();
   const { countries } = useCountry();
+  const dialogs = useDialogs();
   // Devise du marché de l'ARTICLE ou de la COMMANDE, pas du marché affiché :
   // un vendeur présent sur plusieurs marchés voyait tout dans une seule devise.
   const marketOf = (countryId?: string | null) =>
@@ -188,18 +190,25 @@ export function SellerSalesView() {
     } else {
       // Trois échecs distincts : erreur réseau/serveur ; aucune ligne revenue
       // (RLS, hors marché actif) ; ligne revenue mais statut inchangé.
-      alert(
+      dialogs.notify(
         error
           ? "Impossible de marquer l'article comme vendu. Vérifiez votre connexion, puis réessayez."
           : !row
             ? "Impossible de marquer l'article comme vendu : vérifiez que vous êtes sur le marché où il est publié, puis réessayez."
             : "Le statut de l'article n'a pas changé. Réessayez dans un moment.",
+        "error",
       );
     }
   }
 
   async function deleteProduct(id: string) {
-    if (!confirm("Voulez-vous vraiment supprimer cet article ? Cette action est irréversible.")) return;
+    const ok = await dialogs.confirm({
+      title: "Supprimer cet article ?",
+      message: "Cette action est irréversible.",
+      confirmLabel: "Supprimer",
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(id);
     // 2026-10-03 : un vrai DELETE est réservé aux admins (policy
     // products_delete_admin_only) — pour un vendeur il ne supprimait RIEN, sans
@@ -231,7 +240,7 @@ export function SellerSalesView() {
         });
       }
     } else {
-      alert("Suppression impossible : vérifiez que vous êtes sur le marché où l'article est publié, puis réessayez.");
+      dialogs.notify("Suppression impossible : vérifiez que vous êtes sur le marché où l'article est publié, puis réessayez.", "error");
     }
   }
 
@@ -242,10 +251,11 @@ export function SellerSalesView() {
     // accepte tout statut : l'écran annonçait donc une story que personne ne
     // verrait. Retirer une story reste toujours possible.
     if (willBeStory && product.status !== "active" && product.status !== "boosted") {
-      alert(
+      dialogs.notify(
         product.status === "pending"
           ? "La story sera possible dès que Rivendy aura validé l'annonce."
           : "Story impossible : seul un article en vente peut passer en story.",
+        "info",
       );
       return;
     }
@@ -265,7 +275,7 @@ export function SellerSalesView() {
     setTogglingStory(null);
     const res = (data ?? {}) as { ok?: boolean; hours?: number; error?: string };
     if (error || res.ok !== true) {
-      alert(STORY_ERRORS[res.error ?? ""] || "Impossible de modifier la story, réessayez.");
+      dialogs.notify(STORY_ERRORS[res.error ?? ""] || "Impossible de modifier la story, réessayez.", "error");
       return;
     }
 

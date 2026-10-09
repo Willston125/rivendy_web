@@ -28,6 +28,7 @@ import { StoreBrowseProvider } from "@/features/store/store-browse-context";
 import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers";
 import { inMarket } from "@/lib/utils/market-phrase";
 import { MarketHint } from "@/features/country/market-hint";
+import { usableImageUrl } from "@/lib/utils/image-url";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
 
@@ -47,7 +48,10 @@ export async function generateMetadata({
 
   const name = seller.store_name || seller.full_name || "Boutique Rivendy";
   const country = await getCountry(seller.country_id || "DJ");
-  const bannerUrl = seller.cover_video_thumbnail_url || seller.store_banner_url || seller.avatar_url;
+  const bannerUrl =
+    usableImageUrl(seller.cover_video_thumbnail_url) ||
+    usableImageUrl(seller.store_banner_url) ||
+    usableImageUrl(seller.avatar_url);
 
   return {
     title: `${name} — Rivendy`,

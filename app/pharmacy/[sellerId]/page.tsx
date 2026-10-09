@@ -20,6 +20,7 @@ import {
 import { isRestaurantOpen } from "@/features/products/restaurant-grouping";
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { MarketHint } from "@/features/country/market-hint";
+import { usableImageUrl } from "@/lib/utils/image-url";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -119,7 +120,7 @@ export default async function PharmacyCatalogPage({
   const isOpen = hours.length > 0 && isRestaurantOpen(hours, marketNow(country.id));
   const rating = Number(trust.score ?? 0);
 
-  const bannerSrc = seller.store_banner_url;
+  const bannerSrc = usableImageUrl(seller.store_banner_url);
   const sections = buildSections(active);
 
   return (

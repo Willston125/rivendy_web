@@ -8,6 +8,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { ContentFilter } from "@/lib/utils/content-filter";
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
+import { useDialogs } from "@/features/ui/dialogs";
 
 export type ProductComment = {
   id: string;
@@ -33,6 +34,7 @@ export function ProductComments({
 }: ProductCommentsProps) {
   const router = useRouter();
   const { user, profile } = useAuth();
+  const dialogs = useDialogs();
   const [comments, setComments] = useState<ProductComment[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -209,7 +211,12 @@ export function ProductComments({
       router.push("/auth/login");
       return;
     }
-    if (!confirm("Voulez-vous vraiment signaler ce commentaire pour contenu inapproprié ?")) {
+    const ok = await dialogs.confirm({
+      title: "Signaler ce commentaire ?",
+      message: "Rivendy l'examinera pour contenu inapproprié.",
+      confirmLabel: "Signaler",
+    });
+    if (!ok) {
       return;
     }
 
@@ -226,7 +233,7 @@ export function ProductComments({
 
   /* ── Supprimer un commentaire ────────────────────────────────── */
   const handleDelete = async (comment: ProductComment) => {
-    if (!confirm("Voulez-vous supprimer votre commentaire ?")) {
+    if (!(await dialogs.confirm({ title: "Supprimer votre commentaire ?", confirmLabel: "Supprimer", danger: true }))) {
       return;
     }
 
