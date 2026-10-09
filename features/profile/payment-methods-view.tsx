@@ -138,7 +138,9 @@ export function PaymentMethodsView() {
             Aucun moyen de paiement
           </p>
           <p className="mt-2 text-sm text-slate-500">
-            Ajoutez D-Money, CAC Pay, Waafi ou Cash
+            Ajoutez {PAYMENT_TYPES.length > 1
+              ? `${PAYMENT_TYPES.slice(0, -1).join(", ")} ou ${PAYMENT_TYPES[PAYMENT_TYPES.length - 1]}`
+              : PAYMENT_TYPES[0]}
           </p>
         </div>
       ) : (

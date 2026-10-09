@@ -25,6 +25,7 @@ import { orderReference, sellerOrderChip, sellerOrderGroup } from "@/lib/utils/o
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { cn } from "@/lib/utils/cn";
+import { rejectReasonLabel } from "@/lib/utils/reject-reason";
 import type { AppOrder, Country, Product } from "@/types/rivendy";
 
 /* ── Skeleton ────────────────────────────────────────────────────── */
@@ -296,7 +297,7 @@ export function SellerDashboard() {
                     {/* Motif de refus — comme « Mes ventes » de l'app */}
                     {product.status === "rejected" && (
                       <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
-                        Motif : {product.reject_reason?.trim() || "non précisé"} — modifiez l&apos;annonce pour la renvoyer en validation.
+                        Motif : {rejectReasonLabel(product.reject_reason)} — modifiez l&apos;annonce pour la renvoyer en validation.
                       </p>
                     )}
                   </div>
