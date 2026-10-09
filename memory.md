@@ -133,4 +133,20 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 - **Validation** : `npm run check` réussi (0 erreur, 33 avertissements
   préexistants), boutique réelle contrôlée localement avec réponse HTTP 200.
 
-*Dernière mise à jour : 9 septembre 2026 (parité boutique App/Web)*
+## Audit en ligne du 2026-10-09 (branche `fix/site-audit-2026-10-09`)
+
+- **Nom d'un pays dans une phrase** : toujours `inMarket(country)`
+  (`lib/utils/market-phrase.ts`) — « aux Comores », « en France », « au
+  Sénégal ». `à ${country.name}` donnait « à Comores » partout.
+- **Titres** : plus de modèle `%s | Rivendy` dans le layout ; chaque page
+  écrit « … — Rivendy » elle-même (le modèle doublait la marque).
+- **Ton** : vouvoiement, comme l'app (432 « vous » contre 20 « tu »). Pas de
+  « feed » : « accueil » ou « catalogue ». Aucun chiffre non sourcé
+  (« #1 », « 3× plus vite », « des milliers d'acheteurs »).
+- **Marché du lien** : un `?country=` valide est adopté au premier passage
+  (plus de fenêtre « Choisissez votre marché » par-dessus) ; sans compte, il
+  remplace aussi le marché mémorisé sur l'accueil. Connecté, le profil reste
+  maître (il décide aussi du marché de publication).
+- **Catégorie inconnue** dans l'URL de l'accueil : 404, comme un marché inconnu.
+
+*Dernière mise à jour : 9 octobre 2026 (audit en ligne)*
