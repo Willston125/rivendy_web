@@ -25,3 +25,27 @@ const IN_MARKET: Record<string, string> = {
 export function inMarket(country: { id: string; name: string }): string {
   return IN_MARKET[country.id] ?? `à ${country.name}`;
 }
+
+/** « les Comores », « la Côte d'Ivoire », « Djibouti » : le pays avec son article. */
+const THE_MARKET: Record<string, string> = {
+  KM: "les Comores",
+  DJ: "Djibouti",
+  FR: "la France",
+  RE: "La Réunion",
+  YT: "Mayotte",
+  MG: "Madagascar",
+  SN: "le Sénégal",
+  CI: "la Côte d'Ivoire",
+  ML: "le Mali",
+  BF: "le Burkina Faso",
+  CM: "le Cameroun",
+  KE: "le Kenya",
+  ET: "l'Éthiopie",
+  TZ: "la Tanzanie",
+  MR: "la Mauritanie",
+  SO: "la Somalie",
+};
+
+export function theMarket(country: { id: string; name: string }): string {
+  return THE_MARKET[country.id] ?? country.name;
+}

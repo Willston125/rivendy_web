@@ -20,6 +20,7 @@ import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { findPhaseBListing, isPhaseBCategory } from "@/lib/listings";
 import { locationPriceUnit, locationPriceValue } from "@/features/products/location-listings";
 import { inMarket } from "@/lib/utils/market-phrase";
+import { MarketHint } from "@/features/country/market-hint";
 
 /**
  * Marché de l'ARTICLE : il fixe la devise du prix affiché. Le pays du profil
@@ -124,6 +125,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+      <MarketHint countryId={country.id} />
 
       {/* Données structurées produit — title/description saisis par le
           vendeur : échapper « < » pour qu'aucun </script> ne s'y glisse. */}

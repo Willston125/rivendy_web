@@ -14,6 +14,7 @@ import {
 } from "@/services/public-data";
 import { CONSTRUCTION_MATERIALS, constructionMaterialLabel } from "@/features/products/construction-listings";
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
+import { MarketHint } from "@/features/country/market-hint";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -97,6 +98,7 @@ export default async function ConstructionCatalogPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+      <MarketHint countryId={country.id} />
       <Breadcrumbs
         items={[
           { label: "Accueil", href: "/" },

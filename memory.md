@@ -148,5 +148,11 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   remplace aussi le marché mémorisé sur l'accueil. Connecté, le profil reste
   maître (il décide aussi du marché de publication).
 - **Catégorie inconnue** dans l'URL de l'accueil : 404, comme un marché inconnu.
+- **Lien d'article ou de boutique** (même jour, `feat/marche-article-bandeau`) :
+  un premier visiteur sans marché adopte celui de l'article (`MarketHint` →
+  `suggestMarket`) au lieu de la fenêtre de choix. Un marché déjà connu
+  (profil, choix, lien) n'est jamais remplacé.
+- **Connecté sur l'accueil d'un autre marché** : bandeau « Vous consultez la
+  Côte d'Ivoire — revenir aux Comores » (`MarketMismatchBanner`, `theMarket()`).
 
 *Dernière mise à jour : 9 octobre 2026 (audit en ligne)*

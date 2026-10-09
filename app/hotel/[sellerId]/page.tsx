@@ -15,6 +15,7 @@ import { hotelRoomPrice } from "@/features/products/hotel-listings";
 import { HotelRoomCard } from "@/features/products/hotel-room-card";
 import { HotelReservationForm } from "@/features/products/hotel-reservation-form";
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
+import { MarketHint } from "@/features/country/market-hint";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -92,6 +93,7 @@ export default async function HotelDetailPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+      <MarketHint countryId={country.id} />
       <Breadcrumbs
         items={[
           { label: "Accueil", href: "/" },

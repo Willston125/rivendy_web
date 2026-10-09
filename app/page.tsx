@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils/cn";
 import { isBoosted } from "@/lib/utils/format";
 import { marketNow } from "@/lib/utils/market-time";
 import { inMarket } from "@/lib/utils/market-phrase";
+import { MarketMismatchBanner } from "@/features/country/market-mismatch-banner";
 import { notFound } from "next/navigation";
 
 const categoryOf = (id?: string) => CATEGORIES.find((c) => c.id === id);
@@ -276,6 +277,9 @@ export default async function HomePage({
 
         {/* ══ COLONNE PRINCIPALE ════════════════════════════════ */}
         <div className="min-w-0 space-y-4 md:space-y-5">
+
+          {/* ── Connecté, ouvert sur un autre marché que le sien ─── */}
+          {params.country && <MarketMismatchBanner viewedCountryId={params.country} />}
 
           {/* ── Contexte recherche active ───────────────────────── */}
           {(q || category) && (

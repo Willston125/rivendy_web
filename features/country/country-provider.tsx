@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -25,6 +26,11 @@ type CountryContextValue = {
   setCountryId: (countryId: string) => Promise<void>;
   /** Relance le chargement des pays (utilisé par le modal si la liste est vide). */
   reloadCountries: () => Promise<void>;
+  /**
+   * Marché de la page ouverte (article, boutique) : adopté SEULEMENT si le
+   * visiteur n'a encore aucun marché. Ne remplace jamais un choix existant.
+   */
+  suggestMarket: (countryId: string) => void;
 };
 
 const CountryContext = createContext<CountryContextValue | null>(null);
@@ -93,10 +99,16 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   const [countries, setCountries] = useState<Country[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  // Marché suggéré par la page ouverte (lien partagé vers un article ou une boutique).
+  // La ref est lue par l'init ; l'état couvre une suggestion arrivée après elle.
+  const hintRef = useRef<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
 
   // Bloque le modal uniquement si l'init EST terminée ET les pays sont bien chargés.
   // Si countries = [] (Supabase injoignable), on ne bloque pas — le modal propose de réessayer.
-  const needsMarketSelection = !loading && country === null && countries.length > 0;
+  // Une suggestion valide en attente l'emporte : le marché de l'article va être adopté.
+  const hintPending = !!hint && countries.some((c) => c.id === hint);
+  const needsMarketSelection = !loading && country === null && countries.length > 0 && !hintPending;
 
   const loadPaymentMethods = useCallback(async (countryId: string) => {
     const methods = await fetchPaymentMethods(countryId);
@@ -155,6 +167,13 @@ export function CountryProvider({ children }: { children: ReactNode }) {
         if (fromUrl) resolved = list.find((c) => c.id === fromUrl) ?? null;
       }
 
+      // Étape 1 ter — Premier passage par un lien d'article ou de boutique : le
+      // marché de cet article, au lieu de la fenêtre « Choisissez votre marché »
+      // ouverte par-dessus l'article partagé. Modifiable ensuite dans l'en-tête.
+      if (!resolved && hintRef.current) {
+        resolved = list.find((c) => c.id === hintRef.current) ?? null;
+      }
+
       // Étape 2 — Aucun marché résolu → needsMarketSelection (RÈGLE : pas de fallback DJ silencieux)
       setCountry(resolved);
 
@@ -184,9 +203,25 @@ export function CountryProvider({ children }: { children: ReactNode }) {
     [countries, loadPaymentMethods],
   );
 
+  const suggestMarket = useCallback((countryId: string) => {
+    const id = countryId.toUpperCase();
+    hintRef.current = id;
+    setHint(id);
+  }, []);
+
+  // Suggestion arrivée après l'init, alors qu'aucun marché n'est résolu.
+  useEffect(() => {
+    if (loading || country || !hint) return;
+    const next = countries.find((c) => c.id === hint);
+    if (!next) return;
+    localStorage.setItem(LS_KEY, next.id);
+    setCountry(next);
+    void loadPaymentMethods(next.id);
+  }, [hint, loading, country, countries, loadPaymentMethods]);
+
   const value = useMemo<CountryContextValue>(
-    () => ({ country, needsMarketSelection, countries, paymentMethods, loading, setCountryId, reloadCountries }),
-    [country, needsMarketSelection, countries, loading, paymentMethods, setCountryId, reloadCountries],
+    () => ({ country, needsMarketSelection, countries, paymentMethods, loading, setCountryId, reloadCountries, suggestMarket }),
+    [country, needsMarketSelection, countries, loading, paymentMethods, setCountryId, reloadCountries, suggestMarket],
   );
 
   return <CountryContext.Provider value={value}>{children}</CountryContext.Provider>;

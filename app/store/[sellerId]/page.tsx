@@ -27,6 +27,7 @@ import { StoreProtectionCard } from "@/features/store/store-protection-card";
 import { StoreBrowseProvider } from "@/features/store/store-browse-context";
 import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers";
 import { inMarket } from "@/lib/utils/market-phrase";
+import { MarketHint } from "@/features/country/market-hint";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
 
@@ -110,6 +111,7 @@ export default async function StorePage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-5 md:px-6 md:py-8">
+      <MarketHint countryId={country.id} />
       {/* Fil d'Ariane */}
       <Breadcrumbs items={[{ label: "Accueil", href: "/" }, { label: "Boutique" }, { label: sellerName }]} />
 
