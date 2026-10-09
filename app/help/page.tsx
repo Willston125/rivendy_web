@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   description: "Retrouvez les réponses à vos questions sur les commandes, livraisons et retours sur Rivendy.",
 };
 
-export default function HelpPage() {
-  return <HelpView />;
+// `?sujet=payment|selling|…` : sujet pré-choisi quand on arrive du
+// portefeuille, du boost ou de l'abonnement.
+export default async function HelpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sujet?: string }>;
+}) {
+  const { sujet } = await searchParams;
+  return <HelpView initialTopic={sujet} />;
 }
