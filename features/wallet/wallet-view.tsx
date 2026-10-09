@@ -293,7 +293,7 @@ export function WalletView() {
           </button>
           {/* Plus de WhatsApp (2026-10-09) : l'aide passe par la page Aide. */}
           <Link
-            href="/help"
+            href="/help?sujet=payment"
             className="flex items-center justify-center gap-2 rounded-2xl bg-white/20 py-3 text-sm font-black text-white transition hover:bg-white/30"
           >
             <MessageCircle className="h-4 w-4" />

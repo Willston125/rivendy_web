@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Mail } from "lucide-react";
+import { SupportRequestForm } from "@/features/help/support-request-form";
 
 const FAQS = [
   {
@@ -26,7 +27,7 @@ const FAQS = [
   },
   {
     q: "Que faire si je n'ai pas reçu mon article ?",
-    a: "Depuis « Mes commandes », utilisez « Signaler un problème » sur la commande concernée, ou écrivez-nous par email avec sa référence (CMD-…). Notre équipe fait le suivi de toutes les commandes et vous assistera dans la résolution du problème.",
+    a: "Depuis « Mes commandes », utilisez « Signaler un problème » sur la commande concernée, ou écrivez-nous ci-dessus avec sa référence (CMD-…). Notre équipe fait le suivi de toutes les commandes et vous assistera dans la résolution du problème.",
   },
   {
     q: "Comment fonctionne le portefeuille Rivendy ?",
@@ -42,7 +43,7 @@ const FAQS = [
   },
 ] as const;
 
-export function HelpView() {
+export function HelpView({ initialTopic }: { initialTopic?: string }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const emailUrl = `mailto:support@rivendy.com?subject=Aide%20Rivendy&body=Bonjour%2C%20j'ai%20besoin%20d'aide%20avec%20Rivendy.`;
 
@@ -54,22 +55,15 @@ export function HelpView() {
         <h1 className="mt-1 text-3xl font-black text-[#1A1A1A]">Aide & Support</h1>
       </div>
 
-      {/* Carte contact rapide */}
+      {/* Écrire à Rivendy. Plus de WhatsApp depuis le 2026-10-09 : la demande
+          arrive dans le dashboard, la réponse dans les notifications. */}
       <div className="mb-8 rounded-3xl bg-gradient-to-br from-[#009688] to-[#00C4B4] p-6 text-white shadow-xl shadow-[#007168]/20">
         <h2 className="text-xl font-black">Besoin d&apos;aide ?</h2>
         <p className="mt-1 text-sm text-white/80">
-          Notre équipe est disponible 7j/7 de 8h à 22h
+          Écrivez-nous : votre demande arrive directement chez l&apos;équipe Rivendy, 7j/7 de 8h à 22h.
         </p>
-        {/* Plus de WhatsApp depuis le 2026-10-09 : les demandes arrivent chez
-            Rivendy, jamais sur une messagerie. */}
-        <div className="mt-5">
-          <a
-            href={emailUrl}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white py-3 text-sm font-black text-[#009688] transition hover:bg-white/90"
-          >
-            <Mail className="h-4 w-4" />
-            Email
-          </a>
+        <div className="mt-5 text-[#1A1A1A]">
+          <SupportRequestForm initialTopic={initialTopic} />
         </div>
       </div>
 
@@ -119,20 +113,16 @@ export function HelpView() {
 
       {/* Footer contact */}
       <div className="mt-8 text-center">
-        <p className="text-sm text-slate-500">
-          Vous n&apos;avez pas trouvé votre réponse ?<br />
-          Contactez-nous directement.
-        </p>
+        {/* Seule exception à « tout passe par le formulaire » : qui ne peut
+            plus se connecter ne peut pas l'utiliser. */}
+        <p className="text-sm text-slate-500">Impossible de vous connecter à votre compte ?</p>
         <a
           href={emailUrl}
-          className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#E0F2F1] px-6 py-3 text-sm font-black text-[#009688] transition hover:bg-[#009688] hover:text-white"
+          className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#E0F2F1] px-6 py-3 text-sm font-black text-[#009688] transition hover:bg-[#009688] hover:text-white"
         >
           <Mail className="h-4 w-4" />
-          Contacter le support
-        </a>
-        <p className="mt-3 text-xs text-slate-400">
           support@rivendy.com
-        </p>
+        </a>
       </div>
     </div>
   );

@@ -435,7 +435,7 @@ export function BoostView({ product }: { product: Product }) {
         Paiement vérifié manuellement sous 24h
         <br />
         {/* Plus de WhatsApp (2026-10-09) : la demande est suivie dans le dashboard. */}
-        Une question ? <Link href="/help" className="font-semibold text-[#009688] hover:underline">Aide & support</Link>
+        Une question ? <Link href="/help?sujet=selling" className="font-semibold text-[#009688] hover:underline">Aide & support</Link>
       </p>
 
       {/* Payment modal */}
