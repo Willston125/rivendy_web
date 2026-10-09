@@ -2,12 +2,12 @@ import { Badge } from "@/components/ui/badge";
 
 const statusLabels: Record<string, string> = {
   active: "Actif",
-  boosted: "Booste",
+  boosted: "Boosté",
   sold: "Vendu",
-  validated: "Valide",
+  validated: "Validé",
   pending: "En attente",
-  epuise: "Epuise",
-  rejected: "Refuse",
+  epuise: "Épuisé",
+  rejected: "Refusé",
 };
 
 export function ProductStatusBadge({ status }: { status: string }) {

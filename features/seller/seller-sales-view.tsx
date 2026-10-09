@@ -23,6 +23,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney, formatMoneySums } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { rejectReasonLabel } from "@/lib/utils/reject-reason";
 import { deleteVideo } from "@/lib/video/video-service";
 import type { Product, AppOrder } from "@/types/rivendy";
 import { useDialogs } from "@/features/ui/dialogs";
@@ -466,7 +467,7 @@ export function SellerSalesView() {
 
                     {product.status === "rejected" && (
                       <p className="mt-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
-                        Motif : {product.reject_reason?.trim() || "non précisé"} — modifiez l&apos;annonce pour la renvoyer en validation.
+                        Motif : {rejectReasonLabel(product.reject_reason)} — modifiez l&apos;annonce pour la renvoyer en validation.
                       </p>
                     )}
 

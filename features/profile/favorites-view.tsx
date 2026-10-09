@@ -44,7 +44,7 @@ function FavoritesEmpty() {
 
       <h2 className="mt-5 text-xl font-black text-slate-900">Aucun favori pour l&apos;instant</h2>
       <p className="mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
-        Appuie sur le cœur ❤️ d&apos;un produit pour le retrouver ici rapidement.
+        Appuyez sur le cœur ❤️ d&apos;un produit pour le retrouver ici rapidement.
       </p>
 
       <Link

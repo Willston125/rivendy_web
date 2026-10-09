@@ -159,7 +159,9 @@ export function WalletView() {
   // Seuil : 5 000 KMF aux Comores, 2 000 ailleurs (décision du 2026-08-11),
   // selon le pays DU PORTEFEUILLE.
   // ~10 € dans la devise du portefeuille (DV-1, 2026-10-08) — miroir app + serveur.
-  const MIN_WITHDRAW = minWithdrawalFor(walletCountryId);
+  // Sans portefeuille encore (aucune vente versée), le minimum se lit sur le
+  // marché actif : il s'affichait « Retrait à partir de 0 FDJ ».
+  const MIN_WITHDRAW = minWithdrawalFor(walletCountryId ?? country?.id);
   const canWithdraw = !!wallet && !!walletCountryId && availableToWithdraw >= MIN_WITHDRAW;
   const withdrawalMethods = walletCountryId
     ? getMobileMoneyForCountry(walletCountryId).filter((m) => m.id !== "cash")
