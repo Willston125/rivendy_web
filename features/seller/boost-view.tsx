@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Zap, CheckCircle2, Copy, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -433,8 +434,8 @@ export function BoostView({ product }: { product: Product }) {
       <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
         Paiement vérifié manuellement sous 24h
         <br />
-        {/* Jamais de numéro en dur — source unique : le pays actif. */}
-        Support : WhatsApp {country.whatsapp_number}
+        {/* Plus de WhatsApp (2026-10-09) : la demande est suivie dans le dashboard. */}
+        Une question ? <Link href="/help" className="font-semibold text-[#009688] hover:underline">Aide & support</Link>
       </p>
 
       {/* Payment modal */}

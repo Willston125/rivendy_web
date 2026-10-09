@@ -35,7 +35,7 @@ const TRUST = [
   { icon: ShieldCheck, label: "Paiement protégé par Rivendy" },
   { icon: Truck, label: "Livraison suivie de bout en bout" },
   { icon: BadgeCheck, label: "Vendeurs vérifiés et certifiés" },
-  { icon: MessageCircle, label: "Support via WhatsApp" },
+  { icon: MessageCircle, label: "Support Rivendy 7j/7" },
 ];
 
 function FooterColumn({ title, links }: { title: string; links: { href: string; label: string }[] }) {
