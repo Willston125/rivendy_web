@@ -46,6 +46,7 @@ import { formatMoney } from "@/lib/utils/format";
 import { orderCountry, orderReference } from "@/lib/utils/orders";
 import type { AppOrder, Country, OrderStatus } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
+import { useDialogs } from "@/features/ui/dialogs";
 
 /* ── Mapping statut → label + style ────────────────────────────── */
 type StatusConfig = { label: string; bg: string; text: string; icon: React.ReactNode };
@@ -290,6 +291,10 @@ function OrderCard({
   const isAwaitingReceipt = order.status === "delivered_by_rider";
   const [receiptBusy, setReceiptBusy] = useState(false);
   const [receiptError, setReceiptError] = useState("");
+  // Fenêtres dans la page (2026-10-09, autorisation du propriétaire) : confirm()
+  // et prompt() natifs peuvent ne pas s'afficher dans certains navigateurs
+  // intégrés — la réception, le signalement ou la demande échouaient sans un mot.
+  const dialogs = useDialogs();
 
   /**
    * Réception : rien n’est écrit sur `orders` (lecture seule, §1.12). Deux RPC
@@ -314,21 +319,27 @@ function OrderCard({
     }
   }
 
-  function confirmReceipt() {
+  async function confirmReceipt() {
     if (receiptBusy) return;
-    if (!window.confirm(
-      "Vous avez reçu votre commande ?\n\nConfirmez seulement si le colis est entre vos mains et conforme. Le vendeur sera alors payé.",
-    )) return;
+    const ok = await dialogs.confirm({
+      title: "Vous avez reçu votre commande ?",
+      message: "Confirmez seulement si le colis est entre vos mains et conforme. Le vendeur sera alors payé.",
+      confirmLabel: "Oui, je l’ai reçue",
+      focusCancel: true,
+    });
+    if (!ok) return;
     void receiptRpc("buyer_confirm_receipt", { p_order_id: order.id });
   }
 
-  function reportProblem() {
+  async function reportProblem() {
     if (receiptBusy) return;
-    const reason = window.prompt(
-      "Que s’est-il passé ? (colis non reçu, article abîmé, différent…)\nRivendy examine votre commande et vous recontacte. Le vendeur n’est pas payé tant que le problème n’est pas réglé.",
-      "",
-    );
-    if (reason === null) return;   // Annuler la boîte = ne rien signaler
+    const reason = await dialogs.ask({
+      title: "Que s’est-il passé ?",
+      message: "Colis non reçu, article abîmé, différent… Rivendy examine votre commande et vous recontacte. Le vendeur n’est pas payé tant que le problème n’est pas réglé.",
+      placeholder: "Décrivez le problème (facultatif)",
+      confirmLabel: "Signaler le problème",
+    });
+    if (reason === null) return;   // Annuler la fenêtre = ne rien signaler
     void receiptRpc("buyer_report_delivery_problem", {
       p_order_id: order.id,
       p_reason: reason.trim() || null,
@@ -343,11 +354,13 @@ function OrderCard({
    */
   async function requestCancellation() {
     if (asking || hasPendingRequest) return;
-    const reason = window.prompt(
-      "Pourquoi souhaitez-vous annuler cette commande ? (facultatif)",
-      "",
-    );
-    if (reason === null) return;   // Annuler la boîte = ne rien demander
+    const reason = await dialogs.ask({
+      title: "Pourquoi souhaitez-vous annuler cette commande ?",
+      message: "Facultatif. Rivendy examine votre demande.",
+      placeholder: "Votre motif (facultatif)",
+      confirmLabel: "Envoyer la demande",
+    });
+    if (reason === null) return;   // Annuler la fenêtre = ne rien demander
 
     setAsking(true);
     setAskError("");

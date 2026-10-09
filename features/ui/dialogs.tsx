@@ -31,6 +31,8 @@ export type ConfirmOptions = {
   cancelLabel?: string;
   /** Action destructrice : bouton rouge, et le focus part sur « Annuler ». */
   danger?: boolean;
+  /** Action lourde de conséquences sans être destructrice : focus sur « Annuler ». */
+  focusCancel?: boolean;
 };
 export type AskOptions = ConfirmOptions & { placeholder?: string; maxLength?: number };
 
@@ -173,7 +175,12 @@ function DialogBox({ pending, onClose }: { pending: Pending; onClose: () => void
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    (pending.kind === "ask" ? textRef.current : options.danger ? cancelRef.current : confirmRef.current)?.focus();
+    (pending.kind === "ask"
+      ? textRef.current
+      : options.danger || options.focusCancel
+        ? cancelRef.current
+        : confirmRef.current
+    )?.focus();
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
