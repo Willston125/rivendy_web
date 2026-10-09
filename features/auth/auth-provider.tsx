@@ -86,11 +86,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setLoading(false);
       });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    // ⚠️ JAMAIS d'appel Supabase ATTENDU dans ce callback. supabase-js l'exécute
+    // en tenant le verrou de session (navigator.locks) et attend sa fin pour le
+    // relâcher ; une requête lancée ici réclame la session, donc ce même verrou :
+    // les deux s'attendent pour toujours, et TOUTES les requêtes suivantes du
+    // site restent bloquées derrière. Constaté en production le 2026-10-10 :
+    // « Mes commandes » en chargement infini, verrou
+    // `lock:sb-…-auth-token` tenu sans fin. Le travail sort du verrou par
+    // setTimeout (recommandation Supabase).
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
-      await loadProfileFor(nextSession?.user?.id ?? null);
-      setLoading(false);
+      setTimeout(() => {
+        if (!mounted) return;
+        void loadProfileFor(nextSession?.user?.id ?? null).finally(() => {
+          if (mounted) setLoading(false);
+        });
+      }, 0);
     });
 
     return () => {
