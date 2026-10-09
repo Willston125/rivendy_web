@@ -25,6 +25,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import type { AppOrder, OrderStatus, Product } from "@/types/rivendy";
 import { ORDER_STATUS_LABELS, orderCountry, orderReference, orderStatusLabel } from "@/lib/utils/orders";
+import { fetchProfilesShowcase } from "@/lib/supabase/profiles-showcase";
 
 /* ── Couleurs des statuts commande — libellés : source unique
    lib/utils/orders.ts (mêmes mots que l app et que /orders). ───────── */
@@ -155,33 +156,20 @@ export function ProfileDashboard() {
       /* Boutiques suivies */
       const { data: followRows } = await supabase
         .from("store_follows")
-        .select(`
-          seller_id,
-          profiles:seller_id (
-            id,
-            store_name,
-            full_name,
-            avatar_url,
-            is_certified
-          )
-        `)
+        .select("seller_id")
         .eq("follower_id", user.id)
         .order("created_at", { ascending: false });
 
       if (followRows) {
-        const formatted = (followRows as unknown as Array<{
-          seller_id: string;
-          profiles: {
-            id: string;
-            store_name: string | null;
-            full_name: string | null;
-            avatar_url: string | null;
-            is_certified: boolean | null;
-          } | null;
-        }>).map((r) => {
-          const prof = r.profiles;
+        // Vitrine par RPC : la jointure sur profiles rendait null pour un
+        // compte connecté — trois boutiques suivies s'appelaient « Boutique
+        // Rivendy » (parcours du 2026-10-10).
+        const ids = (followRows as Array<{ seller_id: string }>).map((r) => r.seller_id);
+        const showcase = await fetchProfilesShowcase(supabase, ids);
+        const formatted = ids.map((sellerId) => {
+          const prof = showcase.get(sellerId);
           return {
-            id: r.seller_id,
+            id: sellerId,
             name: prof?.store_name || prof?.full_name || "Boutique Rivendy",
             avatarUrl: prof?.avatar_url || "",
             isCertified: !!prof?.is_certified,
