@@ -75,16 +75,16 @@ export function PublishMarketDialog({
       <div className="flex items-center gap-3">
         <Globe className="h-6 w-6 shrink-0 text-[#007168]" aria-hidden="true" />
         <h2 id="publish-market-title" className="text-lg font-bold text-slate-900">
-          Tu n&apos;es pas sur ton marché
+          Vous n&apos;êtes pas sur votre marché
         </h2>
       </div>
       <div id="publish-market-desc" className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
         <p>
-          Tu es sur le marché <strong>{active.name}</strong>. Ton compte a été créé pour{" "}
+          Vous êtes sur le marché <strong>{active.name}</strong>. Votre compte a été créé pour{" "}
           <strong>{homeName}</strong>.
         </p>
         <p>
-          Si tu continues, l&apos;article sera publié sur le marché {active.name}, au prix indiqué en{" "}
+          Si vous continuez, l&apos;article sera publié sur le marché {active.name}, au prix indiqué en{" "}
           {active.currency_symbol || active.currency_code}, pour les acheteurs de ce pays.
         </p>
       </div>

@@ -8,7 +8,7 @@ import { normalizePhoneForWhatsApp } from "@/lib/utils/format";
 const FAQS = [
   {
     q: "Comment publier un article à vendre ?",
-    a: "Cliquez sur le bouton \"Publier\" dans la navigation. Ajoutez jusqu'à 3 photos (et une courte vidéo si vous le souhaitez), remplissez le titre, la description, le prix, la catégorie et sa sous-catégorie, puis envoyez l'annonce. Elle est visible sur le feed dès qu'elle a été validée par l'équipe Rivendy.",
+    a: "Cliquez sur le bouton \"Publier\" dans la navigation. Ajoutez jusqu'à 3 photos (et une courte vidéo si vous le souhaitez), remplissez le titre, la description, le prix, la catégorie et sa sous-catégorie, puis envoyez l'annonce. Elle est visible dans le catalogue dès qu'elle a été validée par l'équipe Rivendy.",
   },
   {
     q: "Comment passer une commande sur Rivendy ?",

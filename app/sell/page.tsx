@@ -6,14 +6,14 @@ import { ProductForm } from "@/features/products/product-form";
 export const metadata: Metadata = {
   title: "Publier un produit — Rivendy",
   description:
-    "Mettez votre produit en vente sur Rivendy en quelques minutes. Touchez des milliers d'acheteurs sur votre marché.",
+    "Mettez votre produit en vente sur Rivendy en quelques minutes. Touchez les acheteurs de votre marché.",
 };
 
 const STEPS = [
   {
     icon: CheckCircle2,
-    label: "Tu remplis le formulaire",
-    desc: "Titre, photos, prix et détails de ton produit.",
+    label: "Vous remplissez le formulaire",
+    desc: "Titre, photos, prix et détails de votre produit.",
   },
   {
     icon: Clock,
@@ -23,12 +23,12 @@ const STEPS = [
   {
     icon: Eye,
     label: "Publication",
-    desc: "Ton produit est visible par tous les acheteurs.",
+    desc: "Votre produit est visible par tous les acheteurs.",
   },
   {
     icon: Zap,
     label: "Commandes & paiements",
-    desc: "Rivendy centralise les commandes — tu es protégé.",
+    desc: "Rivendy centralise les commandes : vous êtes protégé.",
   },
 ];
 
@@ -44,7 +44,7 @@ export default function SellPage() {
             Vends sur Rivendy
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
-            Ton annonce sera examinée par notre équipe avant d&apos;être publiée.
+            Votre annonce sera examinée par notre équipe avant d&apos;être publiée.
             Le processus prend en général moins de 24 h.
           </p>
         </div>
@@ -92,7 +92,7 @@ export default function SellPage() {
               <p className="text-[12px] font-black text-[#009688]">💡 Conseil photo</p>
               <p className="mt-1 text-[11px] leading-relaxed text-[#007168]">
                 Les annonces avec au moins 3 photos claires se vendent{" "}
-                <strong>3× plus vite</strong>. Prends des photos sous plusieurs angles,
+                <strong>plus vite</strong>. Prenez des photos sous plusieurs angles,
                 en bonne lumière.
               </p>
             </div>
@@ -101,8 +101,8 @@ export default function SellPage() {
             <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <p className="text-[12px] font-black text-slate-900">💰 Commission Rivendy</p>
               <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                Une commission est ajoutée automatiquement à ton prix vendeur.
-                Tu reçois exactement le montant que tu as saisi — sans surprise.
+                Une commission est ajoutée automatiquement à votre prix vendeur.
+                Vous recevez exactement le montant saisi, sans surprise.
               </p>
             </div>
           </aside>

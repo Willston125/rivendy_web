@@ -371,7 +371,7 @@ export function ProfileDashboard() {
 
             {favorites.length === 0 ? (
               <p className="px-4 py-5 text-xs font-semibold text-slate-400">
-                Tes produits favoris apparaîtront ici.
+                Vos produits favoris apparaîtront ici.
               </p>
             ) : (
               <div className="divide-y divide-slate-50">
@@ -414,7 +414,7 @@ export function ProfileDashboard() {
 
             {followedStores.length === 0 ? (
               <p className="px-4 py-5 text-xs font-semibold text-slate-400">
-                Tu ne suis aucune boutique pour le moment.
+                Vous ne suivez aucune boutique pour le moment.
               </p>
             ) : (
               <div className="divide-y divide-slate-50">

@@ -147,6 +147,14 @@ export function CountryProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Étape 1 bis — Lien explicite `?country=KM` (lien partagé, sélecteur) : c'est
+      // un choix, pas un repli. Sans elle, un visiteur arrivé par /?country=KM voyait
+      // l'accueil des Comores ET la fenêtre « Choisissez votre marché » par-dessus.
+      if (!resolved) {
+        const fromUrl = new URLSearchParams(window.location.search).get("country")?.toUpperCase();
+        if (fromUrl) resolved = list.find((c) => c.id === fromUrl) ?? null;
+      }
+
       // Étape 2 — Aucun marché résolu → needsMarketSelection (RÈGLE : pas de fallback DJ silencieux)
       setCountry(resolved);
 

@@ -1,10 +1,11 @@
 import { ShieldCheck, PackageCheck, Truck, BadgeCheck } from "lucide-react";
 
-export function StoreTrustBar({ countryName }: { countryName: string }) {
+/** `where` : « aux Comores », « à Djibouti »… (voir `inMarket`). */
+export function StoreTrustBar({ where }: { where: string }) {
   const pillars = [
     { icon: ShieldCheck, title: "Paiements protégés", sub: "100% sécurisés" },
     { icon: PackageCheck, title: "Commandes centralisées", sub: "Par Rivendy" },
-    { icon: Truck, title: "Livraison suivie", sub: `Partout à ${countryName}` },
+    { icon: Truck, title: "Livraison suivie", sub: `Partout ${where}` },
     { icon: BadgeCheck, title: "Vendeurs certifiés", sub: "Contrôlés par Rivendy" },
   ];
 

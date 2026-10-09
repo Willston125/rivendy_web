@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCountry } from "@/features/country/country-provider";
+import { useAuth } from "@/features/auth/auth-provider";
 
 /**
  * Synchronise le marché résolu (profil → localStorage) avec l'URL.
@@ -22,10 +23,22 @@ import { useCountry } from "@/features/country/country-provider";
  *    (évite la fenêtre de race condition qui affichait DJ).
  */
 export function MarketUrlSync() {
-  const { country } = useCountry();
+  const { country, countries, setCountryId } = useCountry();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+
+  // Lien explicite vers un AUTRE marché (/?country=CI alors que le visiteur avait
+  // choisi les Comores) : sans compte, le lien fait foi. Avant, les produits
+  // passaient en Côte d'Ivoire mais l'en-tête et les colonnes restaient aux Comores.
+  // Connecté, le marché du profil reste maître : il décide aussi où l'on publie.
+  useEffect(() => {
+    if (pathname !== "/" || authLoading || user || !country) return;
+    const fromUrl = params.get("country")?.toUpperCase();
+    if (!fromUrl || fromUrl === country.id || !countries.some((c) => c.id === fromUrl)) return;
+    void setCountryId(fromUrl);
+  }, [pathname, params, country, countries, user, authLoading, setCountryId]);
   // Évite de remplacer l'URL plusieurs fois si le composant re-rend
   const replaced = useRef(false);
 

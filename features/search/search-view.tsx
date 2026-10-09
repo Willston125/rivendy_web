@@ -20,10 +20,16 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   alimentation: "🍽️",
 };
 
-export function SearchView() {
+export function SearchView({
+  initialQuery = "",
+  initialCategory = null,
+}: {
+  initialQuery?: string;
+  initialCategory?: CategoryId | null;
+}) {
   const country = useCountryOrDefault();
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<CategoryId | null>(null);
+  const [query, setQuery] = useState(initialQuery);
+  const [category, setCategory] = useState<CategoryId | null>(initialCategory);
   const [subcategory, setSubcategory] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +80,8 @@ export function SearchView() {
       setSearched(false);
       return;
     }
+    // Marché pas encore résolu : attendre, sinon la recherche part sur tous les marchés.
+    if (!country) return;
 
     timerRef.current = setTimeout(() => void doSearch(query, category, subcategory), 400);
     return () => {

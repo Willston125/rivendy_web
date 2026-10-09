@@ -26,6 +26,7 @@ import { StoreAbout } from "@/features/store/store-about";
 import { StoreProtectionCard } from "@/features/store/store-protection-card";
 import { StoreBrowseProvider } from "@/features/store/store-browse-context";
 import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers";
+import { inMarket } from "@/lib/utils/market-phrase";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
 
@@ -51,7 +52,7 @@ export async function generateMetadata({
     title: `${name} — Rivendy`,
     description:
       seller.store_description ||
-      `Découvrez les produits de ${name} sur Rivendy, la marketplace #1 à ${country.name}.`,
+      `Découvrez les produits de ${name} sur Rivendy, la marketplace de confiance ${inMarket(country)}.`,
     openGraph: {
       title: name,
       description: seller.store_description ?? "",
@@ -140,11 +141,11 @@ export default async function StorePage({
             audioUrl={seller.voice_note_url}
             label="Écouter la présentation de la boutique"
           />
-          <StoreTrustBar countryName={country.name} />
+          <StoreTrustBar where={inMarket(country)} />
         </div>
       ) : (
         <div className="mt-4">
-          <StoreTrustBar countryName={country.name} />
+          <StoreTrustBar where={inMarket(country)} />
         </div>
       )}
 

@@ -98,17 +98,17 @@ function ForeignMarketOrderDialog({
       <div className="flex items-center gap-3">
         <Globe className="h-6 w-6 shrink-0 text-[#E65100]" aria-hidden="true" />
         <h2 id="foreign-order-title" className="text-lg font-bold text-slate-900">
-          Commande hors de ton pays
+          Commande hors de votre pays
         </h2>
       </div>
       <div id="foreign-order-desc" className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
         <p>
-          {refusal.plural ? "Des articles de ta commande viennent" : "Cet article vient"} du marché{" "}
-          <strong>{refusal.foreignName}</strong>. Ton compte a été créé pour <strong>{refusal.homeName}</strong> :
-          Rivendy ne prend pas encore de commandes hors de ton pays.
+          {refusal.plural ? "Des articles de votre commande viennent" : "Cet article vient"} du marché{" "}
+          <strong>{refusal.foreignName}</strong>. Votre compte a été créé pour <strong>{refusal.homeName}</strong> :
+          Rivendy ne prend pas encore de commandes hors de votre pays.
         </p>
         <p>
-          Pour acheter des produits d&apos;un autre pays, passe par « Sur commande » : Rivendy s&apos;en charge pour toi.
+          Pour acheter des produits d&apos;un autre pays, passez par « Sur commande » : Rivendy s&apos;en charge pour vous.
         </p>
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

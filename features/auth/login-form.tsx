@@ -47,7 +47,7 @@ export function LoginForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="phone">Numero WhatsApp</Label>
+        <Label htmlFor="phone">Numéro WhatsApp</Label>
         <Input id="phone" name="tel" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder={phoneHint(country?.id)} required />
       </div>
       <div className="space-y-2">
@@ -66,7 +66,7 @@ export function LoginForm() {
       <p className="text-center text-sm text-slate-500">
         Nouveau sur Rivendy ?{" "}
         <Link href="/auth/signup" className="font-bold text-[#009688]">
-          Creer un compte
+          Créer un compte
         </Link>
       </p>
     </form>

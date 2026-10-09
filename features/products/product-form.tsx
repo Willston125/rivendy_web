@@ -229,10 +229,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     if (!lockedCategory && isRivendyManagedCategory(category)) {
       return "Cette catégorie est réservée à Rivendy et ne peut pas être publiée depuis ce formulaire.";
     }
-    if (!country?.id) return "Sélectionne ton marché avant de publier.";
+    if (!country?.id) return "Sélectionnez votre marché avant de publier.";
     if (!title.trim()) return "Le titre est requis.";
     if (!Number.isFinite(numericSellerPrice) || numericSellerPrice <= 0) {
-      return "Saisis un prix vendeur strictement positif.";
+      return "Saisissez un prix vendeur strictement positif.";
     }
     if (subcategoryOptions.length > 0 && !subcategory) return "Sous-catégorie requise.";
     if (isPhaseB && !phaseBTypeKey) return "Précisez le type d'annonce.";
@@ -290,7 +290,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     await setCountryId(reminder.homeId);
     setError("");
     setSuccess("");
-    setNotice(`Marché ${reminder.homeName} sélectionné : vérifie ton prix dans sa monnaie, puis publie.`);
+    setNotice(`Marché ${reminder.homeName} sélectionné : vérifiez votre prix dans sa monnaie, puis publiez.`);
   }
 
   async function switchToArticleMarket() {
@@ -300,7 +300,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     await setCountryId(target.id);
     setError("");
     setSuccess("");
-    setNotice(`Marché ${target.name} sélectionné : vérifie ton prix dans sa monnaie, puis mets à jour le produit.`);
+    setNotice(`Marché ${target.name} sélectionné : vérifiez votre prix dans sa monnaie, puis mettez à jour le produit.`);
   }
 
   /** extra_attributes : champs Phase B + variantes mode (`_buildExtraAttributes`). */
@@ -327,7 +327,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     try {
       const uploaded = files.length ? await uploadProductPhotos(user.id, files) : [];
       const photos   = [...existingPhotos, ...uploaded].filter(Boolean).slice(0, MAX_PRODUCT_PHOTOS);
-      if (!photos.length) throw new Error("Ajoute au moins une photo du produit.");
+      if (!photos.length) throw new Error("Ajoutez au moins une photo du produit.");
 
       const rate = isFood ? 0 : await getCommissionRate(category, country.id);
       const { commission: commissionAmount, displayPrice } = breakdown(numericSellerPrice, rate, country.id);
@@ -419,7 +419,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             .select("id");
           if (updateError) throw updateError;
           if (!updated?.length) {
-            throw new Error("Modification non enregistrée : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
+            throw new Error("Modification non enregistrée : vérifiez que vous êtes sur le marché où l'article est publié, puis réessayez.");
           }
         }
         setExistingPhotos(photos);
@@ -434,7 +434,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             { success?: boolean; error?: string; commission_amount?: number; price?: number } | null;
           if (priceError || !result || !result.success) {
             const cause = priceError?.message || result?.error;
-            throw new Error(`Modifications enregistrées${resubmit ? " et annonce renvoyée en validation" : ""}, mais le prix n'a pas pu être mis à jour${cause ? ` (${cause})` : ""}. Réessaie.`);
+            throw new Error(`Modifications enregistrées${resubmit ? " et annonce renvoyée en validation" : ""}, mais le prix n'a pas pu être mis à jour${cause ? ` (${cause})` : ""}. Réessayez.`);
           }
           setSavedPricing({
             sellerPrice: numericSellerPrice,
@@ -497,7 +497,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           ? err.message
           : typeof err === "object" && err !== null && "message" in err
             ? String((err as { message: unknown }).message)
-            : "Publication impossible, réessaie.";
+            : "Publication impossible, réessayez.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -531,7 +531,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Décris ton produit : matière, origine, défauts éventuels..."
+            placeholder="Décrivez votre produit : matière, origine, défauts éventuels..."
             required
             rows={4}
           />
@@ -677,7 +677,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="price">{isPhaseB || isConstruction ? "Prix / Tarif" : "Ton prix vendeur"}</Label>
+            <Label htmlFor="price">{isPhaseB || isConstruction ? "Prix / Tarif" : "Votre prix vendeur"}</Label>
             <Input
               id="price"
               value={sellerPrice}
@@ -706,7 +706,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             <p className="text-[12px] font-black text-[#009688]">Aperçu du prix affiché</p>
             <div className="mt-2 space-y-1 text-[12px] text-[#007168]">
               <div className="flex justify-between">
-                <span>Ton prix</span>
+                <span>Votre prix</span>
                 <span className="font-bold">{formatMoney(numericSellerPrice, country)}</span>
               </div>
               <div className="flex justify-between">
@@ -720,8 +720,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             </div>
             <p className="mt-2 text-[10px] text-[#009688]/70">
               {estimatedCommission > 0
-                ? `Tu encaisses exactement ${formatMoney(numericSellerPrice, country)}. La commission s'ajoute par-dessus.`
-                : "Aucune commission sur cette catégorie — tu encaisses 100 % de ton prix."}
+                ? `Vous encaissez exactement ${formatMoney(numericSellerPrice, country)}. La commission s'ajoute par-dessus.`
+                : "Aucune commission sur cette catégorie : vous encaissez 100 % de votre prix."}
             </p>
           </div>
         )}

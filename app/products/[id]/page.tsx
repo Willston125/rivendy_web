@@ -19,6 +19,7 @@ import {
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { findPhaseBListing, isPhaseBCategory } from "@/lib/listings";
 import { locationPriceUnit, locationPriceValue } from "@/features/products/location-listings";
+import { inMarket } from "@/lib/utils/market-phrase";
 
 /**
  * Marché de l'ARTICLE : il fixe la devise du prix affiché. Le pays du profil
@@ -47,7 +48,7 @@ export async function generateMetadata(
     description:
       product.description
         ? product.description.slice(0, 155)
-        : `Achetez "${product.title}" sur Rivendy, la marketplace #1 à ${country.name}.`,
+        : `Achetez "${product.title}" sur Rivendy, la marketplace de confiance ${inMarket(country)}.`,
     openGraph: {
       title: product.title,
       description: product.description?.slice(0, 155) ?? "",

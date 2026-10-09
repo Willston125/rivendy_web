@@ -91,7 +91,7 @@ export function ForgotPasswordForm() {
             </div>
 
             <p className="text-center text-sm text-slate-500">
-              Tu te souviens ?{" "}
+              Vous vous en souvenez ?{" "}
               <Link href="/auth/login" className="font-black text-[#009688] hover:underline">
                 Se connecter
               </Link>

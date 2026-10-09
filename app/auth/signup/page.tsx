@@ -46,7 +46,7 @@ export default function SignupPage() {
               <div>
                 <p className="text-sm font-bold text-white">Vendeur</p>
                 <p className="text-xs text-white/70">
-                  Publie tes produits, reçois les commandes via Rivendy, encaisse tes gains.
+                  Publiez vos produits, recevez les commandes via Rivendy, encaissez vos gains.
                 </p>
               </div>
             </div>
@@ -58,7 +58,7 @@ export default function SignupPage() {
               <div>
                 <p className="text-sm font-bold text-white">Certifiable</p>
                 <p className="text-xs text-white/70">
-                  Après tes premières ventes, demande ta certification vendeur Rivendy.
+                  Après vos premières ventes, demandez votre certification vendeur Rivendy.
                 </p>
               </div>
             </div>
@@ -76,7 +76,7 @@ export default function SignupPage() {
           <p className="text-xs font-black uppercase tracking-wider text-[#007168]">Inscription</p>
           <h2 className="mt-1 text-3xl font-black text-[#1A1A1A]">Créer un compte</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Acheteur ou vendeur — ton profil Rivendy en 30 secondes.
+            Acheteur ou vendeur : votre profil Rivendy en 30 secondes.
           </p>
         </div>
         <div className="mt-6">

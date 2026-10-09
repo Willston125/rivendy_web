@@ -495,7 +495,7 @@ export function CheckoutForm() {
       }
 
       // Aucune commande créée : panier conservé, l'acheteur peut réessayer.
-      if (!orderIds.length) throw new Error(firstFailure ?? "Commande impossible. Réessaie.");
+      if (!orderIds.length) throw new Error(firstFailure ?? "Commande impossible. Réessayez.");
 
       // « Commander maintenant » : le panier n'est pas touché.
       if (buyNow) {
@@ -525,7 +525,7 @@ export function CheckoutForm() {
       // au dashboard Rivendy, l'équipe la prend en charge et contacte le client.
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Commande impossible. Réessaie.");
+      setError(err instanceof Error ? err.message : "Commande impossible. Réessayez.");
     } finally {
       submittingRef.current = false;
       setLoading(false);
@@ -537,9 +537,9 @@ export function CheckoutForm() {
   if (needsMarketSelection) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <p className="text-2xl font-black text-slate-950">Sélectionne ton marché</p>
+        <p className="text-2xl font-black text-slate-950">Sélectionnez votre marché</p>
         <p className="mt-3 text-sm text-slate-500">
-          Choisis ton pays en haut de la page pour accéder au checkout.
+          Choisissez votre pays en haut de la page pour finaliser la commande.
         </p>
       </div>
     );
@@ -553,12 +553,12 @@ export function CheckoutForm() {
           <CartNotice />
         </div>
         <h1 className="text-3xl font-black text-slate-950">Panier vide</h1>
-        <p className="mt-3 text-sm text-slate-500">Ajoute des produits depuis le feed pour commander.</p>
+        <p className="mt-3 text-sm text-slate-500">Ajoutez des produits depuis l&apos;accueil pour commander.</p>
         <Link
           href="/"
           className="mt-6 inline-flex h-12 items-center rounded-full bg-[#009688] px-6 text-sm font-black text-white hover:bg-[#00796B]"
         >
-          Voir le feed
+          Voir le catalogue
         </Link>
       </div>
     );

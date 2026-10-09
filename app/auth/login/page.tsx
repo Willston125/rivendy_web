@@ -44,7 +44,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Via WhatsApp</p>
-                <p className="text-xs text-slate-400">Confirmation instantanée sur ton numéro — simple et rapide.</p>
+                <p className="text-xs text-slate-400">Confirmation instantanée sur votre numéro, simple et rapide.</p>
               </div>
             </div>
 
@@ -71,7 +71,7 @@ export default function LoginPage() {
           <p className="text-xs font-black uppercase tracking-wider text-[#007168]">Connexion</p>
           <h2 className="mt-1 text-3xl font-black text-[#1A1A1A]">Bon retour 👋</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Accède à ton panier, tes commandes et ton espace vendeur.
+            Accédez à votre panier, vos commandes et votre espace vendeur.
           </p>
         </div>
         <div className="mt-6">

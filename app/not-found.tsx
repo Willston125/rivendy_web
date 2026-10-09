@@ -24,7 +24,7 @@ export default function NotFound() {
       </h1>
       <p className="mt-3 text-sm leading-6 text-slate-500">
         Cette page n&apos;existe pas ou a été déplacée.<br />
-        Retourne sur le feed pour découvrir les produits disponibles sur Rivendy.
+        Revenez à l&apos;accueil pour découvrir les produits disponibles sur Rivendy.
       </p>
 
       {/* Actions */}
@@ -34,7 +34,7 @@ export default function NotFound() {
           className="flex h-12 items-center gap-2 rounded-full bg-[#009688] px-6 text-sm font-black text-white transition hover:bg-[#00796B]"
         >
           <Home className="h-4 w-4" />
-          Retour au feed
+          Retour à l&apos;accueil
         </Link>
         <Link
           href="/?q="

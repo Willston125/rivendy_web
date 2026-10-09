@@ -45,6 +45,10 @@ import { BannerAdCarousel } from "@/features/ads/banner-ad-carousel";
 import { cn } from "@/lib/utils/cn";
 import { isBoosted } from "@/lib/utils/format";
 import { marketNow } from "@/lib/utils/market-time";
+import { inMarket } from "@/lib/utils/market-phrase";
+import { notFound } from "next/navigation";
+
+const categoryOf = (id?: string) => CATEGORIES.find((c) => c.id === id);
 
 export async function generateMetadata({
   searchParams,
@@ -54,23 +58,26 @@ export async function generateMetadata({
   const params = await searchParams;
   const countryId = params.country || DEFAULT_COUNTRY_ID;
   const country = await getCountry(countryId);
+  const where = inMarket(country);
+  if (params.category && !categoryOf(params.category)) notFound();
+  const categoryLabel = categoryOf(params.category)?.label;
   return {
-    title: `Rivendy — Achetez et vendez à ${country.name}`,
-    description: `Rivendy est la marketplace #1 à ${country.name}. Achetez, vendez et commandez des produits locaux en toute sécurité.`,
+    title: categoryLabel ? `${categoryLabel} ${where} — Rivendy` : `Rivendy — Achetez et vendez ${where}`,
+    description: `Rivendy est la marketplace de confiance ${where}. Achetez, vendez et commandez des produits locaux en toute sécurité.`,
     openGraph: {
       title: `Rivendy — Marketplace ${country.name}`,
       description:
-        "Découvrez des milliers de produits locaux sur Rivendy. Mode, électronique, beauté, alimentation et bien plus.",
+        "Découvrez les produits locaux de votre marché sur Rivendy : mode, électronique, beauté, alimentation et bien plus.",
       url: "https://www.rivendy.com",
       siteName: "Rivendy",
       images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
-      locale: "fr_DJ",
+      locale: "fr_FR",
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
       title: `Rivendy — Marketplace ${country.name}`,
-      description: `Achetez et vendez à ${country.name} avec Rivendy.`,
+      description: `Achetez et vendez ${where} avec Rivendy.`,
       images: ["/brand/hero-woman.png"],
     },
   };
@@ -118,6 +125,9 @@ export default async function HomePage({
 }) {
   const params = await searchParams;
   const countryId = params.country || DEFAULT_COUNTRY_ID;
+  // Catégorie inconnue → 404, comme un marché inconnu : sans ce garde, la page
+  // affichait l'identifiant brut (« construction · 0 article »).
+  if (params.category && !categoryOf(params.category)) notFound();
   const category = params.category as CategoryId | undefined;
   const subcategory = params.subcategory;
   const resType = params.resType;
@@ -292,7 +302,7 @@ export default async function HomePage({
           {!q && !category && (
             ads.length > 0
               ? <AdCarousel ads={ads} />
-              : <HeroBanner countryName={country.name} countryId={country.id} />
+              : <HeroBanner where={inMarket(country)} countryId={country.id} />
           )}
 
           {/* ── Stories (mobile/tablette — sidebar masquée < xl) ── */}

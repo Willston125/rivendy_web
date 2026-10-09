@@ -87,7 +87,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 // (ToggleStoryResult.fromRpc, product_service.dart).
 const STORY_ERRORS: Record<string, string> = {
   VIDEO_STORY_REQUIRES_SUB:
-    "Les stories vidéo sont réservées aux vendeurs Certifié et Pro. Abonne-toi pour les activer.",
+    "Les stories vidéo sont réservées aux vendeurs Certifié et Pro. Abonnez-vous pour les activer.",
   FORBIDDEN: "Cet article ne t'appartient pas.",
   NOT_FOUND: "Article introuvable : il a peut-être été supprimé.",
 };
@@ -190,10 +190,10 @@ export function SellerSalesView() {
       // (RLS, hors marché actif) ; ligne revenue mais statut inchangé.
       alert(
         error
-          ? "Impossible de marquer l'article comme vendu. Vérifie ta connexion, puis réessaie."
+          ? "Impossible de marquer l'article comme vendu. Vérifiez votre connexion, puis réessayez."
           : !row
-            ? "Impossible de marquer l'article comme vendu : vérifie que tu es sur le marché où il est publié, puis réessaie."
-            : "Le statut de l'article n'a pas changé. Réessaie dans un moment.",
+            ? "Impossible de marquer l'article comme vendu : vérifiez que vous êtes sur le marché où il est publié, puis réessayez."
+            : "Le statut de l'article n'a pas changé. Réessayez dans un moment.",
       );
     }
   }
@@ -231,7 +231,7 @@ export function SellerSalesView() {
         });
       }
     } else {
-      alert("Suppression impossible : vérifie que tu es sur le marché où l'article est publié, puis réessaie.");
+      alert("Suppression impossible : vérifiez que vous êtes sur le marché où l'article est publié, puis réessayez.");
     }
   }
 
@@ -265,7 +265,7 @@ export function SellerSalesView() {
     setTogglingStory(null);
     const res = (data ?? {}) as { ok?: boolean; hours?: number; error?: string };
     if (error || res.ok !== true) {
-      alert(STORY_ERRORS[res.error ?? ""] || "Impossible de modifier la story, réessaie.");
+      alert(STORY_ERRORS[res.error ?? ""] || "Impossible de modifier la story, réessayez.");
       return;
     }
 
@@ -357,7 +357,7 @@ export function SellerSalesView() {
       {profile?.is_certified ? (
         <div className="mb-5 flex items-center gap-2 rounded-2xl bg-[#E0F2F1] px-4 py-3 text-sm font-bold text-[#009688]">
           <CheckCircle className="h-4 w-4 shrink-0" />
-          Badge Certifié actif — tes produits inspirent confiance
+          Badge Certifié actif : vos produits inspirent confiance
         </div>
       ) : (
         <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">

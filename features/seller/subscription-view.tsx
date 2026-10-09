@@ -421,7 +421,7 @@ export function SubscriptionView() {
             </div>
 
             <p className="mb-4 font-bold text-[#1A1A1A]">
-              Pour activer ton badge Vendeur Certifié :
+              Pour activer votre badge Vendeur Certifié :
             </p>
 
             {/* Step 1 — choix de la méthode (parité subscription_screen.dart) */}
@@ -533,8 +533,8 @@ export function SubscriptionView() {
                 4
               </div>
               <p className="text-sm text-slate-600">
-                Tape &quot;J&apos;ai payé&quot; : ta demande est enregistrée et
-                vérifiée par l&apos;équipe Rivendy, puis ton badge est activé.
+                Touchez &quot;J&apos;ai payé&quot; : votre demande est enregistrée et
+                vérifiée par l&apos;équipe Rivendy, puis votre badge est activé.
               </p>
             </div>
 

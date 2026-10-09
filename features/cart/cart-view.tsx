@@ -43,13 +43,13 @@ export function CartView() {
         </div>
         <h1 className="mt-5 text-2xl font-black text-[#1A1A1A]">Panier vide</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Ajoute des produits depuis le feed pour commander via Rivendy.
+          Ajoutez des produits depuis l&apos;accueil pour commander via Rivendy.
         </p>
         <Link
           href="/"
           className="mt-6 inline-flex h-12 items-center rounded-full bg-[#009688] px-8 text-sm font-black text-white transition hover:bg-[#00796B]"
         >
-          Explorer le feed
+          Explorer le catalogue
         </Link>
       </div>
     );

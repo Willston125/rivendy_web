@@ -13,6 +13,7 @@ import {
 import { useCart } from "@/features/cart/cart-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { inMarket } from "@/lib/utils/market-phrase";
 
 /* Les compteurs vitrine (« 5 842 produits en ligne », « 24 350+ clients
    satisfaits ») ont été retirés le 2026-09-07 : ils étaient codés en dur et
@@ -174,7 +175,7 @@ export function RightSidebar() {
           <div className="flex-1">
             <h3 className="text-sm font-black text-slate-900">Vendre sur Rivendy</h3>
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-              Développez votre boutique et touchez des milliers d&apos;acheteurs à {country.name} et partout.
+              Développez votre boutique et touchez les acheteurs {inMarket(country)}.
             </p>
             <Link
               href="/seller/create"

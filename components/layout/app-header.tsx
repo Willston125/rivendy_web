@@ -159,7 +159,7 @@ export function AppHeader() {
               value={countryId}
               onChange={(e) => changeCountry(e.target.value)}
               aria-label="Marché"
-              className="h-10 w-[7rem] cursor-pointer appearance-none rounded-full border border-slate-200 bg-slate-50 pl-8 pr-7 text-xs font-bold text-slate-700 outline-none transition hover:border-[#009688] focus:border-[#009688] focus:bg-white 2xl:w-auto"
+              className="h-10 w-[8.5rem] cursor-pointer appearance-none rounded-full border border-slate-200 bg-slate-50 pl-8 pr-7 text-xs font-bold text-slate-700 outline-none transition hover:border-[#009688] focus:border-[#009688] focus:bg-white 2xl:w-auto"
             >
               {needsMarketSelection && (
                 <option value="" disabled>Choisir un marché…</option>
