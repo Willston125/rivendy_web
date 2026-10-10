@@ -44,7 +44,7 @@ import {
   needsHomeMarketReminder,
 } from "@/features/products/publish-market-dialog";
 import { cn } from "@/lib/utils/cn";
-import { PREORDER_DELAY_OPTIONS, isPreorderEligible, saleModeFields } from "@/lib/utils/preorder-mode";
+import { PREORDER_DELAY_OPTIONS, isPreorderEligible, saleModeEditFields, saleModeFields } from "@/lib/utils/preorder-mode";
 
 type EditableProduct = Partial<Product> & {
   id?: string;
@@ -119,8 +119,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const [stock, setStock]               = useState(String(product?.stock_quantity ?? 1));
   // 📦 Mode de vente (2026-10-10) : achat direct ou « Sur commande » —
   // règle et catégories éligibles dans lib/utils/preorder-mode.ts.
-  const [preorder, setPreorder]         = useState(false);
-  const [preorderDays, setPreorderDays] = useState<number | null>(null);
+  const [preorder, setPreorder]         = useState(product?.product_type === "preorder");
+  const [preorderDays, setPreorderDays] = useState<number | null>(product?.delivery_days ?? null);
   const [files, setFiles]               = useState<File[]>([]);
   const [existingPhotos, setExistingPhotos] = useState<string[]>(product?.photos ?? []);
   const [video, setVideo]               = useState<File | null>(null);
@@ -158,9 +158,11 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   // Taille : saisie pour tout sauf alimentation, Phase B et construction (app).
   const showSize           = !isFood && !isPhaseB && !isConstruction;
   const showCondition      = !isFood && !isPhaseB && !isConstruction;
-  // Le mode se choisit à la publication ; à l'édition, il est rappelé en
-  // lecture seule (changer de mode passe par Rivendy).
-  const canChooseSaleMode  = !isEdit && isPreorderEligible(category);
+  // Le mode se choisit à la publication et se change à la modification
+  // (mêmes règles en base : guard_product_insert / guard_product_privileges).
+  // Jamais pour un colis alimentaire.
+  const editableType       = !isEdit || ["standard", "preorder"].includes(String(product?.product_type ?? "standard"));
+  const canChooseSaleMode  = editableType && isPreorderEligible(category);
   const publishesPreorder  = canChooseSaleMode && preorder;
   const totalPhotos        = existingPhotos.length + files.length;
   const canAddMore         = totalPhotos < MAX_PRODUCT_PHOTOS;
@@ -380,9 +382,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
       };
 
       if (isEdit && product?.id) {
-        // N'envoyer QUE ce qui a changé. Jamais seller_id, country_id,
-        // product_type ni package_contents : l'ancienne version les
-        // renvoyait, et un article validé entre-temps repassait en attente.
+        // N'envoyer QUE ce qui a changé. Jamais seller_id, country_id ni
+        // package_contents : l'ancienne version les renvoyait, et un article
+        // validé entre-temps repassait en attente. product_type et
+        // delivery_days ne partent que si le vendeur change le mode de vente.
         const patch: Record<string, unknown> = {};
         const original: Record<string, unknown> = {
           title: product.title ?? "",
@@ -409,6 +412,16 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         for (const [k, v] of Object.entries(initialAttrs)) if (!managedKeys.has(k)) mergedAttrs[k] = v;
         Object.assign(mergedAttrs, extraAttributes);
         if (!same(mergedAttrs, initialAttrs)) patch.extra_attributes = mergedAttrs;
+
+        // Mode de vente (2026-10-10) — vide si rien ne change.
+        Object.assign(patch, saleModeEditFields({
+          currentType:     String(product.product_type ?? "standard"),
+          currentDays:     product.delivery_days ?? null,
+          initialCategory: String(product.category ?? ""),
+          category,
+          preorder,
+          deliveryDays:    preorderDays,
+        }));
 
         // Annonce refusée : la modifier la RENVOIE en modération (comme l'app).
         const resubmit = product.status === "rejected";
@@ -869,11 +882,6 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
               </div>
             )}
           </div>
-        )}
-        {isEdit && product?.product_type === "preorder" && (
-          <p className="rounded-xl bg-[#FFF4E5] px-3 py-2.5 text-xs leading-5 text-[#8A5A00]">
-            📦 Article vendu sur commande. Pour le repasser en achat direct, écrivez à Rivendy depuis la rubrique Aide.
-          </p>
         )}
       </div>
 

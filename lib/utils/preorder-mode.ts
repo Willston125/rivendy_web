@@ -66,6 +66,44 @@ export function saleModeFields({
   return { product_type: "standard" };
 }
 
+/**
+ * Colonnes « mode de vente » à envoyer à la MODIFICATION — vide si rien ne
+ * change. Miroir de saleModeEditFields (app) et de guard_product_privileges
+ * (dashboard, 20261010_preorder_seller_edit.sql) :
+ * - un article d'un autre type (colis alimentaire…) n'est jamais touché ;
+ * - catégorie non éligible : on ne touche à un article sur commande que si sa
+ *   catégorie vient de changer (la base refuserait) ; un ancien article
+ *   Rivendy sur commande, hors liste, reste tel quel ;
+ * - repasser en achat direct efface le délai.
+ */
+export function saleModeEditFields({
+  currentType,
+  currentDays,
+  initialCategory,
+  category,
+  preorder,
+  deliveryDays,
+}: {
+  currentType: string;
+  currentDays: number | null;
+  initialCategory: string;
+  category: string;
+  preorder: boolean;
+  deliveryDays: number | null;
+}): { product_type?: string; delivery_days?: number | null } {
+  if (currentType !== "standard" && currentType !== "preorder") return {};
+  const toDirect = { product_type: "standard", delivery_days: null };
+  if (!isPreorderEligible(category)) {
+    return currentType === "preorder" && category !== initialCategory ? toDirect : {};
+  }
+  if (preorder) {
+    return currentType === "preorder" && currentDays === deliveryDays
+      ? {}
+      : { product_type: "preorder", delivery_days: deliveryDays };
+  }
+  return currentType === "preorder" ? toDirect : {};
+}
+
 /** Phrase du délai, identique sur la fiche app et site. */
 export function preorderDelayText(deliveryDays: number | null | undefined): string {
   return deliveryDays != null && deliveryDays > 0
