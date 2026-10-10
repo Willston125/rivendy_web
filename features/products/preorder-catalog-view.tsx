@@ -82,7 +82,9 @@ export function PreorderCatalogView() {
           <h1 className="text-xl font-black text-[#1A1A1A]">
             Disponible par Commande
           </h1>
-          <p className="text-xs text-slate-400">Produits importés par Rivendy</p>
+          {/* 2026-10-10 : les vendeurs publient aussi sur commande — plus
+              seulement des imports Rivendy. */}
+          <p className="text-xs text-slate-400">Préparés ou commandés après votre achat</p>
         </div>
 
         {/* Search */}
@@ -111,8 +113,8 @@ export function PreorderCatalogView() {
         <div className="mb-4 flex items-start gap-2 rounded-2xl border border-[#009688]/20 bg-[#009688]/8 bg-[#E8F5E9] px-4 py-3">
           <Info className="h-4 w-4 shrink-0 text-[#009688]" />
           <p className="text-xs leading-relaxed text-[#009688]">
-            Ces produits sont commandés et importés par Rivendy après votre
-            paiement.
+            Ces articles sont préparés ou commandés après votre achat, puis
+            livrés dans le délai indiqué sur chacun.
           </p>
         </div>
 

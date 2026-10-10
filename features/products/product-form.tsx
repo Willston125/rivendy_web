@@ -44,6 +44,7 @@ import {
   needsHomeMarketReminder,
 } from "@/features/products/publish-market-dialog";
 import { cn } from "@/lib/utils/cn";
+import { PREORDER_DELAY_OPTIONS, isPreorderEligible, saleModeFields } from "@/lib/utils/preorder-mode";
 
 type EditableProduct = Partial<Product> & {
   id?: string;
@@ -116,6 +117,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const [variantColors, setVariantColors] = useState(initialAttrs.colors ?? "");
   const [condition, setCondition]       = useState(product?.condition ?? DEFAULT_CONDITION);
   const [stock, setStock]               = useState(String(product?.stock_quantity ?? 1));
+  // 📦 Mode de vente (2026-10-10) : achat direct ou « Sur commande » —
+  // règle et catégories éligibles dans lib/utils/preorder-mode.ts.
+  const [preorder, setPreorder]         = useState(false);
+  const [preorderDays, setPreorderDays] = useState<number | null>(null);
   const [files, setFiles]               = useState<File[]>([]);
   const [existingPhotos, setExistingPhotos] = useState<string[]>(product?.photos ?? []);
   const [video, setVideo]               = useState<File | null>(null);
@@ -153,6 +158,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   // Taille : saisie pour tout sauf alimentation, Phase B et construction (app).
   const showSize           = !isFood && !isPhaseB && !isConstruction;
   const showCondition      = !isFood && !isPhaseB && !isConstruction;
+  // Le mode se choisit à la publication ; à l'édition, il est rappelé en
+  // lecture seule (changer de mode passe par Rivendy).
+  const canChooseSaleMode  = !isEdit && isPreorderEligible(category);
+  const publishesPreorder  = canChooseSaleMode && preorder;
   const totalPhotos        = existingPhotos.length + files.length;
   const canAddMore         = totalPhotos < MAX_PRODUCT_PHOTOS;
   const pricingChanged     =
@@ -452,9 +461,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             : "Produit mis à jour avec succès ✓");
         }
       } else {
-        // La base force status 'pending', product_type 'standard', is_story
-        // false et recalcule la commission (guard_product_insert) : les
-        // montants client ne servent qu'à la compatibilité.
+        // La base force status 'pending', is_story false, show_in_catalog
+        // false, n'admet que 'standard' ou 'preorder' (catégories article)
+        // et recalcule la commission (guard_product_insert) : les montants
+        // client ne servent qu'à la compatibilité.
         const { data: inserted, error: insertError } = await supabase
           .from("products")
           .insert({
@@ -462,7 +472,13 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             seller_id: user.id,
             country_id: country.id,
             status: "pending",
-            product_type: isFood ? "food_package" : "standard",
+            // Mode de vente : achat direct, sur commande (+ délai) ou colis.
+            ...saleModeFields({
+              category,
+              preorder: publishesPreorder,
+              deliveryDays: preorderDays,
+              foodPackage: isFood,
+            }),
             ...(Object.keys(extraAttributes).length > 0 ? { extra_attributes: extraAttributes } : {}),
             seller_price: numericSellerPrice,
             commission_amount: commissionAmount,
@@ -480,7 +496,9 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           videoWarning = await uploadProductVideo(video, newId, (r) => setVideoProgress(r));
           setVideoProgress(null);
         }
-        setSuccess("Produit envoyé en modération. Il sera visible après validation par notre équipe.");
+        setSuccess(publishesPreorder
+          ? "Produit envoyé en modération. Une fois validé, il apparaîtra dans l'onglet « Sur commande », avec son délai."
+          : "Produit envoyé en modération. Il sera visible après validation par notre équipe.");
         if (videoWarning) setNotice(videoWarning);
 
         setTitle(""); setDescription(""); setSellerPrice("");
@@ -488,6 +506,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         setSubcategory(""); setPhaseBTypeKey(""); setPhaseBValues({});
         setConstructionKey(""); setConstructionValues({});
         setVariantSizes([]); setVariantColors(""); setStock("1");
+        setPreorder(false); setPreorderDays(null);
       }
 
       router.refresh();
@@ -795,6 +814,67 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             />
           </div>
         </div>
+
+        {/* Mode de vente — sans ce choix, un article préparé ou commandé
+            après l'achat passait pour disponible tout de suite. */}
+        {canChooseSaleMode && (
+          <div className="space-y-3">
+            <Label>Mode de vente</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                { on: !preorder, value: false, title: "Achat direct", text: "L'article est prêt, livré dès la commande" },
+                { on: preorder, value: true, title: "Sur commande", text: "Préparé ou commandé après l'achat" },
+              ] as const).map((m) => (
+                <button
+                  key={m.title}
+                  type="button"
+                  onClick={() => setPreorder(m.value)}
+                  aria-pressed={m.on}
+                  className={cn(
+                    "rounded-xl border-2 p-3 text-left transition",
+                    m.on ? "border-[#009688] bg-[#009688]/5" : "border-slate-200 bg-white hover:border-[#009688]/40",
+                  )}
+                >
+                  <span className={cn("block text-sm font-black", m.on ? "text-[#007168]" : "text-[#1A1A1A]")}>{m.title}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{m.text}</span>
+                </button>
+              ))}
+            </div>
+            {preorder && (
+              <div className="space-y-2">
+                <Label>Délai de livraison annoncé à l&apos;acheteur</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PREORDER_DELAY_OPTIONS.map((o) => {
+                    const on = preorderDays === o.days;
+                    return (
+                      <button
+                        key={o.label}
+                        type="button"
+                        onClick={() => setPreorderDays(o.days)}
+                        aria-pressed={on}
+                        className={cn(
+                          "rounded-lg border px-3 py-1.5 text-sm font-bold transition",
+                          on ? "border-[#009688] bg-[#009688] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-[#009688]/40",
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="rounded-xl bg-[#FFF4E5] px-3 py-2.5 text-xs leading-5 text-[#8A5A00]">
+                  Votre article ira dans l&apos;onglet « Sur commande », avec ce délai. Il n&apos;apparaîtra pas
+                  dans l&apos;accueil : l&apos;acheteur sait ainsi qu&apos;il commande un article à préparer.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        {isEdit && product?.product_type === "preorder" && (
+          <p className="rounded-xl bg-[#FFF4E5] px-3 py-2.5 text-xs leading-5 text-[#8A5A00]">
+            📦 Article vendu sur commande. Pour le repasser en achat direct, écrivez à Rivendy depuis la rubrique Aide.
+          </p>
+        )}
       </div>
 
       {/* ── Photos ───────────────────────────────────────────────── */}

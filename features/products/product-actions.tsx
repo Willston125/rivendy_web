@@ -49,6 +49,10 @@ export function ProductActions({ product }: { product: Product }) {
   // (parité app). Une chambre d'hôtel n'est jamais "achetée" directement.
   const isRental = product.category === "location";
   const isHotelRoom = product.category === "hotel";
+  // Sur commande : pas de panier, comme l'app (add_to_cart_button.dart) —
+  // l'article ne se mélange pas à des achats livrés tout de suite. On le
+  // commande seul, avec son délai (« Commander maintenant »).
+  const isPreorder = product.product_type === "preorder";
 
   // Le stock ne concerne que les articles vendus : une annonce de location à
   // stock 0 perdait sa demande (« épuisé »), alors que l'app la propose
@@ -115,8 +119,9 @@ export function ProductActions({ product }: { product: Product }) {
         </div>
       ) : (
         <>
+          {isPreorder && <BuyNowButton product={product} />}
           <div className="flex gap-2">
-            <AddToCartButton product={product} label="Ajouter au panier" size="lg" />
+            {!isPreorder && <AddToCartButton product={product} label="Ajouter au panier" size="lg" />}
             <FavoriteButton
               productId={product.id}
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-400"
@@ -127,7 +132,7 @@ export function ProductActions({ product }: { product: Product }) {
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
             />
           </div>
-          <BuyNowButton product={product} />
+          {!isPreorder && <BuyNowButton product={product} />}
         </>
       )}
       <ReportButton targetId={product.id} />

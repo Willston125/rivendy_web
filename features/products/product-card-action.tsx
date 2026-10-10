@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Package, Pencil } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { AddToCartButton } from "@/features/products/add-to-cart-button";
 import { FavoriteButton } from "@/features/products/favorite-button";
@@ -40,6 +40,20 @@ export function ProductCardAction({ product }: { product: Product }) {
       >
         <Pencil className="h-3.5 w-3.5" />
         Gérer mon annonce
+      </Link>
+    );
+  }
+
+  // Sur commande : pas d'ajout au panier depuis la carte (parité app) — la
+  // fiche montre d'abord le délai, puis « Commander maintenant ».
+  if (product.product_type === "preorder") {
+    return (
+      <Link
+        href={`/products/${product.id}`}
+        className="flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-[#F0A63E]/50 bg-[#FFF4E5] text-[11px] font-bold text-[#8A5A00] transition hover:bg-[#FFEBCC]"
+      >
+        <Package className="h-3.5 w-3.5" />
+        Sur commande · voir le délai
       </Link>
     );
   }
