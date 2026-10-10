@@ -47,6 +47,7 @@ import { orderCountry, orderReference } from "@/lib/utils/orders";
 import type { AppOrder, Country, OrderStatus } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
 import { useDialogs } from "@/features/ui/dialogs";
+import { orderPreorderDelay } from "@/lib/utils/preorder-mode";
 
 /* ── Mapping statut → label + style ────────────────────────────── */
 type StatusConfig = { label: string; bg: string; text: string; icon: React.ReactNode };
@@ -280,6 +281,7 @@ function OrderCard({
   const shortRef = orderReference(order.id);
   const fmtDate  = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(order.created_at));
   const items    = order.items ?? [];
+  const preorderDelay = orderPreorderDelay(items);
   const isCancelled = order.status === "cancelled";
   const isActive    = !["delivered", "delivered_by_rider", "delivered_confirmed", "completed", "cancelled"].includes(order.status);
   const curStep     = stepIndex(order.status);
@@ -406,6 +408,12 @@ function OrderCard({
         {items.length > 0 && (
           <p className="line-clamp-1 text-sm font-semibold text-slate-700">
             {items.map((i) => i.product_title).join(" · ")}
+          </p>
+        )}
+        {/* Sur commande : le délai PROMIS à l'achat (figé sur la ligne). */}
+        {preorderDelay && (
+          <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-[#FFF4E5] px-2.5 py-1.5 text-xs font-semibold text-[#8A5A00]">
+            📦 {preorderDelay.count > 1 ? `${preorderDelay.count} articles sur commande` : "Article sur commande"} — {preorderDelay.text}
           </p>
         )}
 

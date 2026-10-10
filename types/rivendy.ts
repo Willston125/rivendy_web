@@ -262,6 +262,10 @@ export interface OrderItem {
   commission_amount: number;
   seller_amount: number;
   created_at?: string;
+  /** Mode de vente FIGÉ à l'achat (trigger trg_snapshot_order_item_sale_mode,
+   *  2026-10-10) : 'preorder' = sur commande ; délai promis (null = à confirmer). */
+  product_type?: string | null;
+  delivery_days?: number | null;
 }
 
 export interface AppOrder {

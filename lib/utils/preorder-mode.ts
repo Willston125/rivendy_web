@@ -104,6 +104,24 @@ export function saleModeEditFields({
   return currentType === "preorder" ? toDirect : {};
 }
 
+/**
+ * Délai d'une COMMANDE contenant des articles sur commande, ou null s'il n'y
+ * en a aucun. Lit le mode figé sur chaque ligne au moment de l'achat
+ * (order_items.product_type / delivery_days) : le délai promis, pas celui de
+ * l'annonce aujourd'hui. Plusieurs articles : le délai le plus long compte.
+ */
+export function orderPreorderDelay(
+  items: ReadonlyArray<{ product_type?: string | null; delivery_days?: number | null }>,
+): { text: string; count: number } | null {
+  const preorders = items.filter((i) => i.product_type === "preorder");
+  if (preorders.length === 0) return null;
+  const known = preorders.map((i) => i.delivery_days).filter((d): d is number => d != null && d > 0);
+  return {
+    text: preorderDelayText(known.length === preorders.length ? Math.max(...known) : null),
+    count: preorders.length,
+  };
+}
+
 /** Phrase du délai, identique sur la fiche app et site. */
 export function preorderDelayText(deliveryDays: number | null | undefined): string {
   return deliveryDays != null && deliveryDays > 0
