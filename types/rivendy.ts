@@ -319,6 +319,8 @@ export interface BoostPurchaseInput {
   payment_method: string;
   country_id: string;
   payment_reference?: string | null;
+  /** Capture du paiement (bucket privé preuves-paiement), 2026-10-10. */
+  payment_proof_path?: string;
 }
 
 export interface SellerSubscriptionInput {
@@ -334,6 +336,8 @@ export interface SellerSubscriptionInput {
   country_id: string;
   payment_reference?: string | null;
   notes?: string | null;
+  /** Capture du paiement (bucket privé preuves-paiement), 2026-10-10. */
+  payment_proof_path?: string;
 }
 
 export type PayoutStatus =

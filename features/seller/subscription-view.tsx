@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BadgeCheck, Copy, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -9,6 +9,13 @@ import { formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import { subscriptionPriceFor } from "@/lib/utils/seller-offer-prices";
+import {
+  attachPaymentProof,
+  fetchPendingPaymentRequest,
+  uploadPaymentProof,
+  type PendingPaymentRequest,
+} from "@/lib/supabase/payment-proof";
+import { PaymentProofField, PendingPaymentBanner } from "@/features/seller/payment-proof-field";
 import type { SellerSubscriptionInput } from "@/types/rivendy";
 
 /* ── Plans ─────────────────────────────────────────────────── */
@@ -132,6 +139,39 @@ export function SubscriptionView() {
   const [submitting, setSubmitting] = useState(false);
   const [resultat, setResultat] =
     useState<{ ok: boolean; text: string } | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [pending, setPending] = useState<PendingPaymentRequest | null>(null);
+  const [attaching, setAttaching] = useState(false);
+
+  // Demande d'abonnement déjà envoyée, en attente de vérification.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void fetchPendingPaymentRequest("seller_subscriptions", user.id).then((p) => {
+      if (!cancelled) setPending(p);
+    });
+    return () => { cancelled = true; };
+  }, [user]);
+
+  async function addProofToPending(file: File) {
+    if (!user || !pending) return;
+    setAttaching(true);
+    setResultat(null);
+    const path = await uploadPaymentProof(user.id, file);
+    const err = path ? await attachPaymentProof("subscription", pending.id, path) : "upload";
+    setAttaching(false);
+    if (err || !path) {
+      setResultat({
+        ok: false,
+        text: err === "request_not_pending"
+          ? "Cette demande a déjà été traitée par l'équipe Rivendy."
+          : "La capture n'a pas pu être envoyée. Vérifiez votre connexion et réessayez.",
+      });
+      return;
+    }
+    setPending({ ...pending, payment_proof_path: path });
+    setResultat({ ok: true, text: "Capture envoyée ✓ — l'équipe Rivendy vérifie votre paiement." });
+  }
 
   // Jamais de numéro en dur — miroir de mobile_money_data.dart (parité app).
   const paymentMethods = getMobileMoneyForCountry(country?.id ?? "");
@@ -163,6 +203,15 @@ export function SubscriptionView() {
     setSubmitting(true);
     setResultat(null);
 
+    // Capture du paiement (facultative), envoyée avant la demande ; si l'envoi
+    // échoue, la demande part quand même et la capture se rajoute ensuite.
+    let proofPath: string | null = null;
+    let proofFailed = false;
+    if (!isCash && proofFile) {
+      proofPath = await uploadPaymentProof(user.id, proofFile);
+      proofFailed = proofPath === null;
+    }
+
     const payload: SellerSubscriptionInput = {
       seller_id: user.id,
       plan: plan.dbPlan,
@@ -174,6 +223,8 @@ export function SubscriptionView() {
       payment_method: selectedMethod.id,
       country_id: country.id,
       payment_reference: reference,
+      // Clé omise sans capture : la demande ne dépend pas de la colonne.
+      ...(proofPath ? { payment_proof_path: proofPath } : {}),
     };
     const { error } = await supabase.from("seller_subscriptions").insert(payload);
 
@@ -193,13 +244,22 @@ export function SubscriptionView() {
     }
 
     setSelectedPlan(null);
+    setProofFile(null);
+    void fetchPendingPaymentRequest("seller_subscriptions", user.id).then(setPending);
     // La référence doit rester LISIBLE : c'est WhatsApp qui en tenait lieu
     // d'archive. Le serveur en pose aussi une trace dans les notifications.
+    const proofNote = isCash
+      ? ""
+      : proofPath
+        ? " Capture du paiement jointe ✓"
+        : proofFailed
+          ? " La capture n'a pas pu être envoyée : ajoutez-la ci-dessus."
+          : " Ajoutez la capture de votre paiement ci-dessus pour accélérer la validation.";
     setResultat({
       ok: true,
       text: isCash
         ? `Demande enregistrée sous la référence ${reference}. L'équipe Rivendy vous contactera pour convenir du règlement en espèces.`
-        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Votre badge ${tierLabel(plan.tier)} sera activé après vérification.`,
+        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Votre badge ${tierLabel(plan.tier)} sera activé après vérification.${proofNote}`,
     });
   }
 
@@ -227,6 +287,14 @@ export function SubscriptionView() {
 
       {/* Résultat de la demande — remplace l'ouverture WhatsApp, qui servait
           jusqu'ici de seule confirmation ET d'archive de la référence. */}
+      {pending && (
+        <PendingPaymentBanner
+          title="Demande d'abonnement en attente"
+          request={pending}
+          busy={attaching}
+          onAddProof={addProofToPending}
+        />
+      )}
       {resultat && (
         <div
           role="status"
@@ -372,7 +440,7 @@ export function SubscriptionView() {
               {/* Button — collé en bas pour aligner les cartes */}
               <button
                 type="button"
-                onClick={() => setSelectedPlan(plan)}
+                onClick={() => { setProofFile(null); setSelectedPlan(plan); }}
                 className={`mt-auto w-full rounded-xl py-3 text-sm font-black text-white transition ${
                   plan.isPopular
                     ? "bg-[#009688] hover:bg-[#00796B]"
@@ -528,10 +596,27 @@ export function SubscriptionView() {
               </div>
             </div>
 
-            {/* Step 4 */}
+            {/* Step 4 — capture du paiement (Mobile Money) */}
+            {!isCash && (
+              <div className="mb-3 flex gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
+                  4
+                </div>
+                <div className="flex-1 text-sm text-slate-600">
+                  <p className="mb-2">
+                    Après le paiement, ajoutez la capture d&apos;écran de la
+                    confirmation (SMS ou appli) — facultatif, mais la
+                    validation est plus rapide :
+                  </p>
+                  <PaymentProofField file={proofFile} onChange={setProofFile} disabled={submitting} />
+                </div>
+              </div>
+            )}
+
+            {/* Dernière étape */}
             <div className="mb-5 flex gap-3">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                4
+                {isCash ? 4 : 5}
               </div>
               <p className="text-sm text-slate-600">
                 Touchez &quot;J&apos;ai payé&quot; : votre demande est enregistrée et
@@ -546,7 +631,9 @@ export function SubscriptionView() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#009688] py-4 text-sm font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
             >
               <BadgeCheck className="h-5 w-5" />
-              J&apos;ai payé — Enregistrer ma demande
+              {submitting
+                ? proofFile && !isCash ? "Envoi de la capture…" : "Envoi…"
+                : isCash ? "Envoyer ma demande d'abonnement" : "J'ai payé — Enregistrer ma demande"}
             </button>
             <p className="mt-2 text-center text-xs text-slate-400">
               En confirmant, vous attestez avoir effectué le paiement.
