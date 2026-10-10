@@ -91,7 +91,11 @@ const MOBILE_MONEY_BY_COUNTRY: Record<string, MobileMoneyMethod[]> = {
     { id: "airtel_mg", name: "Airtel Money", color: "#E64A19", enabled: false },
   ],
   // ── Comores ──
-  KM: [{ id: "mcomores_km", name: "M-Comores", color: "#388E3C", enabled: false }],
+  // MVola : compte Rivendy, activé le 2026-10-10. Miroir : mobile_money_data.dart.
+  KM: [
+    { id: "mvola_km", name: "MVola", number: "474 26 88", color: "#E64A19", enabled: true },
+    { id: "mcomores_km", name: "M-Comores", color: "#388E3C", enabled: false },
+  ],
   // ── France ──
   FR: [
     { id: "card_fr", name: "Carte bancaire", color: "#1976D2", enabled: false },
