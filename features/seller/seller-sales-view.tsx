@@ -27,6 +27,7 @@ import { rejectReasonLabel } from "@/lib/utils/reject-reason";
 import { deleteVideo } from "@/lib/video/video-service";
 import type { Product, AppOrder } from "@/types/rivendy";
 import { useDialogs } from "@/features/ui/dialogs";
+import { preorderDelayText } from "@/lib/utils/preorder-mode";
 
 type Tab = "garde-robe" | "commandes" | "ventes" | "stats";
 
@@ -598,6 +599,12 @@ export function SellerSalesView() {
                           <div className="flex-1 min-w-0">
                             <p className="line-clamp-1 text-sm font-bold text-slate-700">{item.product_title}</p>
                             <p className="text-xs text-slate-500">Qté: {item.quantity} {item.product_size && `· Taille: ${item.product_size}`}</p>
+                            {/* Sur commande : à préparer, dans le délai promis à l'achat. */}
+                            {item.product_type === "preorder" && (
+                              <p className="mt-0.5 text-xs font-semibold text-[#8A5A00]">
+                                📦 Sur commande — {preorderDelayText(item.delivery_days)}
+                              </p>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-black text-[#009688]">
