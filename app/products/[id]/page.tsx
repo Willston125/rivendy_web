@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BadgeCheck, ChevronRight, MessageCircle, Package, ShieldCheck, Star, Zap } from "lucide-react";
+import { BadgeCheck, ChevronRight, Clock, MessageCircle, Package, ShieldCheck, Star, Zap } from "lucide-react";
+import { preorderDelayText } from "@/lib/utils/preorder-mode";
 import { ProductActions } from "@/features/products/product-actions";
 import { ProductGallery } from "@/features/products/product-gallery";
 import { ProductGrid } from "@/features/products/product-grid";
@@ -295,8 +296,23 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             );
           })()}
 
-          {/* Livraison estimée */}
-          {product.delivery_days != null && product.delivery_days > 0 && (
+          {/* Sur commande — même bandeau que l'app (product_detail_screen) :
+              l'acheteur sait qu'il commande un article à préparer. */}
+          {product.product_type === "preorder" ? (
+            <div className="rounded-2xl border border-[#009688]/30 bg-[#E0F2F1] p-4">
+              <p className="flex items-center gap-2 text-sm font-black text-[#009688]">
+                <Package className="h-4 w-4 shrink-0" />
+                Disponible sur commande
+              </p>
+              <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#F57C00]">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                {preorderDelayText(product.delivery_days)}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                L&apos;article est préparé ou commandé après votre achat : comptez ce délai avant de le recevoir.
+              </p>
+            </div>
+          ) : product.delivery_days != null && product.delivery_days > 0 && (
             <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm shadow-sm">
               <Package className="h-4 w-4 shrink-0 text-[#007168]" />
               <span className="font-semibold text-slate-600">
