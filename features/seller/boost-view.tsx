@@ -10,6 +10,14 @@ import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import { boostPriceFor } from "@/lib/utils/seller-offer-prices";
+import { generatePaymentReference } from "@/lib/utils/payment-reference";
+import {
+  attachPaymentProof,
+  fetchPendingPaymentRequest,
+  uploadPaymentProof,
+  type PendingPaymentRequest,
+} from "@/lib/supabase/payment-proof";
+import { PaymentProofField, PendingPaymentBanner } from "@/features/seller/payment-proof-field";
 import type { BoostPurchaseInput, Product } from "@/types/rivendy";
 
 /* ── Tiers ─────────────────────────────────────────────────── */
@@ -119,6 +127,47 @@ export function BoostView({ product }: { product: Product }) {
   const [usingCredit, setUsingCredit] = useState(false);
   const [creditMessage, setCreditMessage] =
     useState<{ ok: boolean; text: string } | null>(null);
+  // Référence COURTE, tirée à l'ouverture de la fenêtre de paiement.
+  const [reference, setReference] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [pending, setPending] = useState<PendingPaymentRequest | null>(null);
+  const [attaching, setAttaching] = useState(false);
+
+  // Demande déjà envoyée pour cet article, en attente de vérification.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void fetchPendingPaymentRequest("boost_purchases", user.id, product.id).then((p) => {
+      if (!cancelled) setPending(p);
+    });
+    return () => { cancelled = true; };
+  }, [user, product.id]);
+
+  async function addProofToPending(file: File) {
+    if (!user || !pending) return;
+    setAttaching(true);
+    setCreditMessage(null);
+    const path = await uploadPaymentProof(user.id, file);
+    const err = path ? await attachPaymentProof("boost", pending.id, path) : "upload";
+    setAttaching(false);
+    if (err || !path) {
+      setCreditMessage({
+        ok: false,
+        text: err === "request_not_pending"
+          ? "Cette demande a déjà été traitée par l'équipe Rivendy."
+          : "La capture n'a pas pu être envoyée. Vérifiez votre connexion et réessayez.",
+      });
+      return;
+    }
+    setPending({ ...pending, payment_proof_path: path });
+    setCreditMessage({ ok: true, text: "Capture envoyée ✓ — l'équipe Rivendy vérifie votre paiement." });
+  }
+
+  function openPayment(tier: BoostTier) {
+    setReference(generatePaymentReference());
+    setProofFile(null);
+    setSelectedTier(tier);
+  }
 
   const loadCredits = useCallback(async () => {
     if (!user) return;
@@ -143,6 +192,9 @@ export function BoostView({ product }: { product: Product }) {
   // Miroir de la condition serveur : seul un produit 'active' est boostable
   // (pas de produit suspendu/épuisé, pas d'empilement sur un boost en cours).
   const isProductBoostable = product.status === "active";
+  // Boost PAYANT : article en vente (déjà boosté = prolongation). Miroir du
+  // garde serveur guard_payment_request (PRODUCT_NOT_BOOSTABLE).
+  const isProductSellable = product.status === "active" || product.status === "boosted";
 
   async function useIncludedBoost() {
     if (!user || usingCredit) return;
@@ -185,9 +237,9 @@ export function BoostView({ product }: { product: Product }) {
     CASH_METHOD;
   const isCash = selectedMethod.id === "cash";
 
-  // Même référence que l'app (boost_screen.dart) : BOOST-<id produit>-<PLAN>.
-  // L'équipe la rapproche du paiement au dashboard, quel que soit le canal.
-  const reference = `BOOST-${product.id}-${selectedTier?.id.toUpperCase() ?? ""}`;
+  // Même référence que l'app (boost_screen.dart) : `BST-XXXXXX`, tirée à
+  // l'ouverture de la fenêtre (openPayment). L'équipe la rapproche du
+  // paiement au dashboard, quel que soit le canal.
   function copyReference() {
     navigator.clipboard.writeText(reference);
     setCopied(true);
@@ -202,6 +254,16 @@ export function BoostView({ product }: { product: Product }) {
     setSubmitting(true);
     setCreditMessage(null);
 
+    // Capture du paiement (facultative) : envoyée avant la demande. Si l'envoi
+    // échoue, la demande part quand même — la capture se rajoute ensuite
+    // depuis le rappel « demande en attente ».
+    let proofPath: string | null = null;
+    let proofFailed = false;
+    if (!isCash && proofFile) {
+      proofPath = await uploadPaymentProof(user.id, proofFile);
+      proofFailed = proofPath === null;
+    }
+
     const payload: BoostPurchaseInput = {
       product_id: product.id,
       seller_id: user.id,
@@ -213,11 +275,20 @@ export function BoostView({ product }: { product: Product }) {
       payment_method: selectedMethod.id,
       country_id: country.id,
       payment_reference: reference,
+      // Clé omise sans capture : la demande ne dépend pas de la colonne.
+      ...(proofPath ? { payment_proof_path: proofPath } : {}),
     };
     const { error } = await supabase.from("boost_purchases").insert(payload);
 
     setSubmitting(false);
 
+    if (error?.message?.includes("PRODUCT_NOT_BOOSTABLE")) {
+      setCreditMessage({
+        ok: false,
+        text: "Cet article n'est plus en vente : il ne peut pas être mis en avant.",
+      });
+      return;
+    }
     if (error) {
       // L'enregistrement est désormais le SEUL canal. L'ancien code
       // enveloppait l'insert dans un try/catch qui n'attrapait RIEN —
@@ -232,13 +303,22 @@ export function BoostView({ product }: { product: Product }) {
     }
 
     setSelectedTier(null);
+    setProofFile(null);
+    void fetchPendingPaymentRequest("boost_purchases", user.id, product.id).then(setPending);
     // La référence doit rester LISIBLE : c'est WhatsApp qui en tenait lieu
     // d'archive. Le serveur en pose aussi une trace dans les notifications.
+    const proofNote = isCash
+      ? ""
+      : proofPath
+        ? " Capture du paiement jointe ✓"
+        : proofFailed
+          ? " La capture n'a pas pu être envoyée : ajoutez-la ci-dessus."
+          : " Ajoutez la capture de votre paiement ci-dessus pour accélérer la validation.";
     setCreditMessage({
       ok: true,
       text: isCash
         ? `Demande de boost ${tier.name} enregistrée sous la référence ${reference}. L'équipe Rivendy vous contactera pour convenir du règlement en espèces.`
-        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Le boost ${tier.name} démarre après vérification.`,
+        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Le boost ${tier.name} démarre après vérification.${proofNote}`,
     });
   }
 
@@ -268,10 +348,24 @@ export function BoostView({ product }: { product: Product }) {
             {formatMoney(product.price, country)}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-[#009688]/10 px-3 py-1 text-xs font-semibold text-[#009688]">
-          En vente
+        <span
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+            isProductSellable ? "bg-[#009688]/10 text-[#009688]" : "bg-slate-100 text-slate-500"
+          }`}
+        >
+          {isProductSellable ? "En vente" : "Hors vente"}
         </span>
       </div>
+
+      {/* Demande déjà envoyée, en attente de vérification */}
+      {pending && (
+        <PendingPaymentBanner
+          title="Demande de boost en attente"
+          request={pending}
+          busy={attaching}
+          onAddProof={addProofToPending}
+        />
+      )}
 
       {/* Info banner */}
       <div className="mb-6 flex gap-3 rounded-2xl border border-[#009688]/20 bg-[#E8F5E9] p-4">
@@ -365,11 +459,35 @@ export function BoostView({ product }: { product: Product }) {
           </div>
         )}
 
+      {/* Message hors carte « boost inclus » (demande payante, capture) */}
+      {creditMessage &&
+        !(credits.hasSubscription && (credits.tier === "certified" || credits.tier === "pro")) && (
+          <p
+            className={`mb-6 rounded-xl px-3 py-2 text-sm font-semibold ${
+              creditMessage.ok ? "bg-[#E0F2F1] text-[#00796B]" : "bg-red-50 text-red-600"
+            }`}
+          >
+            {creditMessage.text}
+          </p>
+        )}
+
       {/* Tiers */}
       <h2 className="mb-3 text-lg font-black text-[#1A1A1A]">
         Choisissez votre boost
       </h2>
 
+      {!isProductSellable ? (
+        <p className="rounded-2xl bg-slate-100 p-4 text-sm leading-relaxed text-slate-700">
+          {product.status === "epuise"
+            ? "Cet article est épuisé"
+            : product.status === "pending"
+              ? "Cet article est en cours de vérification"
+              : product.status === "rejected"
+                ? "Cet article n'a pas été validé"
+                : "Cet article n'est pas en vente"}{" "}
+          : il ne peut pas être mis en avant. Remettez-le en vente pour pouvoir le booster.
+        </p>
+      ) : (
       <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
         {TIERS.map((tier) => (
           <div
@@ -421,7 +539,7 @@ export function BoostView({ product }: { product: Product }) {
             {/* Button — collé en bas pour aligner les cartes */}
             <button
               type="button"
-              onClick={() => setSelectedTier(tier)}
+              onClick={() => openPayment(tier)}
               className="mt-auto w-full rounded-xl py-3 text-sm font-black text-white transition hover:opacity-90"
               style={{ backgroundColor: tier.color }}
             >
@@ -430,6 +548,7 @@ export function BoostView({ product }: { product: Product }) {
           </div>
         ))}
       </div>
+      )}
 
       <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
         Paiement vérifié manuellement sous 24h
@@ -577,13 +696,38 @@ export function BoostView({ product }: { product: Product }) {
                 </div>
               </div>
 
-              {/* Step 3 */}
+              {/* Step 3 — capture du paiement (Mobile Money) */}
+              {!isCash && (
+                <div className="mb-2 flex gap-2">
+                  <div
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
+                    style={{ backgroundColor: selectedTier.color }}
+                  >
+                    3
+                  </div>
+                  <div className="flex-1">
+                    <p className="mb-2 text-sm text-slate-600">
+                      Après le paiement, ajoutez la capture d&apos;écran de la
+                      confirmation (SMS ou appli) — facultatif, mais la
+                      validation est plus rapide :
+                    </p>
+                    <PaymentProofField
+                      file={proofFile}
+                      onChange={setProofFile}
+                      color={selectedTier.color}
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Dernière étape */}
               <div className="flex gap-2">
                 <div
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
                   style={{ backgroundColor: selectedTier.color }}
                 >
-                  3
+                  {isCash ? 3 : 4}
                 </div>
                 <p className="text-sm text-slate-600">
                   Cliquez sur &quot;J&apos;ai payé&quot; ci-dessous. Notre
@@ -599,7 +743,9 @@ export function BoostView({ product }: { product: Product }) {
               className="w-full rounded-xl py-4 text-sm font-black text-white transition hover:opacity-90 disabled:opacity-60"
               style={{ backgroundColor: selectedTier.color }}
             >
-              J&apos;ai payé — Activer mon boost
+              {submitting
+                ? proofFile && !isCash ? "Envoi de la capture…" : "Envoi…"
+                : isCash ? "Envoyer ma demande de boost" : "J'ai payé — Activer mon boost"}
             </button>
             <p className="mt-2 text-center text-xs text-slate-400">
               En cliquant, vous confirmez avoir effectué le paiement.
