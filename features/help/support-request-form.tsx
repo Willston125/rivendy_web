@@ -25,12 +25,15 @@ export const SUPPORT_TOPICS = [
 
 type TopicId = (typeof SUPPORT_TOPICS)[number]["id"];
 
-const ERRORS: Record<string, string> = {
+/** Messages des codes de create_support_request — partagés avec la demande
+ * « Commander depuis l'étranger » (features/checkout/foreign-market-order.tsx). */
+export const SUPPORT_REQUEST_ERRORS: Record<string, string> = {
   not_authenticated: "Connectez-vous pour écrire à Rivendy.",
   message_too_short: "Votre message est trop court (10 caractères minimum).",
   message_too_long: "Votre message est trop long (2 000 caractères maximum).",
   rate_limited: "Vous avez déjà envoyé 5 demandes aujourd'hui. L'équipe Rivendy vous répond dans vos notifications.",
   invalid_topic: "Choisissez le sujet de votre demande.",
+  seller_not_found: "Cette boutique est introuvable.",
 };
 
 function isTopic(v: string | undefined): v is TopicId {
@@ -62,7 +65,7 @@ export function SupportRequestForm({ initialTopic }: { initialTopic?: string }) 
     setSending(false);
     const res = data as { success?: boolean; error?: string } | null;
     if (rpcError || !res?.success) {
-      setError(ERRORS[res?.error ?? ""] ?? "La demande n'a pas pu être envoyée. Réessayez dans un moment.");
+      setError(SUPPORT_REQUEST_ERRORS[res?.error ?? ""] ?? "La demande n'a pas pu être envoyée. Réessayez dans un moment.");
       return;
     }
     setSent(true);
