@@ -34,7 +34,7 @@ export function AddToCartButton({
       <button
         type="button"
         onClick={async () => {
-          if (await marketGuard.allows([product.country_id])) addItem(product);
+          if (await marketGuard.allows([product.country_id], { product })) addItem(product);
         }}
         className={cn(
           "inline-flex flex-1 items-center justify-center rounded-xl font-bold transition-all duration-200 active:scale-95",

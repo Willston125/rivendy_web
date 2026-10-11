@@ -87,6 +87,26 @@ if (neighbours.some((f) => !fs.existsSync(f))) {
   if (dashDays && webDays && !same(dashDays, webDays)) failures.push(`délais dashboard (${dashDays}) ≠ site (${webDays})`);
 }
 
+// ── Demande « Commander depuis l'étranger » (2026-10-11) ───────────────────
+// Le dashboard reconnaît la demande à sa première ligne : le marqueur et les
+// libellés du texte doivent être identiques sur le site et dans l'app.
+const FOREIGN_LABELS = [
+  "Commande depuis l'étranger", 'Article : ', '(réf. #', 'Vendu au marché : ', "l'unité",
+  'Quantité souhaitée : ', 'À livrer : ', 'Lien : ', 'https://www.rivendy.com/products/', 'Précisions : ',
+];
+const webForeign = read(path.join(WEB, 'lib/utils/foreign-order.ts'));
+const appForeignFile = path.join(ROOT, 'rivendy_app/lib/features/checkout/logic/foreign_order_request.dart');
+for (const label of FOREIGN_LABELS) {
+  if (!webForeign.includes(label)) failures.push(`demande étrangère : « ${label} » absent du site`);
+}
+if (fs.existsSync(appForeignFile)) {
+  // Le Dart échappe l'apostrophe (\') : on compare le texte déséchappé.
+  const appForeign = read(appForeignFile).replace(/\\'/g, "'");
+  for (const label of FOREIGN_LABELS) {
+    if (!appForeign.includes(label)) failures.push(`demande étrangère : « ${label} » absent de l'app`);
+  }
+}
+
 if (failures.length > 0) {
   console.error('ÉCHEC — mode « Sur commande » : les copies divergent.\n  ' + failures.join('\n  '));
   process.exit(1);

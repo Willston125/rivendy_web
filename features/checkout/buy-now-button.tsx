@@ -18,7 +18,7 @@ export function BuyNowButton({ product }: { product: Product }) {
       <button
         type="button"
         onClick={async () => {
-          if (!(await marketGuard.allows([product.country_id]))) return;
+          if (!(await marketGuard.allows([product.country_id], { product }))) return;
           // Comme l'app : « Commander maintenant » commande CET article seul.
           // Il voyage hors du panier — l'ancien bouton l'y ajoutait puis
           // commandait tout le panier.
