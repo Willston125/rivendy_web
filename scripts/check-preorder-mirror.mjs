@@ -107,6 +107,11 @@ if (fs.existsSync(appForeignFile)) {
   }
 }
 
+const dashForeignFile = path.join(ROOT, 'rivendy_dashboard/lib/foreign-order.ts');
+if (fs.existsSync(dashForeignFile) && !read(dashForeignFile).includes("Commande depuis l'étranger")) {
+  failures.push('demande étrangère : marqueur absent du dashboard (lib/foreign-order.ts)');
+}
+
 if (failures.length > 0) {
   console.error('ÉCHEC — mode « Sur commande » : les copies divergent.\n  ' + failures.join('\n  '));
   process.exit(1);
