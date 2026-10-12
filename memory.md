@@ -171,6 +171,11 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   après avoir payé ne change pas le motif).
 - « Mes pass » : même page (`#mes-pass`), lien dans le profil, destination de
   la notification `play_pass`.
+- **Motif d'un refus : affiché ICI seulement** (audit I2, 2026-10-13). La
+  notification de refus est NEUTRE (elle s'affiche aussi dans l'app Android :
+  ni référence, ni motif, ni lien — règle Google Play) ; le motif voyage en
+  `metadata.reason` (`20261013_play_reject_neutral.sql`) et « Mes pass » le
+  lit (`fetchPassNotifications` + `rejectReasons`).
 - Logique pure testée : `npm run check:play` (inclus dans `npm run check`).
 - Texte « vous regardez ensuite dans l'application » : ajouter « et sur le
   site » seulement quand la lecture web existera (lot 8).
