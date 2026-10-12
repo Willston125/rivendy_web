@@ -140,6 +140,29 @@ export function accessUntil(passes: MyPass[], now: Date): Date | null {
   return best;
 }
 
+/**
+ * Motifs de refus, par demande : lus dans les notifications `play_pass`
+ * (`metadata.step = 'rejected'`, `metadata.play_pass_id`, `metadata.reason`)
+ * écrites par `play_reject_pass` (20261013_play_reject_neutral.sql). Le
+ * texte de la notification est NEUTRE car il s'affiche aussi dans l'app ;
+ * le motif n'est montré qu'ici, sur le site (audit I2, 2026-10-13).
+ * Notifications les plus récentes d'abord : la première trouvée l'emporte.
+ */
+export function rejectReasons(
+  notifications: Array<{ metadata?: unknown }>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const n of notifications) {
+    const m = n.metadata;
+    if (!m || typeof m !== "object") continue;
+    const { step, play_pass_id: id, reason } = m as Record<string, unknown>;
+    if (step !== "rejected" || typeof id !== "string" || typeof reason !== "string") continue;
+    const text = reason.trim();
+    if (text && !(id in out)) out[id] = text;
+  }
+  return out;
+}
+
 export type PassTone = "active" | "pending" | "ended" | "refused";
 
 /**
@@ -163,7 +186,9 @@ export function passStatus(p: MyPass, now: Date): { label: string; tone: PassTon
     case "expired":
       return { label: "Terminé", tone: "ended" };
     case "rejected":
-      return { label: "Non validé — le motif est dans vos notifications", tone: "refused" };
+      // Le motif s'affiche sous la ligne (rejectReasons) : la notification,
+      // visible aussi dans l'app, reste neutre (règle Google Play, audit I2).
+      return { label: "Non validé", tone: "refused" };
     default:
       return { label: "Annulé", tone: "ended" };
   }

@@ -14,6 +14,7 @@ import {
   passRequestMessage,
   passStatus,
   plansOnSale,
+  rejectReasons,
 } from "./play-pass-logic.ts";
 
 const KM = [
@@ -136,6 +137,19 @@ test("statuts lisibles", () => {
   );
   assert.equal(passStatus(pass({ expires_at: "2026-10-11T00:00:00Z" }), now).tone, "ended");
   assert.equal(passStatus(pass({ status: "expired" }), now).label, "Terminé");
-  assert.equal(passStatus(pass({ status: "rejected" }), now).tone, "refused");
+  assert.deepEqual(passStatus(pass({ status: "rejected" }), now), { label: "Non validé", tone: "refused" });
   assert.equal(passStatus(pass({ status: "cancelled" }), now).label, "Annulé");
+});
+
+test("motifs de refus : lus en metadata des notifications, le plus récent l'emporte (audit I2)", () => {
+  const reasons = rejectReasons([
+    { metadata: { step: "rejected", play_pass_id: "p1", reason: "  Aucun paiement reçu  " } },
+    { metadata: { step: "rejected", play_pass_id: "p1", reason: "Ancien motif" } },
+    { metadata: { step: "activated", play_pass_id: "p2", expires_at: "2026-11-01" } },
+    { metadata: { step: "rejected", play_pass_id: "p3", reason: "   " } },
+    { metadata: { step: "rejected", play_pass_id: "p4" } },
+    { metadata: null },
+    {},
+  ]);
+  assert.deepEqual(reasons, { p1: "Aucun paiement reçu" });
 });

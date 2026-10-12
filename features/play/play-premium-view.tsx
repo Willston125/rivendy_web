@@ -12,7 +12,13 @@ import { formatMoney } from "@/lib/utils/format";
 import { inMarket } from "@/lib/utils/market-phrase";
 import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { Country } from "@/types/rivendy";
-import { attachPlayPassProof, fetchMyPasses, fetchPassPrices, requestPlayPass } from "@/features/play/play-pass-api";
+import {
+  attachPlayPassProof,
+  fetchMyPasses,
+  fetchPassNotifications,
+  fetchPassPrices,
+  requestPlayPass,
+} from "@/features/play/play-pass-api";
 import {
   accessUntil,
   cheapestPerDayPlan,
@@ -22,6 +28,7 @@ import {
   passStatus,
   planInfo,
   plansOnSale,
+  rejectReasons,
   type MyPass,
   type PassPlan,
   type PassPrice,
@@ -89,6 +96,9 @@ export function PlayPremiumView() {
   const [prices, setPrices] = useState<PassPrice[] | null>(null);
   const [pricesError, setPricesError] = useState(false);
   const [passes, setPasses] = useState<MyPass[]>([]);
+  // Motif d'un refus, par demande : la notification (visible aussi dans
+  // l'app) reste neutre, le motif ne se lit qu'ici (audit I2, 2026-10-13).
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [plan, setPlan] = useState<PassPlan | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
@@ -142,13 +152,15 @@ export function PlayPremiumView() {
 
   const reloadPasses = useCallback(async () => {
     if (!user) return;
-    const rows = await fetchMyPasses();
+    const [rows, notifications] = await Promise.all([fetchMyPasses(), fetchPassNotifications(user.id)]);
     if (rows) setPasses(rows);
+    setReasons(rejectReasons(notifications));
   }, [user]);
 
   useEffect(() => {
     if (!user) {
       setPasses([]);
+      setReasons({});
       setReference(null);
       return;
     }
@@ -302,6 +314,7 @@ export function PlayPremiumView() {
         {user && (until || passes.length > 0) && (
           <MyPasses
             passes={passes}
+            reasons={reasons}
             until={until}
             now={now}
             countries={countries}
@@ -611,6 +624,7 @@ function ProofPicker({
 
 function MyPasses({
   passes,
+  reasons,
   until,
   now,
   countries,
@@ -618,6 +632,7 @@ function MyPasses({
   onAddProof,
 }: {
   passes: MyPass[];
+  reasons: Record<string, string>;
   until: Date | null;
   now: Date;
   countries: Country[];
@@ -681,6 +696,20 @@ function MyPasses({
                 {formatDateTime(p.created_at)}
                 {p.status === "active" && p.expires_at ? ` · jusqu’au ${formatDateTime(p.expires_at)}` : ""}
               </p>
+              {p.status === "rejected" && (
+                <p className="mt-2 text-xs leading-relaxed text-[#CBD5E1]">
+                  {reasons[p.id] ? (
+                    <>
+                      Motif : <span className="text-white">{reasons[p.id]}</span>
+                      <br />
+                    </>
+                  ) : null}
+                  Une question ?{" "}
+                  <Link href="/help" className="font-bold text-[#5EEAD4] underline">
+                    Aide &amp; Support
+                  </Link>
+                </p>
+              )}
               {p.status === "pending" &&
                 (p.payment_proof_path ? (
                   <p className="mt-2 text-xs text-[#CBD5E1]">Capture reçue ✓ — l’équipe vérifie votre paiement.</p>

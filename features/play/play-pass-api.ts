@@ -44,6 +44,26 @@ export async function fetchMyPasses(): Promise<MyPass[] | null> {
   return (data ?? []) as unknown as MyPass[];
 }
 
+/**
+ * Notifications `play_pass` du compte, les plus récentes d'abord : elles
+ * portent le motif d'un refus (`metadata.reason`), que la page affiche dans
+ * « Mes pass » — voir `rejectReasons`. Best effort : [] en cas d'échec.
+ */
+export async function fetchPassNotifications(userId: string): Promise<Array<{ metadata: unknown }>> {
+  const { data, error } = await supabase
+    .from("app_notifications")
+    .select("metadata")
+    .eq("user_id", userId)
+    .eq("type", "play_pass")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    console.error("[play-pass] motifs de refus :", error.message);
+    return [];
+  }
+  return (data ?? []) as Array<{ metadata: unknown }>;
+}
+
 export type PassRequestResult =
   | { ok: true; reference: string; price: number; currency: string | null }
   | { ok: false; error: string };
