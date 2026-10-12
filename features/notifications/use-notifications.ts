@@ -200,6 +200,10 @@ export function notificationDestination(n: AppNotification): string | null {
     case "order_placed":
     case "delivery_code":
       return "/orders";
+    case "play_pass":
+      // Pass Premium activé ou refusé (play_activate_pass / play_reject_pass).
+      // Site seulement : l'app n'oriente jamais vers l'achat (règle Google Play).
+      return "/play/premium#mes-pass";
     default:
       // "security", "delivery_assigned" (espace livreur : app uniquement)
       // et les types inconnus n'ont pas de destination sur le site.
@@ -212,5 +216,6 @@ export function notificationLinkLabel(destination: string): string {
   if (destination === "/wallet") return "Voir mon portefeuille";
   if (destination === "/orders") return "Voir ma commande";
   if (destination === "/seller/sales") return "Voir mes articles";
+  if (destination.startsWith("/play/")) return "Voir mes pass";
   return "Voir le produit";
 }

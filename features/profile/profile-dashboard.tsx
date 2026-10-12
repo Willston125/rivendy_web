@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   BedDouble,
   ChevronRight,
+  Clapperboard,
   Heart,
   KeyRound,
   LogOut,
@@ -65,6 +66,8 @@ const NAV_LINKS = [
   { href: "/profile/password",         icon: KeyRound,  label: "Sécurité & mot de passe" },
   { href: "/profile/payment-methods",  icon: Wallet,    label: "Modes de paiement" },
   { href: "/hotels/bookings",          icon: BedDouble, label: "Mes réservations d'hôtel" },
+  // Rivendy Play (lot 6) : statut et échéance des pass Premium.
+  { href: "/play/premium#mes-pass",    icon: Clapperboard, label: "Rivendy Play — mes pass" },
   { href: "/profile/settings",         icon: Settings,  label: "Paramètres" },
   { href: "/seller",                   icon: Store,     label: "Mon espace vendeur" },
 ];

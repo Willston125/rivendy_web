@@ -155,4 +155,24 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 - **Connecté sur l'accueil d'un autre marché** : bandeau « Vous consultez la
   Côte d'Ivoire — revenir aux Comores » (`MarketMismatchBanner`, `theMarket()`).
 
-*Dernière mise à jour : 9 octobre 2026 (audit en ligne)*
+## Rivendy Play — page Pass Premium (2026-10-12, branche `feature/rivendy-play`)
+
+- **`/play/premium`** (`features/play/`) : maquette 4 validée le 2026-10-11.
+  Vente SEULEMENT ici, en **mobile money** (pas d'espèces), validation
+  manuelle au dashboard. L'app n'affiche ni prix ni lien vers cette page
+  (règle Google Play) — ne jamais y ajouter de lien depuis l'app.
+- **Marché du pass = marché d'ORIGINE du compte** (`fetchHomeMarketId`), comme
+  `request_play_pass` et le jeton de lecture — pas le marché affiché.
+- **Prix et marché fixés par le serveur** (`request_play_pass`) ; le
+  navigateur n'envoie que formule, moyen, référence et capture.
+- Vente ouverte = tarif `is_on_sale` (`play_pass_prices`) ET moyen mobile
+  money activé (`mobile-money.ts`) ; sinon « pas encore disponible ».
+- Référence `RVP-XXXXXX` gardée dans le navigateur jusqu'à l'envoi (recharger
+  après avoir payé ne change pas le motif).
+- « Mes pass » : même page (`#mes-pass`), lien dans le profil, destination de
+  la notification `play_pass`.
+- Logique pure testée : `npm run check:play` (inclus dans `npm run check`).
+- Texte « vous regardez ensuite dans l'application » : ajouter « et sur le
+  site » seulement quand la lecture web existera (lot 8).
+
+*Dernière mise à jour : 12 octobre 2026 (Rivendy Play, lot 6)*
