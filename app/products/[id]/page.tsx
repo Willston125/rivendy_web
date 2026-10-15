@@ -22,6 +22,7 @@ import { findPhaseBListing, isPhaseBCategory } from "@/lib/listings";
 import { locationPriceUnit, locationPriceValue } from "@/features/products/location-listings";
 import { inMarket } from "@/lib/utils/market-phrase";
 import { MarketHint } from "@/features/country/market-hint";
+import { clip, marketHomePath, SITE_URL } from "@/lib/seo";
 
 /**
  * Marché de l'ARTICLE : il fixe la devise du prix affiché. Le pays du profil
@@ -45,15 +46,27 @@ export async function generateMetadata(
     : "/brand/hero-woman.png";
 
   const country = await getCountry(productMarket(product));
+  const where = inMarket(country);
+  // Le prix n'est cité que s'il a un sens seul : une location a son unité
+  // (par nuit, par jour…) que la description ne porte pas.
+  const price =
+    product.category !== "location" && Number(product.price) > 0
+      ? ` à ${formatMoney(product.price, country)}`
+      : "";
+  const store = product.seller_name ? ` chez ${product.seller_name}` : "";
+  const sellerText = product.description?.trim() ?? "";
+  // Une description vendeur courte (« pentalon et chemise ») ne suffit pas à
+  // Google : on la complète toujours du prix, du marché et de la boutique.
+  const description = clip(
+    `${product.title}${price}${store} ${where}. ${sellerText ? `${sellerText} ` : ""}Commandez en ligne sur Rivendy.`,
+  );
   return {
-    title: `${product.title} — Rivendy`,
-    description:
-      product.description
-        ? product.description.slice(0, 155)
-        : `Achetez "${product.title}" sur Rivendy, la marketplace de confiance ${inMarket(country)}.`,
+    title: `${product.title} ${where} — Rivendy`,
+    description,
+    alternates: { canonical: `/products/${product.id}` },
     openGraph: {
       title: product.title,
-      description: product.description?.slice(0, 155) ?? "",
+      description,
       images: [{ url: image, width: 800, height: 800 }],
       type: "website",
     },
@@ -104,8 +117,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   // résultats enrichis Google. priceCurrency exige un code ISO 4217 :
   // « FDJ » (symbole local) → DJF. Pas d'aggregateRating : le nombre
   // d'avis n'est pas exposé ici et Google l'exige avec la note.
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
+  const siteUrl = SITE_URL;
   const isoCurrency =
     country.currency_code === "FDJ" ? "DJF" : (country.currency_code || "DJF");
   const productJsonLd = {
@@ -121,6 +133,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       priceCurrency: isoCurrency,
       availability: "https://schema.org/InStock",
       url: `${siteUrl}/products/${product.id}`,
+      ...(product.seller_name
+        ? { seller: { "@type": "Organization", name: product.seller_name } }
+        : {}),
     },
   };
 
@@ -142,10 +157,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       {/* Breadcrumb */}
       <nav className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <Link href="/" className="hover:text-[#007168]">Accueil</Link>
+        <Link href={marketHomePath(country.id)} className="hover:text-[#007168]">Accueil</Link>
         <ChevronRight className="h-3 w-3" />
         <Link
-          href={`/?category=${product.category}`}
+          href={marketHomePath(country.id, product.category)}
           className="hover:text-[#007168]"
         >
           {categoryLabel(product.category)}

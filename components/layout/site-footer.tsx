@@ -13,12 +13,14 @@ const TOP_CATEGORIES = CATEGORIES.slice(0, 6);
 
 const ACHETER = [
   { href: "/", label: "Explorer le catalogue" },
+  { href: "/boutiques", label: "Toutes les boutiques" },
   { href: "/preorders", label: "Sur commande" },
   { href: "/favorites", label: "Mes favoris" },
   { href: "/cart", label: "Mon panier" },
 ];
 
 const VENDRE = [
+  { href: "/vendre-en-ligne", label: "Vendre en ligne" },
   { href: "/sell", label: "Vendre un article" },
   { href: "/seller/create", label: "Ouvrir ma boutique" },
   { href: "/seller/subscription", label: "Devenir Vendeur Certifié" },

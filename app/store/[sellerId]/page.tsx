@@ -29,8 +29,7 @@ import { pickFeatured, storeCompleteness } from "@/features/store/store-helpers"
 import { inMarket } from "@/lib/utils/market-phrase";
 import { MarketHint } from "@/features/country/market-hint";
 import { usableImageUrl } from "@/lib/utils/image-url";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://www.rivendy.com";
+import { clip, getSellerMarketId, SITE_URL } from "@/lib/seo";
 
 /* ── Déduplication React.cache — évite 2 appels DB identiques
    (generateMetadata + page body appellent tous deux getSellerProfile) ── */
@@ -47,20 +46,26 @@ export async function generateMetadata({
   if (!seller) return { title: "Boutique introuvable — Rivendy" };
 
   const name = seller.store_name || seller.full_name || "Boutique Rivendy";
-  const country = await getCountry(seller.country_id || "DJ");
+  // Marché réel de la boutique (ses articles), pas le pays du profil.
+  const country = await getCountry(
+    (await getSellerMarketId(sellerId)) || seller.country_id || DEFAULT_COUNTRY_ID,
+  );
+  const where = inMarket(country);
   const bannerUrl =
     usableImageUrl(seller.cover_video_thumbnail_url) ||
     usableImageUrl(seller.store_banner_url) ||
     usableImageUrl(seller.avatar_url);
+  const description = clip(
+    `${name}, boutique en ligne ${where} sur Rivendy. ${seller.store_description?.trim() || "Découvrez son catalogue"} — commande et livraison suivies par Rivendy.`,
+  );
 
   return {
-    title: `${name} — Rivendy`,
-    description:
-      seller.store_description ||
-      `Découvrez les produits de ${name} sur Rivendy, la marketplace de confiance ${inMarket(country)}.`,
+    title: `${name} — boutique en ligne ${where} | Rivendy`,
+    description,
+    alternates: { canonical: `/store/${sellerId}` },
     openGraph: {
       title: name,
-      description: seller.store_description ?? "",
+      description,
       images: bannerUrl ? [{ url: bannerUrl }] : [],
       type: "website",
     },

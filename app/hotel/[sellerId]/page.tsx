@@ -17,6 +17,8 @@ import { HotelReservationForm } from "@/features/products/hotel-reservation-form
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { MarketHint } from "@/features/country/market-hint";
 import { usableImageUrl } from "@/lib/utils/image-url";
+import { inMarket } from "@/lib/utils/market-phrase";
+import { clip, getSellerMarketId } from "@/lib/seo";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -29,11 +31,13 @@ export async function generateMetadata({
   const seller = await getSellerProfileCached(sellerId);
   if (!seller) return { title: "Hôtel introuvable — Rivendy" };
   const name = seller.store_name || seller.full_name || "Hôtel Rivendy";
+  const where = inMarket(await getCountry((await getSellerMarketId(sellerId)) || seller.country_id || DEFAULT_COUNTRY_ID));
   return {
-    title: `${name} — Hôtel sur Rivendy`,
-    description:
-      seller.store_description ||
-      `Réservez une chambre chez ${name} sur Rivendy.`,
+    title: `${name} — hôtel ${where} | Rivendy`,
+    description: clip(
+      seller.store_description || `Réservez une chambre chez ${name} ${where} sur Rivendy.`,
+    ),
+    alternates: { canonical: `/hotel/${sellerId}` },
   };
 }
 

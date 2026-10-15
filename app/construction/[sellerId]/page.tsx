@@ -16,6 +16,8 @@ import { CONSTRUCTION_MATERIALS, constructionMaterialLabel } from "@/features/pr
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { MarketHint } from "@/features/country/market-hint";
 import { usableImageUrl } from "@/lib/utils/image-url";
+import { inMarket } from "@/lib/utils/market-phrase";
+import { clip, getSellerMarketId } from "@/lib/seo";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -33,11 +35,14 @@ export async function generateMetadata({
   const seller = await getSellerProfileCached(sellerId);
   if (!seller) return { title: "Fournisseur introuvable — Rivendy" };
   const name = seller.store_name || seller.full_name || "Fournisseur Rivendy";
+  const where = inMarket(await getCountry((await getSellerMarketId(sellerId)) || seller.country_id || DEFAULT_COUNTRY_ID));
   return {
-    title: `${name} — Matériaux de construction sur Rivendy`,
-    description:
+    title: `${name} — matériaux de construction ${where} | Rivendy`,
+    description: clip(
       seller.store_description ||
-      `Découvrez le catalogue de ${name} et commandez vos matériaux sur Rivendy.`,
+        `Découvrez le catalogue de ${name} ${where} et commandez vos matériaux sur Rivendy.`,
+    ),
+    alternates: { canonical: `/construction/${sellerId}` },
   };
 }
 

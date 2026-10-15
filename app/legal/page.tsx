@@ -5,6 +5,7 @@ import { LegalView } from "@/features/legal/legal-view";
 export const metadata: Metadata = {
   title: "Mentions Légales & CGU — Rivendy",
   description: "Consultez les conditions générales d'utilisation et la politique de confidentialité de Rivendy.",
+  alternates: { canonical: "/legal" },
 };
 
 export default async function LegalPage({

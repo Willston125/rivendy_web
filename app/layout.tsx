@@ -6,14 +6,21 @@ import { Providers } from "@/app/providers";
 import { AppHeader } from "@/components/layout/app-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { AppDownloadBanner } from "@/features/app-banner/app-download-banner";
+import { PLAY_LISTING_URL, SITE_URL } from "@/lib/seo";
 
 export const metadata: Metadata = {
   // Pas de modèle « %s | Rivendy » : chaque page nomme déjà Rivendy dans son
   // titre, et le modèle donnait « Connexion — Rivendy | Rivendy ».
-  title: "Rivendy — Marketplace",
+  title: "Rivendy — Vendre et acheter en ligne aux Comores et à Djibouti",
   description:
-    "Rivendy est la marketplace multi-marchés africaine. Achetez, vendez et commandez des produits locaux en toute sécurité.",
-  metadataBase: new URL("https://www.rivendy.com"),
+    "Rivendy est la marketplace des Comores, de Djibouti et de 14 autres marchés. Achetez, vendez et commandez des produits locaux en toute sécurité.",
+  metadataBase: new URL(SITE_URL),
+  // Vérification Google Search Console (méthode « balise HTML ») : renseigner
+  // GOOGLE_SITE_VERIFICATION sur Vercel puis redéployer. Inutile si le
+  // domaine est vérifié par un enregistrement DNS.
+  ...(process.env.GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
+    : {}),
   // Item K (audit) — Open Graph par défaut : tout partage d'une page sans
   // metadata propre (accueil, catégories…) affiche quand même une carte
   // complète. Les fiches produit/boutique gardent leur generateMetadata,
@@ -32,17 +39,37 @@ export const metadata: Metadata = {
 
 // Item K — données structurées globales (Organization + WebSite). Injectées
 // une seule fois à la racine ; les fiches produit portent leur JSON-LD
-// Product propre. Pas de SearchAction : le site n'a pas de route /search.
+// Product propre. Le logo est le vrai logo carré (Google l'affiche dans le
+// panneau de marque) ; `sameAs` relie le site à la fiche Google Play.
 const SITE_JSONLD = {
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
       name: "Rivendy",
-      url: "https://www.rivendy.com",
-      logo: "https://www.rivendy.com/brand/hero-woman.png",
+      url: SITE_URL,
+      logo: `${SITE_URL}/brand/rivendy-logo-square.png`,
+      description: "Marketplace pour vendre et acheter en ligne aux Comores, à Djibouti et dans 14 autres marchés.",
+      areaServed: ["Comores", "Djibouti"],
+      sameAs: [PLAY_LISTING_URL],
     },
-    { "@type": "WebSite", name: "Rivendy", url: "https://www.rivendy.com" },
+    {
+      "@type": "WebSite",
+      name: "Rivendy",
+      url: SITE_URL,
+      inLanguage: "fr",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "MobileApplication",
+      name: "Rivendy",
+      operatingSystem: "ANDROID",
+      applicationCategory: "ShoppingApplication",
+      installUrl: PLAY_LISTING_URL,
+      offers: { "@type": "Offer", price: 0, priceCurrency: "EUR" },
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
   ],
 };
 

@@ -20,6 +20,8 @@ import {
 import { DEFAULT_COUNTRY_ID, type Product } from "@/types/rivendy";
 import { MarketHint } from "@/features/country/market-hint";
 import { usableImageUrl } from "@/lib/utils/image-url";
+import { inMarket } from "@/lib/utils/market-phrase";
+import { clip, getSellerMarketId } from "@/lib/seo";
 
 const getSellerProfileCached = cache(getSellerProfile);
 
@@ -32,11 +34,14 @@ export async function generateMetadata({
   const seller = await getSellerProfileCached(sellerId);
   if (!seller) return { title: "Restaurant introuvable — Rivendy" };
   const name = seller.store_name || seller.full_name || "Restaurant Rivendy";
+  const where = inMarket(await getCountry((await getSellerMarketId(sellerId)) || seller.country_id || DEFAULT_COUNTRY_ID));
   return {
-    title: `${name} — Restaurant sur Rivendy`,
-    description:
+    title: `${name} — restaurant ${where} | Rivendy`,
+    description: clip(
       seller.store_description ||
-      `Découvrez le menu de ${name} et commandez vos plats préférés sur Rivendy.`,
+        `Découvrez le menu de ${name} ${where} et commandez vos plats préférés sur Rivendy.`,
+    ),
+    alternates: { canonical: `/restaurant/${sellerId}` },
   };
 }
 

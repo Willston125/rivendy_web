@@ -5,6 +5,8 @@ import { CATEGORIES, type CategoryId } from "@/types/rivendy";
 export const metadata: Metadata = {
   title: "Rechercher — Rivendy",
   description: "Recherchez des produits et boutiques sur Rivendy Marketplace.",
+  // Page de recherche : utile aux visiteurs, sans valeur propre pour Google.
+  robots: { index: false, follow: true },
 };
 
 // Un lien /search?q=robe (partagé, en favori) lance la recherche à l'ouverture :

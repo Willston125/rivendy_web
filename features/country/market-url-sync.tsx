@@ -9,10 +9,10 @@ import { useAuth } from "@/features/auth/auth-provider";
  * Synchronise le marché résolu (profil → localStorage) avec l'URL.
  *
  * Pourquoi : l'accueil (`app/page.tsx`) est rendu côté serveur et choisit le
- * pays UNIQUEMENT d'après `?country=`, avec fallback `DJ` si le paramètre est
+ * pays UNIQUEMENT d'après `?country=`, avec repli `HOME_MARKET_ID` (KM, lib/seo.ts) si le paramètre est
  * absent. Un utilisateur qui revient (marché déjà résolu → pas de modale)
- * atterrit sur l'URL nue `/` → le serveur affiche Djibouti même si son marché
- * est les Comores. Ce composant réécrit l'URL avec le marché résolu.
+ * atterrit sur l'URL nue `/` → le serveur affiche les Comores même si son marché
+ * est Djibouti. Ce composant réécrit l'URL avec le marché résolu.
  *
  * Règles :
  *  - N'agit que sur l'accueil `/` (seule route serveur pilotée par `?country=`).

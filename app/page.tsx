@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Zap } from "lucide-react";
 import { UniverseGrid } from "@/components/home/universe-grid";
-import { CATEGORIES, SUBCATEGORIES, DEFAULT_COUNTRY_ID, type CategoryId } from "@/types/rivendy";
+import { CATEGORIES, SUBCATEGORIES, type CategoryId } from "@/types/rivendy";
+import { HOME_MARKET_ID, homeSeo, marketHomePath } from "@/lib/seo";
 import { AdCarousel } from "@/features/ads/ad-carousel";
 import { ProductGrid } from "@/features/products/product-grid";
 import { StoriesRail } from "@/features/products/stories-rail";
@@ -57,19 +58,27 @@ export async function generateMetadata({
   searchParams: HomeSearchParams;
 }): Promise<Metadata> {
   const params = await searchParams;
-  const countryId = params.country || DEFAULT_COUNTRY_ID;
+  const countryId = params.country || HOME_MARKET_ID;
   const country = await getCountry(countryId);
-  const where = inMarket(country);
   if (params.category && !categoryOf(params.category)) notFound();
   const categoryLabel = categoryOf(params.category)?.label;
+  const { title, description } = homeSeo(country, categoryLabel);
+  // Adresse officielle : marché + catégorie + page. Tri, prix et filtres de
+  // sous-catégorie retombent sur elle ; une recherche (`?q=`) n'est jamais
+  // indexée (résultats instables, contenu dupliqué).
+  const grouped = !!params.category && GROUPED_CATEGORIES.has(params.category);
+  const page = grouped ? 1 : Math.max(1, Math.floor(Number(params.page) || 1));
+  const canonical = marketHomePath(country.id, params.category, page);
+  const shareTitle = `Rivendy — Marketplace ${country.name}`;
   return {
-    title: categoryLabel ? `${categoryLabel} ${where} — Rivendy` : `Rivendy — Achetez et vendez ${where}`,
-    description: `Rivendy est la marketplace de confiance ${where}. Achetez, vendez et commandez des produits locaux en toute sécurité.`,
+    title,
+    description,
+    alternates: { canonical },
+    ...(params.q ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
-      title: `Rivendy — Marketplace ${country.name}`,
-      description:
-        "Découvrez les produits locaux de votre marché sur Rivendy : mode, électronique, beauté, alimentation et bien plus.",
-      url: "https://www.rivendy.com",
+      title: shareTitle,
+      description,
+      url: canonical,
       siteName: "Rivendy",
       images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
       locale: "fr_FR",
@@ -77,8 +86,8 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `Rivendy — Marketplace ${country.name}`,
-      description: `Achetez et vendez ${where} avec Rivendy.`,
+      title: shareTitle,
+      description,
       images: ["/brand/hero-woman.png"],
     },
   };
@@ -125,7 +134,8 @@ export default async function HomePage({
   searchParams: HomeSearchParams;
 }) {
   const params = await searchParams;
-  const countryId = params.country || DEFAULT_COUNTRY_ID;
+  // Accueil nu `/` = Comores (priorité référencement, voir lib/seo.ts).
+  const countryId = params.country || HOME_MARKET_ID;
   // Catégorie inconnue → 404, comme un marché inconnu : sans ce garde, la page
   // affichait l'identifiant brut (« construction · 0 article »).
   if (params.category && !categoryOf(params.category)) notFound();
