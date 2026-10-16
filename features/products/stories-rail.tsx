@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { BadgeCheck } from "lucide-react";
 import { isSeen, loadSeen, markSeen } from "./story-seen-store";
 import { firstPhoto } from "@/lib/utils/format";
 import type { Product } from "@/types/rivendy";
-import { StoryViewer, type SellerStory } from "./story-viewer";
+import type { SellerStory } from "./story-viewer";
+
+// Le lecteur plein écran (≈ 600 lignes, commentaires, signalement) n'est
+// chargé qu'au premier toucher d'une story, pas avec l'accueil (audit 17, WEB-12).
+const StoryViewer = dynamic(() => import("./story-viewer").then((m) => m.StoryViewer), {
+  ssr: false,
+});
 
 /** Regroupe les produits-stories par vendeur (ordre d'apparition conservé). */
 function groupStories(products: Product[], excludeSellerId?: string | null): SellerStory[] {

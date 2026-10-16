@@ -33,6 +33,11 @@ interface PrintCatalogProps {
 
 export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatalogProps) {
   const [printing, setPrinting] = useState(false);
+  // Le catalogue imprimable n'est monté qu'à la demande (audit 17, WEB-5) :
+  // caché par CSS, ses <img> étaient quand même téléchargées par CHAQUE
+  // visiteur de la boutique — l'original de chaque photo, ≈ 4 Mo pour 50
+  // articles, en plus des vignettes déjà affichées.
+  const [armed, setArmed] = useState(false);
 
   const sellerName = seller.store_name || seller.full_name || "Boutique Rivendy";
   const activeProducts = products.filter(
@@ -40,13 +45,40 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
   );
 
   const handlePrint = () => {
+    setArmed(true);
     setPrinting(true);
-    // Permettre au DOM de s'ajuster si nécessaire
-    setTimeout(() => {
+  };
+
+  // Une fois le catalogue monté : attendre ses images (8 s au plus), puis imprimer.
+  useEffect(() => {
+    if (!printing) return;
+    let cancelled = false;
+    const run = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const images = Array.from(
+        document.querySelectorAll<HTMLImageElement>("#print-catalog-container img"),
+      );
+      const loaded = images.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+      );
+      await Promise.race([
+        Promise.all(loaded),
+        new Promise((resolve) => setTimeout(resolve, 8000)),
+      ]);
+      if (cancelled) return;
       window.print();
       setPrinting(false);
-    }, 500);
-  };
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [printing]);
 
   // « Imprimer le catalogue » du menu propriétaire déclenche la même
   // impression (il ne faisait que défiler jusqu'aux produits).
@@ -83,7 +115,9 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
         }
       ` }} />
 
-      {/* Conteneur masqué à l'écran, visible et structuré pour l'impression */}
+      {/* Conteneur masqué à l'écran, visible et structuré pour l'impression —
+          monté seulement après une demande d'impression. */}
+      {armed && (
       <div id="print-catalog-container" className="hidden print:block w-full text-slate-900 bg-white font-sans">
         {/* En-tête du catalogue */}
         <header className="border-b-4 border-[#009688] pb-6 mb-8 flex items-start justify-between">
@@ -190,6 +224,7 @@ export function PrintCatalog({ seller, products, country, storeUrl }: PrintCatal
           <p>Achetez en toute sécurité sur notre site ou application mobile.</p>
         </footer>
       </div>
+      )}
     </>
   );
 }

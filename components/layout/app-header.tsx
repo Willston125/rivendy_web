@@ -26,6 +26,7 @@ import { useCountry } from "@/features/country/country-provider";
 import { notificationDestination, useNotifications } from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
 import { useDialogs } from "@/features/ui/dialogs";
+import { marketHomePath } from "@/lib/seo";
 
 const navItems = [
   { href: "/", label: "Explorer" },
@@ -50,6 +51,10 @@ export function AppHeader() {
   const notifRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
   const dialogs = useDialogs();
+  // Accueil DU marché choisi : un lien nu « / » affichait d'abord les Comores,
+  // puis MarketUrlSync relançait tout le rendu (audit 17, WEB-3).
+  const homeHref = countryId ? marketHomePath(countryId) : "/";
+  const hrefOf = (href: string) => (href === "/" ? homeHref : href);
 
   const displayName = useMemo(() => {
     return profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Mon compte";
@@ -90,12 +95,12 @@ export function AppHeader() {
       <div className="mx-auto flex max-w-[1440px] items-center gap-2 px-4 py-2.5 lg:gap-4 lg:px-6">
 
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center">
+        <Link href={homeHref} className="flex shrink-0 items-center">
           <Image
             src="/brand/rivendy-wordmark.png"
             alt="Rivendy"
-            width={1214}
-            height={428}
+            width={204}
+            height={72}
             priority
             className="h-8 w-auto lg:h-9"
           />
@@ -122,7 +127,7 @@ export function AppHeader() {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={hrefOf(item.href)}
                 className={cn(
                   "whitespace-nowrap rounded-lg px-2 py-2 text-[13.5px] font-semibold transition-colors 2xl:px-3.5",
                   active
@@ -481,7 +486,7 @@ export function AppHeader() {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={hrefOf(item.href)}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
                     "rounded-2xl px-4 py-3 text-sm font-bold transition",

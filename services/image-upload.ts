@@ -40,6 +40,9 @@ export async function uploadProductPhotos(userId: string, files: File[]) {
       .upload(path, compressed, {
         contentType: "image/jpeg",
         upsert: false,
+        // Nom unique (horodaté, jamais réécrit) : le navigateur et le CDN
+        // peuvent garder la photo un an au lieu d'une heure (audit 17, WEB-18).
+        cacheControl: "31536000",
       });
 
     if (error) throw error;

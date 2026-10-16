@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCountry } from "@/features/country/country-provider";
 import { useAuth } from "@/features/auth/auth-provider";
+import { HOME_MARKET_ID } from "@/lib/seo";
 
 /**
  * Synchronise le marché résolu (profil → localStorage) avec l'URL.
@@ -46,6 +47,10 @@ export function MarketUrlSync() {
     if (pathname !== "/") return;
     if (!country) return;            // marché non résolu → la modale s'en charge
     if (params.get("country")) return; // choix explicite déjà présent → respecter
+    // Marché par défaut du serveur : `/` sans paramètre affiche DÉJÀ ce marché.
+    // Le réécrire relançait tout le rendu serveur (requête RSC de 219 Ko et
+    // contenu qui saute 1 à 2 s après l'affichage — audit 17, WEB-3).
+    if (country.id === HOME_MARKET_ID) return;
 
     // Si l'URL n'a pas encore le bon pays, on la corrige immédiatement
     if (replaced.current) return;

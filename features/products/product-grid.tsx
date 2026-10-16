@@ -8,6 +8,7 @@ export function ProductGrid({
   emptyLabel = "Aucun produit disponible pour ce filtre.",
   cols = 4,
   inlineAds = [],
+  countryOf,
 }: {
   products: Product[];
   country?: Country | null;
@@ -16,6 +17,8 @@ export function ProductGrid({
   cols?: 3 | 4;
   /** Affiches pub insérées comme cellules dans la grille (1 toutes les 12 produits) */
   inlineAds?: Advertisement[];
+  /** Marché propre à chaque article (devise de SON pays) — listes multi-marchés comme les favoris (audit 17, WEB-13). */
+  countryOf?: (product: Product) => Country | null | undefined;
 }) {
   if (!products.length) {
     return (
@@ -60,7 +63,7 @@ export function ProductGrid({
     <div className={`grid gap-3 ${gridClass}`}>
       {mixed.map((item) =>
         item.type === "product" ? (
-          <ProductCard key={item.data.id} product={item.data} country={country} />
+          <ProductCard key={item.data.id} product={item.data} country={countryOf?.(item.data) ?? country} />
         ) : (
           <AdCardInline key={item.key} ad={item.data} />
         )

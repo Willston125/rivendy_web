@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils/cn";
 import { firstPhoto } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
+import { useFavorites } from "@/features/products/favorites-provider";
 import { ContentFilter } from "@/lib/utils/content-filter";
 import type { Product } from "@/types/rivendy";
 import { useDialogs } from "@/features/ui/dialogs";
@@ -329,29 +330,17 @@ export function StoryViewer({ stories, initialIndex, onClose, onSellerViewed }: 
 ════════════════════════════════════════════════════════════════ */
 function LikeButton({ productId, initialCount }: { productId: string; initialCount: number }) {
   const { user } = useAuth();
+  // État partagé avec les cœurs des cartes (FavoritesProvider, audit 17 WEB-2) :
+  // aucune requête par story.
+  const { isFavorite, toggle: toggleFavorite } = useFavorites();
   const router = useRouter();
-  const [liked, setLiked] = useState(false);
+  const liked = Boolean(user) && isFavorite(productId);
   const [count, setCount] = useState(initialCount ?? 0);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setCount(initialCount ?? 0);
-    let active = true;
-    async function load() {
-      if (!user) return setLiked(false);
-      const { data } = await supabase
-        .from("favorites")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("product_id", productId)
-        .maybeSingle();
-      if (active) setLiked(Boolean(data));
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, [productId, user, initialCount]);
+  }, [productId, initialCount]);
 
   async function toggle() {
     if (!user) {
@@ -361,18 +350,12 @@ function LikeButton({ productId, initialCount }: { productId: string; initialCou
     if (busy) return;
     setBusy(true);
     const next = !liked;
-    setLiked(next);
     setCount((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
-      if (next) {
-        await supabase.from("favorites").insert({ user_id: user.id, product_id: productId });
-      } else {
-        await supabase
-          .from("favorites")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("product_id", productId);
-      }
+      await toggleFavorite(productId);
+    } catch {
+      // Refus de la base : le cœur est déjà revenu en arrière, le compteur aussi.
+      setCount((c) => Math.max(0, c + (next ? -1 : 1)));
     } finally {
       setBusy(false);
     }

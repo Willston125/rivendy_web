@@ -1,52 +1,33 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
+import { useFavorites } from "@/features/products/favorites-provider";
 
+/**
+ * Cœur « favori ». L'état vient de FavoritesProvider, lu une seule fois pour
+ * tout le site (audit 17, WEB-2) : plus aucune requête par carte.
+ */
 export function FavoriteButton({ productId, className }: { productId: string; className?: string }) {
   const { user } = useAuth();
+  const { isFavorite, toggle } = useFavorites();
   const router = useRouter();
-  const [favorite, setFavorite] = useState(false);
   const [busy, setBusy] = useState(false);
+  const favorite = Boolean(user) && isFavorite(productId);
 
-  useEffect(() => {
-    async function load() {
-      if (!user) return setFavorite(false);
-      const { data } = await supabase
-        .from("favorites")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("product_id", productId)
-        .maybeSingle();
-      setFavorite(Boolean(data));
-    }
-    load();
-  }, [productId, user]);
-
-  async function toggle() {
+  async function onToggle() {
     if (!user) {
       router.push("/auth/login");
       return;
     }
     setBusy(true);
     try {
-      if (favorite) {
-        await supabase
-          .from("favorites")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("product_id", productId);
-        setFavorite(false);
-      } else {
-        await supabase
-          .from("favorites")
-          .insert({ user_id: user.id, product_id: productId });
-        setFavorite(true);
-      }
+      await toggle(productId);
+    } catch {
+      // Refus de la base : le fournisseur a déjà remis le cœur dans son état d'avant.
     } finally {
       setBusy(false);
     }
@@ -56,7 +37,7 @@ export function FavoriteButton({ productId, className }: { productId: string; cl
     return (
       <button
         type="button"
-        onClick={toggle}
+        onClick={onToggle}
         disabled={busy}
         aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
         className={cn(className, busy && "opacity-50")}
@@ -69,7 +50,7 @@ export function FavoriteButton({ productId, className }: { productId: string; cl
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={onToggle}
       disabled={busy}
       aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
       className={cn(

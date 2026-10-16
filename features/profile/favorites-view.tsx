@@ -6,7 +6,7 @@ import { Heart, ShoppingBag } from "lucide-react";
 import { ProductGrid } from "@/features/products/product-grid";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { isVisibleInCatalog } from "@/lib/utils/format";
 import type { Product } from "@/types/rivendy";
 
@@ -62,6 +62,10 @@ function FavoritesEmpty() {
 export function FavoritesView() {
   const { user } = useAuth();
   const country = useCountryOrDefault();
+  // Un favori garde la devise de SON marché (un article de Djibouti reste en FDJ
+  // même si l’en-tête affiche les Comores — audit 17, WEB-13).
+  const { countries } = useCountry();
+  const countryOf = (p: Product) => countries.find((c) => c.id === p.country_id) ?? null;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -130,6 +134,7 @@ export function FavoritesView() {
         <ProductGrid
           products={products}
           country={country}
+          countryOf={countryOf}
           cols={4}
           emptyLabel="Aucun produit sauvegardé."
         />

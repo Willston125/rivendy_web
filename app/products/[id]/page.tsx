@@ -43,7 +43,7 @@ export async function generateMetadata(
 
   const image = Array.isArray(product.photos) && product.photos.length > 0
     ? (product.photos[0] as string)
-    : "/brand/hero-woman.png";
+    : "/brand/og-rivendy.jpg";
 
   const country = await getCountry(productMarket(product));
   const where = inMarket(country);

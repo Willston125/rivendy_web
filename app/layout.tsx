@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     title: "Rivendy — Marketplace",
     description:
       "Achetez, vendez et commandez des produits locaux en toute sécurité — Djibouti, Comores et 14 autres marchés.",
-    images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
+    images: [{ url: "/brand/og-rivendy.jpg", width: 1200, height: 630 }],
   },
   twitter: { card: "summary_large_image" },
 };

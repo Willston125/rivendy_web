@@ -7,6 +7,7 @@ import { CountryProvider } from "@/features/country/country-provider";
 import { MarketSelectorModal } from "@/features/country/market-selector-modal";
 import { MarketUrlSync } from "@/features/country/market-url-sync";
 import { NotificationsProvider } from "@/features/notifications/use-notifications";
+import { FavoritesProvider } from "@/features/products/favorites-provider";
 import { DialogsProvider } from "@/features/ui/dialogs";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -21,7 +22,9 @@ export function Providers({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <MarketUrlSync />
         </Suspense>
-        <CartProvider>{children}</CartProvider>
+        <FavoritesProvider>
+          <CartProvider>{children}</CartProvider>
+        </FavoritesProvider>
       </CountryProvider>
       </NotificationsProvider>
     </AuthProvider>

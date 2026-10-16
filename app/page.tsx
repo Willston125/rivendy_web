@@ -80,7 +80,7 @@ export async function generateMetadata({
       description,
       url: canonical,
       siteName: "Rivendy",
-      images: [{ url: "/brand/hero-woman.png", width: 1200, height: 630 }],
+      images: [{ url: "/brand/og-rivendy.jpg", width: 1200, height: 630 }],
       locale: "fr_FR",
       type: "website",
     },
@@ -88,7 +88,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title: shareTitle,
       description,
-      images: ["/brand/hero-woman.png"],
+      images: ["/brand/og-rivendy.jpg"],
     },
   };
 }

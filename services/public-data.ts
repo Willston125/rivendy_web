@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { unstable_cache } from "next/cache";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { isAdLive } from "@/features/ads/ad-window";
 import { usableImageUrl } from "@/lib/utils/image-url";
@@ -136,17 +137,28 @@ function normalizeAd(row: Record<string, unknown>): Advertisement {
  * Même règle que l'app (sélection obligatoire, aucun pays par défaut).
  */
 export async function getCountries(): Promise<Country[]> {
-  const supabase = createAnonServerClient();
-  const { data, error } = await supabase
-    .from("countries")
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
-
-  if (error) throw new Error(`Marchés indisponibles : ${error.message}`);
-  if (!data?.length) throw new Error("Marchés indisponibles : aucun marché actif.");
-  return data as Country[];
+  return getCountriesCached();
 }
+
+// Les marchés changent rarement : lus au plus toutes les 5 min, au lieu d'un
+// aller-retour vers la base à CHAQUE rendu de page (audit 17, WEB-1). Une
+// erreur lève et n'est jamais mise en cache (la règle D-2 reste entière).
+const getCountriesCached = unstable_cache(
+  async (): Promise<Country[]> => {
+    const supabase = createAnonServerClient();
+    const { data, error } = await supabase
+      .from("countries")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) throw new Error(`Marchés indisponibles : ${error.message}`);
+    if (!data?.length) throw new Error("Marchés indisponibles : aucun marché actif.");
+    return data as Country[];
+  },
+  ["countries-active-v1"],
+  { revalidate: 300, tags: ["countries"] },
+);
 
 /**
  * Le marché demandé. Un code inconnu ou inactif donne une page 404 : avant,

@@ -55,10 +55,17 @@ function CountryRow({
  * S'affiche quand needsMarketSelection = true — pas de bouton fermer.
  * Parity Flutter : _CountryPickerSheet (bottom-sheet draggable).
  */
+const MARKET_FREE_PATHS = ["/play", "/musique", "/legal", "/delete-account", "/auth/reset-password"];
+
 export function MarketSelectorModal() {
-  const { needsMarketSelection, countries, setCountryId, reloadCountries } = useCountry();
+  const { needsMarketSelection: marketMissing, countries, setCountryId, reloadCountries } = useCountry();
   const router = useRouter();
   const pathname = usePathname();
+  // Pages d'un lien partagé (Play, Musique) et pages légales : jamais bloquées
+  // par le choix du marché (audit 17, WEB-4). Un visiteur venu de WhatsApp
+  // voyait une fenêtre sans bouton fermer avant même le titre partagé.
+  const exempt = MARKET_FREE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const needsMarketSelection = marketMissing && !exempt;
   const [pending, setPending] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [retrying, setRetrying] = useState(false);
