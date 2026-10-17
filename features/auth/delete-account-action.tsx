@@ -10,9 +10,10 @@ const CONFIRM_WORD = "SUPPRIMER";
 
 /**
  * Suppression RÉELLE du compte depuis le site — même chemin que l'app
- * (`AuthProvider.deleteAccount`) : l'Edge Function `delete-user` anonymise le
- * profil, retire les annonces, purge les fichiers et supprime le compte de
- * connexion. Jusqu'au 2026-10-04 cette page renvoyait vers l'application.
+ * (`AuthProvider.deleteAccount`) : l'Edge Function `delete-user` vérifie qu'aucune
+ * opération n'est en cours, retire les annonces, supprime le compte de connexion
+ * puis purge les fichiers personnels. Jusqu'au 2026-10-04 cette page renvoyait
+ * vers l'application.
  *
  * On ne ferme la session et on n'annonce la suppression QUE si le serveur a
  * répondu `success: true` — jamais un compte annoncé supprimé qui existe encore.
@@ -55,9 +56,20 @@ export function DeleteAccountAction() {
     setError("");
     try {
       const { data, error: fnError } = await supabase.functions.invoke("delete-user", { method: "POST" });
-      const success = !fnError && data && typeof data === "object" && (data as { success?: boolean }).success === true;
+      const result = (data && typeof data === "object" ? data : {}) as {
+        success?: boolean;
+        error?: string;
+        message?: string;
+      };
+      const success = !fnError && result.success === true;
       if (!success) {
-        setError("La suppression du compte a échoué. Réessayez plus tard ou contactez le support.");
+        // Refus motivé (audit 17, SB-5) : commande en cours, solde, versement
+        // ou séjour — le serveur n'a rien touché et dit quoi faire.
+        setError(
+          !fnError && result.error === "deletion_blocked" && result.message
+            ? result.message
+            : "La suppression du compte a échoué. Réessayez plus tard ou contactez le support.",
+        );
         setBusy(false);
         return;
       }
