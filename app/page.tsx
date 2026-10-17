@@ -113,8 +113,9 @@ type HomeSearchParams = Promise<{
   page?: string;
 }>;
 
-/** Taille d'une page du fil standard. */
-const PAGE_SIZE = 60;
+/** Taille d'une page du fil standard — 30, comme l'app (audit 17, WEB-9 :
+ *  à 60, l'accueil pesait 614 Ko de HTML). */
+const PAGE_SIZE = 30;
 
 /** Accueils métier qui REGROUPENT les annonces (établissements, offres) :
  *  ils ont besoin de l'ensemble du marché, pas d'une page. */
@@ -819,9 +820,9 @@ export default async function HomePage({
               }
             />
             )}
-            {/* Pagination — miroir du « Charger plus » de l'app (30 par page,
-                ici 60) : sans elle, seuls les 60 articles les plus récents
-                étaient accessibles depuis le site. */}
+            {/* Pagination — miroir du « Charger plus » de l'app (30 par page) :
+                sans elle, seuls les articles les plus récents étaient
+                accessibles depuis le site. */}
             {(page > 1 || hasNextPage) && (
               <nav className="mt-5 flex items-center justify-center gap-3" aria-label="Pagination">
                 {page > 1 && (

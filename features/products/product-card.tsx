@@ -141,10 +141,33 @@ export function ProductCard({
         {/* ── Action ──────────────────────────────────────────── */}
         {!isEpuise && (
           <div className="border-t border-slate-100 pt-2.5">
-            <ProductCardAction product={product} />
+            <ProductCardAction product={forCart(product)} />
           </div>
         )}
       </div>
     </article>
   );
+}
+
+/**
+ * Article transmis au bouton panier, donc écrit dans la page pour le
+ * navigateur (audit 17, WEB-9) : sans les textes et dates que ni le panier ni
+ * le paiement ne lisent — ils relisent prix, photos et stock en base avant de
+ * commander.
+ */
+function forCart(product: Product): Product {
+  return {
+    ...product,
+    description: "",
+    package_contents: "",
+    reject_reason: null,
+    seller_avatar_url: null,
+    video_thumbnail_url: null,
+    story_started_at: null,
+    story_expires_at: null,
+    epuise_at: null,
+    sold_at: null,
+    created_at: "",
+    updated_at: "",
+  };
 }

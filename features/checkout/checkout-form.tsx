@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
 import { CartNotice } from "@/features/cart/cart-notice";
-import { useCountry } from "@/features/country/country-provider";
+import { useCountry, usePaymentMethods } from "@/features/country/country-provider";
 
 import { formatMoney, isOrderable, orderId } from "@/lib/utils/format";
 import { compressImage } from "@/services/image-upload";
@@ -92,9 +92,10 @@ export function CheckoutForm() {
   const {
     country: displayedCountry,
     countries,
-    paymentMethods: displayedMethods,
     needsMarketSelection,
   } = useCountry();
+  // Audit 17 (WEB-10) : chargés ici, au paiement, plus au démarrage de chaque page.
+  const { paymentMethods: displayedMethods, loading: displayedMethodsLoading } = usePaymentMethods();
   const marketGuard = useForeignMarketGuard();
 
   // Verrou anti double envoi, posé AVANT tout await (comme _isProcessing de
@@ -158,7 +159,7 @@ export function CheckoutForm() {
     };
   }, [otherMarketId]);
   const loadedMethods = cartMarketMethods?.market === otherMarketId ? cartMarketMethods?.methods : undefined;
-  const methodsLoading = !!otherMarketId && !loadedMethods;
+  const methodsLoading = otherMarketId ? !loadedMethods : displayedMethodsLoading;
   const paymentMethods = otherMarketId ? loadedMethods ?? [] : displayedMethods;
 
   const totalAmount = buyNow ? Number(buyNow.product.price) * buyNow.quantity : cart.totalAmount;

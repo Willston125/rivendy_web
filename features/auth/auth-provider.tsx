@@ -94,9 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // « Mes commandes » en chargement infini, verrou
     // `lock:sb-…-auth-token` tenu sans fin. Le travail sort du verrou par
     // setTimeout (recommandation Supabase).
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
+      // Audit 17 (WEB-10) : INITIAL_SESSION redonne la session que getSession()
+      // ci-dessus vient de lire, et dont il charge déjà le profil — le profil
+      // était lu deux fois au démarrage de chaque page.
+      if (event === "INITIAL_SESSION") return;
       setTimeout(() => {
         if (!mounted) return;
         void loadProfileFor(nextSession?.user?.id ?? null).finally(() => {

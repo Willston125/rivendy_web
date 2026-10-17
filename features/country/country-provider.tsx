@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/features/auth/auth-provider";
 import { supabase } from "@/lib/supabase/client";
 import type { Country, PaymentMethod } from "@/types/rivendy";
 
@@ -21,7 +22,12 @@ type CountryContextValue = {
   /** True si l'init est terminée, aucun marché résolu, ET la liste des pays est disponible. */
   needsMarketSelection: boolean;
   countries: Country[];
+  /** Moyens de paiement du marché actif — chargés seulement quand un écran
+   *  les demande (usePaymentMethods), vides sinon. */
   paymentMethods: PaymentMethod[];
+  paymentMethodsLoading: boolean;
+  /** Demande le chargement des moyens de paiement (usePaymentMethods). */
+  requestPaymentMethods: () => void;
   loading: boolean;
   setCountryId: (countryId: string) => Promise<void>;
   /** Relance le chargement des pays (utilisé par le modal si la liste est vide). */
@@ -69,19 +75,6 @@ async function fetchPaymentMethods(countryId: string): Promise<PaymentMethod[]> 
   return (data as PaymentMethod[] | null) ?? [];
 }
 
-/** Lit active_market_country_id depuis profiles si l'utilisateur est connecté. */
-async function fetchProfileMarket(): Promise<string | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select("active_market_country_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  return (data as { active_market_country_id?: string | null } | null)
-    ?.active_market_country_id ?? null;
-}
-
 /** Persiste active_market_country_id dans profiles — best-effort. */
 async function persistProfileMarket(marketId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -97,8 +90,16 @@ async function persistProfileMarket(marketId: string): Promise<void> {
 export function CountryProvider({ children }: { children: ReactNode }) {
   const [country, setCountry] = useState<Country | null>(null);
   const [countries, setCountries] = useState<Country[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  // Audit 17 (WEB-10) : moyens de paiement chargés au paiement seulement
+  // (ils l'étaient au démarrage de chaque page), pour le marché actif.
+  const [methodsWanted, setMethodsWanted] = useState(false);
+  const [loadedMethods, setLoadedMethods] = useState<{ market: string; methods: PaymentMethod[] } | null>(null);
   const [loading, setLoading] = useState(true);
+  // Audit 17 (WEB-10) : le marché du profil vient du profil déjà chargé par
+  // l'authentification — plus de getUser() (réseau) ni de seconde lecture.
+  const { profile, loading: authLoading } = useAuth();
+  const [listLoaded, setListLoaded] = useState(false);
+  const initDone = useRef(false);
   // Marché suggéré par la page ouverte (lien partagé vers un article ou une boutique).
   // La ref est lue par l'init ; l'état couvre une suggestion arrivée après elle.
   const hintRef = useRef<string | null>(null);
@@ -110,21 +111,35 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   const hintPending = !!hint && countries.some((c) => c.id === hint);
   const needsMarketSelection = !loading && country === null && countries.length > 0 && !hintPending;
 
-  const loadPaymentMethods = useCallback(async (countryId: string) => {
-    const methods = await fetchPaymentMethods(countryId);
-    setPaymentMethods(methods);
-  }, []);
+  const requestPaymentMethods = useCallback(() => setMethodsWanted(true), []);
+  const methodsMarket = methodsWanted ? country?.id ?? null : null;
+  useEffect(() => {
+    if (!methodsMarket) return;
+    let cancelled = false;
+    fetchPaymentMethods(methodsMarket).then((methods) => {
+      if (!cancelled) setLoadedMethods({ market: methodsMarket, methods });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [methodsMarket]);
+  const paymentMethods = useMemo(
+    () => (methodsMarket && loadedMethods?.market === methodsMarket ? loadedMethods.methods : []),
+    [methodsMarket, loadedMethods],
+  );
+  // Vrai aussi avant la première demande : l'écran qui les demande ne doit
+  // pas afficher les moyens de secours le temps que la demande parte.
+  const paymentMethodsLoading = !!country && (!methodsWanted || loadedMethods?.market !== country.id);
 
   const reloadCountries = useCallback(async () => {
     const list = await fetchActiveMarkets();
     if (list.length > 0) setCountries(list);
   }, []);
 
+  // Liste des marchés, en parallèle du chargement de la session et du profil.
   useEffect(() => {
-    async function init() {
-      setLoading(true);
-      let resolved: Country | null = null;
-
+    let cancelled = false;
+    (async () => {
       // Retry jusqu'à 3 fois si Supabase est lent à démarrer (cold start Vercel)
       let list: Country[] = [];
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -132,11 +147,28 @@ export function CountryProvider({ children }: { children: ReactNode }) {
         if (list.length > 0) break;
         if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
       }
+      if (cancelled) return;
       setCountries(list);
+      setListLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Résolution du marché, une fois la liste ET le profil (ou son absence) connus.
+  useEffect(() => {
+    if (!listLoaded || authLoading || initDone.current) return;
+    initDone.current = true;
+    const list = countries;
+    const profileMarketId =
+      (profile as { active_market_country_id?: string | null } | null)?.active_market_country_id ?? null;
+
+    async function init() {
+      let resolved: Country | null = null;
 
       // Étape 0 — Profil Supabase (source autoritaire, parity with Flutter step 0)
       try {
-        const profileMarketId = await fetchProfileMarket();
         if (profileMarketId) {
           resolved = list.find((c) => c.id === profileMarketId) ?? null;
           if (!resolved) {
@@ -177,16 +209,13 @@ export function CountryProvider({ children }: { children: ReactNode }) {
       // Étape 2 — Aucun marché résolu → needsMarketSelection (RÈGLE : pas de fallback DJ silencieux)
       setCountry(resolved);
 
-      if (resolved) {
-        localStorage.setItem(LS_KEY, resolved.id);
-        await loadPaymentMethods(resolved.id);
-      }
+      if (resolved) localStorage.setItem(LS_KEY, resolved.id);
 
       setLoading(false);
     }
 
-    init();
-  }, [loadPaymentMethods]);
+    void init();
+  }, [listLoaded, authLoading, countries, profile]);
 
   const setCountryId = useCallback(
     async (countryId: string) => {
@@ -195,12 +224,11 @@ export function CountryProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem(LS_KEY, next.id);
       setCountry(next);
-      await loadPaymentMethods(next.id);
 
       // Parity Flutter : persister dans profiles.active_market_country_id
       persistProfileMarket(next.id).catch(() => null);
     },
-    [countries, loadPaymentMethods],
+    [countries],
   );
 
   const suggestMarket = useCallback((countryId: string) => {
@@ -216,12 +244,33 @@ export function CountryProvider({ children }: { children: ReactNode }) {
     if (!next) return;
     localStorage.setItem(LS_KEY, next.id);
     setCountry(next);
-    void loadPaymentMethods(next.id);
-  }, [hint, loading, country, countries, loadPaymentMethods]);
+  }, [hint, loading, country, countries]);
 
   const value = useMemo<CountryContextValue>(
-    () => ({ country, needsMarketSelection, countries, paymentMethods, loading, setCountryId, reloadCountries, suggestMarket }),
-    [country, needsMarketSelection, countries, loading, paymentMethods, setCountryId, reloadCountries, suggestMarket],
+    () => ({
+      country,
+      needsMarketSelection,
+      countries,
+      paymentMethods,
+      paymentMethodsLoading,
+      requestPaymentMethods,
+      loading,
+      setCountryId,
+      reloadCountries,
+      suggestMarket,
+    }),
+    [
+      country,
+      needsMarketSelection,
+      countries,
+      loading,
+      paymentMethods,
+      paymentMethodsLoading,
+      requestPaymentMethods,
+      setCountryId,
+      reloadCountries,
+      suggestMarket,
+    ],
   );
 
   return <CountryContext.Provider value={value}>{children}</CountryContext.Provider>;
@@ -231,6 +280,19 @@ export function useCountry() {
   const context = useContext(CountryContext);
   if (!context) throw new Error("useCountry must be used inside CountryProvider");
   return context;
+}
+
+/**
+ * Moyens de paiement du marché actif, chargés à la première demande (audit
+ * 17, WEB-10). `loading` : liste pas encore arrivée — ne pas proposer de
+ * moyens de secours en attendant.
+ */
+export function usePaymentMethods(): { paymentMethods: PaymentMethod[]; loading: boolean } {
+  const { paymentMethods, paymentMethodsLoading, requestPaymentMethods } = useCountry();
+  useEffect(() => {
+    requestPaymentMethods();
+  }, [requestPaymentMethods]);
+  return { paymentMethods, loading: paymentMethodsLoading };
 }
 
 /**
