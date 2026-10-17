@@ -36,10 +36,15 @@ export function SearchView({
   const [searched, setSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Audit 17 (WEB-23) : numéro de la dernière recherche lancée — une réponse
+  // plus ancienne arrivée après coup n'écrase plus les résultats récents
+  // (« recherche dans le désordre »).
+  const requestRef = useRef(0);
 
   const subcategories = category ? SUBCATEGORIES[category] ?? [] : [];
 
   async function doSearch(q: string, cat: CategoryId | null, sub: string | null) {
+    const requestId = ++requestRef.current;
     setLoading(true);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,6 +66,7 @@ export function SearchView({
     }
 
     const { data } = await dbQuery;
+    if (requestId !== requestRef.current) return; // une recherche plus récente est partie
     setProducts((data as Product[]) ?? []);
     setSearched(true);
     setLoading(false);
@@ -76,6 +82,7 @@ export function SearchView({
     if (timerRef.current) clearTimeout(timerRef.current);
 
     if (!query.trim() && !category) {
+      requestRef.current++; // une réponse en vol ne doit plus rien afficher
       setProducts([]);
       setSearched(false);
       return;

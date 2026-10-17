@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { PlayLinkPage, UUID_RE, type PlayLinkContent } from "@/features/play/play-link-page";
 
@@ -78,6 +79,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function PlayTitleLinkPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const t = await getTitle(id);
+  // Audit 17 (WEB-21) : introuvable → 404 (écran « indisponible » : not-found.tsx).
+  if (!t) notFound();
   // Chemin bâti sur l'identifiant VALIDÉ (lu en base), jamais sur l'URL brute :
   // il entre dans une adresse intent:// (« J'ai déjà l'application »).
   return <PlayLinkPage path={t ? `/play/title/${t.id}` : "/play"} content={t ? toContent(t) : null} />;

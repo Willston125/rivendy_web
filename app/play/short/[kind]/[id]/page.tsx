@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { PlayLinkPage, UUID_RE, type PlayLinkContent } from "@/features/play/play-link-page";
 
@@ -79,6 +80,8 @@ export async function generateMetadata({
 export default async function PlayShortLinkPage({ params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
   const c = await getShort(kind, id);
+  // Audit 17 (WEB-21) : introuvable → 404.
+  if (!c) notFound();
   // Chemin repris seulement s'il est VALIDE (type connu, uuid) : il entre dans
   // une adresse intent:// (« J'ai déjà l'application »).
   return <PlayLinkPage path={c ? `/play/short/${kind}/${id.toLowerCase()}` : "/play"} content={c} />;

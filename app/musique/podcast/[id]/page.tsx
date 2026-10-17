@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { UUID_RE } from "@/features/play/play-link-page";
 import { MusiqueLinkPage, formatMusiqueDuration, type MusiqueLinkContent } from "@/features/musique/musique-link-page";
@@ -75,6 +76,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function MusiquePodcastLinkPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const found = await getPodcast(id);
+  // Audit 17 (WEB-21) : introuvable → 404.
+  if (!found) notFound();
   return (
     <MusiqueLinkPage
       path={found ? `/musique/podcast/${found.podcast.id}` : "/"}

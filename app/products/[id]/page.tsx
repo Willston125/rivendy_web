@@ -131,7 +131,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       "@type": "Offer",
       price: Number(product.price ?? 0),
       priceCurrency: isoCurrency,
-      availability: "https://schema.org/InStock",
+      // Audit 17 (WEB-24) : la vraie disponibilité (c'était toujours « en stock »).
+      availability:
+        product.product_type === "preorder"
+          ? "https://schema.org/PreOrder"
+          : ["epuise", "sold", "deleted"].includes(String(product.status)) || Number(product.stock_quantity ?? 1) <= 0
+            ? "https://schema.org/OutOfStock"
+            : "https://schema.org/InStock",
       url: `${siteUrl}/products/${product.id}`,
       ...(product.seller_name
         ? { seller: { "@type": "Organization", name: product.seller_name } }

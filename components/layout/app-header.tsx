@@ -18,7 +18,7 @@ import {
   Plus,
   Menu,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCart } from "@/features/cart/cart-provider";
@@ -39,12 +39,10 @@ const navItems = [
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const params = useSearchParams();
   const { profile, user, signOut } = useAuth();
   const { totalItems } = useCart();
   const { country: countryOrNull, countries, setCountryId, needsMarketSelection } = useCountry();
   const countryId = countryOrNull?.id ?? "";
-  const [query, setQuery] = useState(params.get("q") ?? "");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -65,21 +63,12 @@ export function AppHeader() {
     return name.slice(0, 1).toUpperCase();
   }, [profile, user]);
 
-  function onSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const next = new URLSearchParams(params.toString());
-    if (query.trim()) next.set("q", query.trim());
-    else next.delete("q");
-    if (countryId) next.set("country", countryId);
-    router.push(`/?${next.toString()}`);
-  }
-
   function changeCountry(newCountryId: string) {
     // Mise à jour de l'état client SANS bloquer la navigation : si setCountryId
     // traîne (chargement des moyens de paiement) ou échoue, l'URL doit changer
     // quand même → c'est `?country=` qui pilote le rendu serveur (produits/pubs).
     void setCountryId(newCountryId);
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(window.location.search);
     next.set("country", newCountryId);
     // push vers la nouvelle URL suffit à re-rendre le serveur. PAS de
     // router.refresh() ici : il rechargerait la route COURANTE (ancien pays)
@@ -106,19 +95,10 @@ export function AppHeader() {
           />
         </Link>
 
-        {/* Barre de recherche — desktop */}
-        <form onSubmit={onSearch} className="relative hidden min-w-0 flex-1 xl:block xl:max-w-xl 2xl:max-w-2xl">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            name="q"
-            aria-label="Rechercher sur Rivendy"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un produit, une boutique..."
-            className="h-11 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#009688] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,150,136,0.1)]"
-          />
-        </form>
+        {/* Barre de recherche — desktop (seule à lire ?q=, sous Suspense : WEB-11) */}
+        <Suspense fallback={<HeaderSearchForm initial="" variant="desktop" countryId={countryId} />}>
+          <HeaderSearch variant="desktop" countryId={countryId} />
+        </Suspense>
 
         {/* Nav desktop — liens texte */}
         <nav className="hidden items-center gap-1 xl:flex">
@@ -433,18 +413,9 @@ export function AppHeader() {
 
       {/* ── Barre de recherche mobile ──────────────────────────────── */}
       <div className="px-4 pb-2.5 xl:hidden">
-        <form onSubmit={onSearch} className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            name="q"
-            aria-label="Rechercher sur Rivendy"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher sur Rivendy..."
-            className="h-10 w-full rounded-full border-0 bg-slate-50 pl-9 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#009688]/25"
-          />
-        </form>
+        <Suspense fallback={<HeaderSearchForm initial="" variant="mobile" countryId={countryId} />}>
+          <HeaderSearch variant="mobile" countryId={countryId} />
+        </Suspense>
       </div>
 
       {/* ── Menu mobile déroulant ──────────────────────────────────── */}
@@ -566,5 +537,69 @@ export function AppHeader() {
         </div>
       )}
     </header>
+  );
+}
+
+/**
+ * Barre de recherche, isolée sous Suspense (audit 17, WEB-11) : c'est la
+ * seule partie de l'en-tête qui lit `?q=` — tout l'en-tête était sinon
+ * rendu seulement dans le navigateur, absent du HTML des pages statiques.
+ */
+function HeaderSearch({ variant, countryId }: { variant: "desktop" | "mobile"; countryId: string }) {
+  const params = useSearchParams();
+  const q = params.get("q") ?? "";
+  return <HeaderSearchForm key={q} initial={q} variant={variant} countryId={countryId} />;
+}
+
+function HeaderSearchForm({
+  initial,
+  variant,
+  countryId,
+}: {
+  initial: string;
+  variant: "desktop" | "mobile";
+  countryId: string;
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState(initial);
+
+  function onSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const next = new URLSearchParams(window.location.search);
+    if (query.trim()) next.set("q", query.trim());
+    else next.delete("q");
+    if (countryId) next.set("country", countryId);
+    router.push(`/?${next.toString()}`);
+  }
+
+  if (variant === "desktop") {
+    return (
+      <form onSubmit={onSearch} className="relative hidden min-w-0 flex-1 xl:block xl:max-w-xl 2xl:max-w-2xl">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          name="q"
+          aria-label="Rechercher sur Rivendy"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher un produit, une boutique..."
+          className="h-11 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#009688] focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,150,136,0.1)]"
+        />
+      </form>
+    );
+  }
+  return (
+    <form onSubmit={onSearch} className="relative">
+      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <input
+        type="search"
+        name="q"
+        aria-label="Rechercher sur Rivendy"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Rechercher sur Rivendy..."
+        className="h-10 w-full rounded-full border-0 bg-slate-50 pl-9 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#009688]/25"
+      />
+    </form>
   );
 }

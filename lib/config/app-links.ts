@@ -11,11 +11,13 @@ export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || "";
 /** Au moins un lien store est-il configuré ? */
 export const HAS_APP_LINKS = Boolean(PLAY_STORE_URL || APP_STORE_URL);
 
-/** Choisit le bon lien selon la plateforme détectée (UA). */
-export function storeUrlForUA(ua: string): string {
+/**
+ * Choisit le bon lien selon la plateforme détectée (UA). null : aucune app
+ * pour cet appareil — audit 17 (WEB-24) : un iPhone était envoyé vers
+ * Google Play, où rien ne s'installe.
+ */
+export function storeUrlForUA(ua: string): string | null {
   const isIOS = /iPad|iPhone|iPod/.test(ua);
-  if (isIOS && APP_STORE_URL) return APP_STORE_URL;
-  if (!isIOS && PLAY_STORE_URL) return PLAY_STORE_URL;
-  // Fallback : le premier lien disponible, sinon l'accueil.
-  return PLAY_STORE_URL || APP_STORE_URL || "/";
+  if (isIOS) return APP_STORE_URL || null;
+  return PLAY_STORE_URL || null;
 }

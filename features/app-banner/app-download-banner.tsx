@@ -29,7 +29,10 @@ export function AppDownloadBanner() {
     if (dismissedAt && Date.now() - dismissedAt < SNOOZE_MS) return;
 
     const ua = navigator.userAgent || "";
-    setStoreUrl(storeUrlForUA(ua));
+    const url = storeUrlForUA(ua);
+    // Pas d'app pour cet appareil (iPhone sans App Store) : pas de bannière.
+    if (!url) return;
+    setStoreUrl(url);
 
     const isMobile =
       /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || window.innerWidth < 768;
