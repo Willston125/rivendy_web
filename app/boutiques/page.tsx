@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { BadgeCheck, Store } from "lucide-react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { createAnonServerClient } from "@/lib/supabase/server";
@@ -41,7 +42,11 @@ const supabaseImage = (url: string) => (/^https:\/\/[a-z0-9]+\.supabase\.co\//i.
 
 const categoryLabel = (id: string) => CATEGORIES.find((c) => c.id === id)?.label ?? "Boutique";
 
-async function getMarketStores(countryId: string): Promise<StoreEntry[]> {
+/** Audit 17 (WEB-16) : relu au plus toutes les 5 minutes par marché (c'était
+ *  à chaque visite, jusqu'à 5 000 lignes). */
+const getMarketStores = unstable_cache(readMarketStores, ["market-stores"], { revalidate: 300 });
+
+async function readMarketStores(countryId: string): Promise<StoreEntry[]> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from("visible_products")

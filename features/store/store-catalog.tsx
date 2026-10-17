@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Search, LayoutGrid, List } from "lucide-react";
@@ -10,6 +10,9 @@ import { ProductCardAction, ProductCardFavorite } from "@/features/products/prod
 import { categoryLabel, firstPhoto, formatMoney } from "@/lib/utils/format";
 import { distinctCategories } from "@/features/store/store-helpers";
 import { useStoreBrowse } from "@/features/store/store-browse-context";
+
+/** Articles affichés à la fois (audit 17, WEB-17 : tout le catalogue d'un coup). */
+const STEP = 24;
 
 export function StoreCatalog({
   products,
@@ -34,6 +37,13 @@ export function StoreCatalog({
     else sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return sorted;
   }, [products, query, category, sort]);
+
+  // Repart de 24 dès que la recherche, la catégorie ou le tri change.
+  const filterKey = `${query}|${category}|${sort}`;
+  const [limit, setLimit] = useState({ key: filterKey, count: STEP });
+  const count = limit.key === filterKey ? limit.count : STEP;
+  const visible = filtered.slice(0, count);
+  const remaining = filtered.length - visible.length;
 
   return (
     <div className="space-y-4">
@@ -119,7 +129,7 @@ export function StoreCatalog({
       {/* Vue grille ou liste */}
       {view === "grid" ? (
         <ProductGrid
-          products={filtered}
+          products={visible}
           country={country}
           cols={4}
           emptyLabel="Aucun produit ne correspond à votre recherche."
@@ -130,7 +140,7 @@ export function StoreCatalog({
         </div>
       ) : (
         <div className="space-y-2.5">
-          {filtered.map((p) => (
+          {visible.map((p) => (
             <div
               key={p.id}
               className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:border-slate-200 hover:shadow-md"
@@ -159,6 +169,18 @@ export function StoreCatalog({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {remaining > 0 && (
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            onClick={() => setLimit({ key: filterKey, count: count + STEP })}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-[#009688] hover:text-[#009688]"
+          >
+            Afficher plus ({remaining})
+          </button>
         </div>
       )}
     </div>

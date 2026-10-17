@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { createAnonServerClient } from "@/lib/supabase/server";
@@ -390,27 +391,62 @@ export async function getSellerPublicProducts(sellerId: string, countryId?: stri
  * Tous les prix affichés sont ainsi natifs du marché choisi, sans conversion.
  */
 export async function getSellerStorefront(sellerId: string, requestedMarket?: string | null) {
-  const all = await getSellerPublicProducts(sellerId);
-  const counts = new Map<string, number>();
-  for (const p of all) {
-    if (p.country_id) counts.set(p.country_id, (counts.get(p.country_id) ?? 0) + 1);
-  }
   const requested = (requestedMarket ?? "").trim().toUpperCase();
-  let market: string | null = requested && counts.has(requested) ? requested : null;
-  if (!market) {
-    let best = 0;
-    for (const [id, n] of counts) {
-      if (n > best) {
-        best = n;
-        market = id;
-      }
+  // Audit 17 (WEB-17) : les articles du SEUL marché affiché — c'était tout le
+  // catalogue, tous marchés (un article publié sur 16 marchés = 16 lignes),
+  // toutes colonnes. Le marché demandé est en général le bon : ses articles
+  // sont lus en même temps que les comptes par marché.
+  const [counts, guess] = await Promise.all([
+    getSellerMarketCounts(sellerId),
+    requested ? getSellerPublicProducts(sellerId, requested) : Promise.resolve(null),
+  ]);
+  const market = pickSellerMarket(counts, requested);
+  const products =
+    market && market === requested && guess
+      ? guess
+      : await getSellerPublicProducts(sellerId, market ?? undefined);
+  return { market, products, markets: [...counts.keys()] };
+}
+
+/** Marché d'une boutique, sans lire ses articles (métadonnées, liens). */
+export async function getSellerMarket(sellerId: string, requestedMarket?: string | null) {
+  const counts = await getSellerMarketCounts(sellerId);
+  return pickSellerMarket(counts, (requestedMarket ?? "").trim().toUpperCase());
+}
+
+/**
+ * Articles visibles du vendeur par marché, sur une seule colonne. Partagé
+ * dans une même requête (métadonnées + page lisaient chacune tout le
+ * catalogue).
+ */
+const getSellerMarketCounts = cache(async (sellerId: string): Promise<Map<string, number>> => {
+  const supabase = createAnonServerClient();
+  const { data, error } = await supabase
+    .from("visible_products")
+    .select("country_id")
+    .eq("seller_id", sellerId)
+    .order("created_at", { ascending: false });
+  const counts = new Map<string, number>();
+  if (error || !data) return counts;
+  for (const row of data) {
+    const id = row.country_id as string | null;
+    if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+});
+
+/** 1. le marché demandé s'il a des articles ; 2. sinon celui qui en a le plus. */
+function pickSellerMarket(counts: Map<string, number>, requested: string): string | null {
+  if (requested && counts.has(requested)) return requested;
+  let market: string | null = null;
+  let best = 0;
+  for (const [id, n] of counts) {
+    if (n > best) {
+      best = n;
+      market = id;
     }
   }
-  return {
-    market,
-    products: market ? all.filter((p) => p.country_id === market) : all,
-    markets: [...counts.keys()],
-  };
+  return market;
 }
 
 export async function getStoreTrustSummary(sellerId: string) {

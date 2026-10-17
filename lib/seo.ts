@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { PLAY_STORE_URL } from "@/lib/config/app-links";
 import { inMarket } from "@/lib/utils/market-phrase";
-import { getSellerStorefront } from "@/services/public-data";
+import { getSellerMarket } from "@/services/public-data";
 import type { Country } from "@/types/rivendy";
 
 /**
@@ -101,7 +101,7 @@ export function clip(text: string, max = 155): string {
  */
 export const getSellerMarketId = cache(async (sellerId: string): Promise<string | null> => {
   try {
-    return (await getSellerStorefront(sellerId)).market;
+    return await getSellerMarket(sellerId);
   } catch {
     return null;
   }
