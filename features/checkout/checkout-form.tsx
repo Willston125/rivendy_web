@@ -89,9 +89,12 @@ export function CheckoutForm() {
   const { user, profile } = useAuth();
   const cart = useCart();
   const { removeItem, revalidateCart } = cart;
-  const { country: countryOrNull, paymentMethods, needsMarketSelection } = useCountry();
-  // country est alias de countryOrNull — utilise optional chaining partout
-  const country = countryOrNull;
+  const {
+    country: displayedCountry,
+    countries,
+    paymentMethods: displayedMethods,
+    needsMarketSelection,
+  } = useCountry();
   const marketGuard = useForeignMarketGuard();
 
   // Verrou anti double envoi, posé AVANT tout await (comme _isProcessing de
@@ -119,6 +122,45 @@ export function CheckoutForm() {
         : cart.groups,
     [buyNow, cart.groups],
   );
+  // 💱 Marché du PANIER (audit 17, WEB-6) : devise, moyens de paiement, numéro
+  // Mobile Money, zones de livraison et format du téléphone suivent le marché
+  // des ARTICLES, pas le marché affiché. Un acheteur qui parcourait Djibouti
+  // avec un panier des Comores voyait des FDJ, D-Money et les zones de
+  // Djibouti, alors que la commande est enregistrée aux Comores (la base
+  // tire le marché des articles). Miroir de orderMarketFor (app).
+  // country : marché du panier, à défaut le marché affiché — optional chaining partout.
+  const cartMarketId = useMemo(
+    () => groups.flatMap((g) => g.items).find((i) => i.product.country_id)?.product.country_id ?? null,
+    [groups],
+  );
+  const country =
+    cartMarketId && cartMarketId !== displayedCountry?.id
+      ? countries.find((c) => c.id === cartMarketId) ?? displayedCountry
+      : displayedCountry;
+  const otherMarket = !!country && !!displayedCountry && country.id !== displayedCountry.id;
+  // Moyens de paiement du marché du panier quand il n'est pas le marché affiché.
+  const [cartMarketMethods, setCartMarketMethods] = useState<{ market: string; methods: PaymentMethod[] } | null>(null);
+  const otherMarketId = otherMarket && country ? country.id : null;
+  useEffect(() => {
+    if (!otherMarketId) return;
+    let cancelled = false;
+    void supabase
+      .from("payment_methods")
+      .select("*")
+      .eq("country_id", otherMarketId)
+      .eq("is_active", true)
+      .order("display_order")
+      .then(({ data }) => {
+        if (!cancelled) setCartMarketMethods({ market: otherMarketId, methods: (data as PaymentMethod[] | null) ?? [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [otherMarketId]);
+  const loadedMethods = cartMarketMethods?.market === otherMarketId ? cartMarketMethods?.methods : undefined;
+  const methodsLoading = !!otherMarketId && !loadedMethods;
+  const paymentMethods = otherMarketId ? loadedMethods ?? [] : displayedMethods;
+
   const totalAmount = buyNow ? Number(buyNow.product.price) * buyNow.quantity : cart.totalAmount;
   const totalItems = buyNow ? buyNow.quantity : cart.totalItems;
   const sellerCount = buyNow ? 1 : cart.sellerCount;
@@ -167,8 +209,8 @@ export function CheckoutForm() {
   // ── Computed ──────────────────────────────────────────────────────────────
 
   const fallbackMethods: PaymentMethod[] = useMemo(() => fallbackPaymentMethods(country?.id), [country?.id]);
-  const activeMethods = paymentMethods.length ? paymentMethods : fallbackMethods;
-  const noPaymentMethod = activeMethods.length === 0;
+  const activeMethods = methodsLoading ? [] : paymentMethods.length ? paymentMethods : fallbackMethods;
+  const noPaymentMethod = !methodsLoading && activeMethods.length === 0;
 
   // Instructions Mobile Money : numéro du marché (mobile-money.ts, miroir de
   // l'app) quand il est configuré — l'acheteur sait où envoyer le paiement.
@@ -882,6 +924,12 @@ export function CheckoutForm() {
         {/* Méthodes de paiement */}
         <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-base font-black text-slate-950">Mode de paiement</h2>
+          {otherMarket && (
+            <p className="mb-3 rounded-xl bg-[#F5F7FA] p-3 text-xs font-semibold text-slate-600">
+              Vos articles sont vendus sur le marché {country?.name} : paiement, prix et livraison
+              sont ceux de ce marché.
+            </p>
+          )}
           {noPaymentMethod && (
             <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
               Aucun moyen de paiement n&apos;est encore configuré pour ce marché. Contactez Rivendy depuis
