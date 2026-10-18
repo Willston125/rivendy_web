@@ -4,7 +4,8 @@ import { appIntentUrl, PLAY_STORE_URL } from "@/features/play/play-link-page";
 
 /**
  * Rivendy Musique — page de repli d'un lien partagé (lot 4, 2026-10-16) :
- * `/musique/release/{id}` et `/musique/podcast/{id}`.
+ * `/musique/release/{id}`, `/musique/podcast/{id}` et, depuis le lot M6
+ * (2026-10-18), `/musique/story/{id}` (story d'un artiste, 24 h ou « À la une »).
  *
  * Avec l'application Rivendy (version qui contient Rivendy Musique), Android
  * ouvre le lien DIRECTEMENT dans l'app (App Link, même hôte vérifié que /store
@@ -24,6 +25,8 @@ export type MusiqueLinkContent = {
   image?: string | null;
   /** Titres ou épisodes, pour donner envie (titre + durée « 3:05 »). */
   items?: { title: string; duration?: string | null }[];
+  /** Phrase d'invitation sous le contenu (sinon celle d'une sortie). */
+  note?: string;
 };
 
 export function formatMusiqueDuration(seconds: number | null | undefined): string | null {
@@ -34,7 +37,15 @@ export function formatMusiqueDuration(seconds: number | null | undefined): strin
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
-export function MusiqueLinkPage({ path, content }: { path: string; content: MusiqueLinkContent | null }) {
+export function MusiqueLinkPage({
+  path,
+  content,
+  unavailableTitle = "Ce contenu n’est plus disponible",
+}: {
+  path: string;
+  content: MusiqueLinkContent | null;
+  unavailableTitle?: string;
+}) {
   return (
     <div className="min-h-[80vh] bg-[#0D0B19] px-4 py-10 text-slate-100">
       <div className="mx-auto flex max-w-3xl flex-col items-center gap-8 md:flex-row md:items-start">
@@ -54,7 +65,7 @@ export function MusiqueLinkPage({ path, content }: { path: string; content: Musi
             {content ? content.kicker : "Rivendy Musique"}
           </p>
           <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">
-            {content ? content.title : "Ce contenu n’est plus disponible"}
+            {content ? content.title : unavailableTitle}
           </h1>
           {content?.subtitle ? <p className="mt-2 text-sm font-semibold text-slate-300">{content.subtitle}</p> : null}
           {content?.description ? (
@@ -75,7 +86,8 @@ export function MusiqueLinkPage({ path, content }: { path: string; content: Musi
 
           <p className="mt-6 text-sm text-slate-400">
             {content
-              ? "Écoutez-le en entier, ajoutez-le à vos playlists et suivez vos artistes dans l’application Rivendy."
+              ? (content.note ??
+                "Écoutez-le en entier, ajoutez-le à vos playlists et suivez vos artistes dans l’application Rivendy.")
               : "Découvrez les singles, albums et podcasts de Rivendy Musique dans l’application Rivendy."}
           </p>
 
