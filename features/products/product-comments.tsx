@@ -117,7 +117,7 @@ export function ProductComments({
 
     // Filtrage de contenu
     if (!ContentFilter.isClean(trimmed)) {
-      setErrorMsg(ContentFilter.errorMessage);
+      setErrorMsg(ContentFilter.messageFor(trimmed));
       return;
     }
 
@@ -148,8 +148,10 @@ export function ProductComments({
         setComments((prev) => [data as ProductComment, ...prev]);
         setText("");
       }
-    } catch {
-      setErrorMsg("Erreur lors de la publication du commentaire. Veuillez réessayer.");
+    } catch (err) {
+      setErrorMsg(ContentFilter.isServerContactRefusal(err)
+        ? ContentFilter.contactMessage
+        : "Erreur lors de la publication du commentaire. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }

@@ -123,7 +123,7 @@ export function StoreRatings({ sellerId, onRatingSubmitted }: StoreRatingsProps)
 
     const trimmedComment = comment.trim();
     if (trimmedComment.length > 0 && !ContentFilter.isClean(trimmedComment)) {
-      setErrorMsg(ContentFilter.errorMessage);
+      setErrorMsg(ContentFilter.messageFor(trimmedComment));
       return;
     }
 

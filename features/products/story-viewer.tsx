@@ -465,7 +465,7 @@ function CommentsPanel({
     // Même filtre que les commentaires de la fiche produit et que l'app
     // (story_comments_sheet) : les commentaires de story passaient sans.
     if (!ContentFilter.isClean(trimmed)) {
-      notify(ContentFilter.errorMessage, "error");
+      notify(ContentFilter.messageFor(trimmed), "error");
       return;
     }
     setSending(true);
@@ -499,6 +499,11 @@ function CommentsPanel({
       // app_notifications pour un TIERS (policy auth.uid() = user_id depuis le
       // 2026-09-02). L'insert était refusé en silence. Le vendeur est prévenu
       // par le trigger serveur notify_seller_new_comment.
+    } else if (error) {
+      // Audit n° 19 (LM19-1) : le serveur refuse aussi numéros et liens.
+      notify(ContentFilter.isServerContactRefusal(error)
+        ? ContentFilter.contactMessage
+        : "Le commentaire n'a pas pu être publié. Réessayez.", "error");
     }
   }
 
