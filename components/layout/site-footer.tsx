@@ -31,6 +31,7 @@ const AIDE = [
   { href: "/help", label: "Aide & support" },
   { href: "/legal?tab=privacy", label: "Confidentialité" },
   { href: "/legal?tab=cgu", label: "Conditions d'utilisation" },
+  { href: "/droits-auteur", label: "Droits d'auteur" },
 ];
 
 const TRUST = [

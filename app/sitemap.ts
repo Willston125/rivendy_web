@@ -31,6 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl(storesPath(HOME_MARKET_ID)), lastModified: now, changeFrequency: "daily", priority: 0.8 },
     { url: absoluteUrl("/help"), lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: absoluteUrl("/legal"), lastModified: now, changeFrequency: "yearly", priority: 0.1 },
+    { url: absoluteUrl("/droits-auteur"), lastModified: now, changeFrequency: "yearly", priority: 0.1 },
   ];
 
   let dynamic: MetadataRoute.Sitemap = [];
