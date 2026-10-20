@@ -55,6 +55,12 @@ export function orderFailureMessage(raw: string | null | undefined, productTitle
       // 2026-10-03 : la base refuse les produits d'un autre marché que celui
       // de création du compte (20261003_orders_home_market_only.sql).
       return "Votre commande contient des articles d'un autre pays que celui de votre compte : Rivendy ne prend pas encore ces commandes. Retirez-les du panier, ou passez par « Sur commande » pour acheter des produits d'un autre pays.";
+    // Audit 19 (MK19-2) : refus de l'audit 17, affichés jusqu'ici en code.
+    case "mixed_sellers":
+    case "seller_mismatch":
+      return "Votre panier a changé depuis son ouverture (un article a changé de boutique). Rechargez la page, vérifiez votre panier puis réessayez.";
+    case "mixed_markets":
+      return "Votre commande mélange des articles de deux pays. Passez une commande par pays.";
   }
 
   const suffix = code ? ` (code : ${code.slice(0, 80)})` : "";

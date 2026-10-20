@@ -188,6 +188,9 @@ export function CheckoutForm() {
   // Méthode de paiement sélectionnée
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [transactionRef, setTransactionRef] = useState("");
+  // Audit 19 (MK19-4) : numéro qui envoie le paiement Mobile Money — l'équipe
+  // rapproche le virement de la commande (orders.payer_phone).
+  const [payerPhone, setPayerPhone] = useState("");
   // Note libre transmise à l'équipe Rivendy (`p_order_note`). L'app l'envoie
   // depuis le 2026-08-30 — c'est par là que passe l'ordonnance d'une commande
   // pharmacie ou une précision de livraison. Le web ne l'envoyait pas : la
@@ -505,6 +508,9 @@ export function CheckoutForm() {
             p_payment_status: paymentStatus,
             p_country_id: orderMarket,
             p_transaction_ref: transactionRef.trim() || null,
+            ...(selectedMethod?.type !== "cash" && payerPhone.trim()
+              ? { p_payer_phone: payerPhone.trim() }
+              : {}),
             p_order_note: orderNoteParam,
             p_items: group.items.map((item) => ({
               product_id: item.product.id,
@@ -952,7 +958,7 @@ export function CheckoutForm() {
           <div
             className={`overflow-hidden transition-all duration-300 ease-out ${
               selectedMethod?.type !== "cash" && selectedMethod !== null
-                ? "mt-4 max-h-48 opacity-100"
+                ? "mt-4 max-h-80 opacity-100"
                 : "max-h-0 opacity-0"
             }`}
           >
@@ -962,6 +968,16 @@ export function CheckoutForm() {
                   ? `Envoyez ${formatMoney(amountDue, country)} au ${mobileMoneyTarget.name} ${mobileMoneyTarget.number}, puis indiquez la référence de la transaction.`
                   : "L'équipe Rivendy vous indiquera comment régler par ce moyen."}
               </p>
+              <Label htmlFor="payerPhone" className="text-sm font-bold text-slate-700">
+                Numéro qui envoie le paiement
+              </Label>
+              <Input
+                id="payerPhone"
+                type="tel"
+                value={payerPhone}
+                onChange={(e) => setPayerPhone(e.target.value)}
+                placeholder="Votre numéro Mobile Money"
+              />
               <Label htmlFor="transactionRef" className="text-sm font-bold text-slate-700">
                 Référence de paiement (optionnel)
               </Label>
