@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellRing, Info, Loader2, MessageSquareText, Store, Tag } from "lucide-react";
+import { BellRing, Clapperboard, Info, Loader2, MessageSquareText, Music, Store, Tag } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils/cn";
  * (app) et de la table `notification_preferences` (PROTECTED_ZONES §1.13).
  *
  * Règles du contrat, à ne pas assouplir :
- *  - TROIS familles seulement. Commandes, livraison, modération et sécurité
+ *  - CINQ familles seulement (Rivendy Play et Rivendy Musique ajoutées le
+ *    2026-10-20, audit 19 lot E, comme dans l'app). Commandes, livraison,
+ *    modération et sécurité
  *    ne se coupent pas — l'écran le dit au lieu de le cacher ;
  *  - la coupure porte sur le PUSH (téléphone), jamais sur la notification :
  *    l'historique reste complet, ici comme dans l'app ;
@@ -20,10 +22,23 @@ import { cn } from "@/lib/utils/cn";
  *  - pas de suppression de ligne (aucune policy DELETE, volontairement).
  */
 
-type Prefs = { push_reviews: boolean; push_follows: boolean; push_offers: boolean };
+type Prefs = {
+  push_reviews: boolean;
+  push_follows: boolean;
+  push_offers: boolean;
+  push_play: boolean;
+  push_musique: boolean;
+};
 type Family = keyof Prefs;
 
-const ALL_ON: Prefs = { push_reviews: true, push_follows: true, push_offers: true };
+const ALL_ON: Prefs = {
+  push_reviews: true,
+  push_follows: true,
+  push_offers: true,
+  push_play: true,
+  push_musique: true,
+};
+const COLUMNS = "push_reviews, push_follows, push_offers, push_play, push_musique";
 
 const FAMILIES: { key: Family; label: string; sub: string; icon: LucideIcon }[] = [
   {
@@ -44,6 +59,18 @@ const FAMILIES: { key: Family; label: string; sub: string; icon: LucideIcon }[] 
     sub: "Promotions et annonces de Rivendy",
     icon: Tag,
   },
+  {
+    key: "push_play",
+    label: "Rivendy Play",
+    sub: "Nouveaux abonnés, commentaires, nouvelles vidéos des créateurs suivis",
+    icon: Clapperboard,
+  },
+  {
+    key: "push_musique",
+    label: "Rivendy Musique",
+    sub: "Nouvelles sorties et stories des artistes suivis",
+    icon: Music,
+  },
 ];
 
 export function NotificationPreferencesView() {
@@ -59,7 +86,7 @@ export function NotificationPreferencesView() {
     let cancelled = false;
     supabase
       .from("notification_preferences")
-      .select("push_reviews, push_follows, push_offers")
+      .select(COLUMNS)
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
@@ -83,7 +110,7 @@ export function NotificationPreferencesView() {
     const { data, error } = await supabase
       .from("notification_preferences")
       .upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() }, { onConflict: "user_id" })
-      .select("push_reviews, push_follows, push_offers");
+      .select(COLUMNS);
     setSaving(null);
     if (error || !data || data.length === 0) {
       setMessage({ ok: false, text: "Le réglage n'a pas pu être enregistré. Réessayez." });
