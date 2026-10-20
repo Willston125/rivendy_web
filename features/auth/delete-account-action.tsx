@@ -24,6 +24,8 @@ export function DeleteAccountAction() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deleted, setDeleted] = useState(false);
+  // Audit 19 (RG19-2) : Pass en cours → la suppression attend un accord explicite.
+  const [passUntil, setPassUntil] = useState<string | null | undefined>(undefined);
 
   if (deleted) {
     return (
@@ -50,18 +52,28 @@ export function DeleteAccountAction() {
     );
   }
 
-  async function remove() {
+  async function remove(acceptPassLoss = false) {
     if (busy || typed.trim().toUpperCase() !== CONFIRM_WORD) return;
     setBusy(true);
     setError("");
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("delete-user", { method: "POST" });
+      const { data, error: fnError } = await supabase.functions.invoke("delete-user", {
+        method: "POST",
+        body: { accept_pass_loss: acceptPassLoss },
+      });
       const result = (data && typeof data === "object" ? data : {}) as {
         success?: boolean;
         error?: string;
         message?: string;
+        confirm?: string;
+        pass_expires_at?: string | null;
       };
       const success = !fnError && result.success === true;
+      if (!fnError && result.confirm === "pass_loss") {
+        setPassUntil(result.pass_expires_at ?? null);
+        setBusy(false);
+        return;
+      }
       if (!success) {
         // Refus motivé (audit 17, SB-5) : commande en cours, solde, versement
         // ou séjour — le serveur n'a rien touché et dit quoi faire.
@@ -96,9 +108,29 @@ export function DeleteAccountAction() {
         className="mt-3 h-11 w-full rounded-xl border border-red-200 bg-white px-3 text-sm font-semibold outline-none focus:border-red-400"
       />
       {error && <p className="mt-2 text-sm font-semibold text-red-700">{error}</p>}
+      {passUntil !== undefined && (
+        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-bold">Votre Pass sera perdu</p>
+          <p className="mt-1">
+            Votre Pass Rivendy est actif
+            {passUntil
+              ? ` jusqu’au ${new Date(passUntil).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`
+              : ""}
+            . Si vous supprimez votre compte maintenant, les jours restants sont perdus et ne sont pas remboursés.
+          </p>
+          <button
+            type="button"
+            onClick={() => remove(true)}
+            disabled={busy}
+            className="mt-2 inline-flex h-10 items-center gap-2 rounded-xl border border-red-300 bg-white px-3 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            Supprimer quand même
+          </button>
+        </div>
+      )}
       <button
         type="button"
-        onClick={remove}
+        onClick={() => remove()}
         disabled={busy || typed.trim().toUpperCase() !== CONFIRM_WORD}
         className="mt-3 inline-flex h-11 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
       >

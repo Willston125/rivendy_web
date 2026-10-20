@@ -72,6 +72,17 @@ export default function DeleteAccountPage() {
             profil, informations de boutique.
           </li>
           <li>Vos annonces / produits publiés sont retirés du catalogue.</li>
+          <li>
+            Rivendy Play et Rivendy Musique : vos Shorts, clips, sorties
+            musicales, stories et vidéos (effacées de nos serveurs vidéo), vos
+            playlists, J&apos;aime, abonnements, « Ma liste », reprises de
+            lecture et historique.
+          </li>
+          <li>
+            Un Pass en cours est perdu et n&apos;est pas remboursé : il vous est
+            demandé de le confirmer avant la suppression. Si une demande de Pass
+            attend la réponse de Rivendy, attendez sa validation ou son refus.
+          </li>
         </ul>
 
         <h3 className="mt-6 text-base font-semibold text-slate-900">
@@ -80,8 +91,9 @@ export default function DeleteAccountPage() {
         <p className="mt-2 text-slate-700">
           Pour des raisons légales, comptables et de prévention de la fraude,
           l&apos;historique des commandes déjà réalisées (montants, statut de
-          livraison) est conservé de manière anonymisée : votre nom n&apos;y est
-          plus associé de façon identifiable.
+          livraison) et des paiements (Pass, boosts, abonnements, versements)
+          est conservé de manière anonymisée : votre nom n&apos;y est plus
+          associé de façon identifiable.
         </p>
       </section>
 

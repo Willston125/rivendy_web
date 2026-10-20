@@ -19,7 +19,9 @@ export function friendlyLoginError(raw: string): string {
   const common = commonError(raw);
   if (common) return common;
   if (raw.includes("Invalid login credentials") || raw.includes("invalid_credentials")) {
-    return "Numéro ou mot de passe incorrect.";
+    // Audit 19 (RG19-1) : avant la 1.4.8 de l'app, changer de numéro dans les
+    // Réglages ne changeait pas le numéro de connexion.
+    return "Numéro ou mot de passe incorrect. Si vous aviez changé de numéro dans l’application, essayez aussi votre ancien numéro.";
   }
   if (raw.includes("Email not confirmed")) {
     return "Compte non confirmé. Contactez le support Rivendy.";
