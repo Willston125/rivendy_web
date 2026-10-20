@@ -56,6 +56,23 @@ export function FollowButton({ sellerId, onFollowChanged }: FollowButtonProps) {
     setToggling(true);
 
     try {
+      // Audit 19, lot I (IU19-4) : un seul « S'abonner » — la boutique ET le
+      // créateur (Play, Musique) de la même personne. Sans la fonction
+      // serveur (PGRST202) : l'abonnement à la boutique seul, comme avant.
+      const { data: both, error: personError } = await supabase.rpc("person_follow", {
+        p_user: sellerId,
+        p_on: !following,
+        p_from: "store",
+      });
+      if (!personError && both && typeof both === "object" && "success" in both) {
+        const r = both as { success: boolean; store?: boolean };
+        if (r.success) {
+          setFollowing(!!r.store);
+          if (onFollowChanged) onFollowChanged(!!r.store);
+        }
+        return;
+      }
+      if (personError && personError.code !== "PGRST202") return;
       if (following) {
         // Désabonnement
         await supabase

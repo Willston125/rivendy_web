@@ -92,15 +92,14 @@ export default async function StorePage({
   const [storefront, trust, followCountRes] = await Promise.all([
     getSellerStorefront(sellerId, requestedMarket),
     getStoreTrustSummary(sellerId),
-    createAnonServerClient()
-      .from("store_follows")
-      .select("id", { count: "exact", head: true })
-      .eq("seller_id", sellerId),
+    // Audit 19, lot I (IU19-4) : la liste des abonnés n'est plus publique ;
+    // le NOMBRE reste public par la fonction serveur.
+    createAnonServerClient().rpc("get_store_followers_count", { p_seller_id: sellerId }),
   ]);
   const products = storefront.products;
   const country = await getCountry(storefront.market || seller.country_id || DEFAULT_COUNTRY_ID);
 
-  const followersCount = followCountRes.count ?? 0;
+  const followersCount = typeof followCountRes.data === "number" ? followCountRes.data : 0;
 
   const activeProducts = products.filter(
     (p) => p.status === "active" || p.status === "boosted",
