@@ -4,11 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Heart, Library, Loader2, Lock, Plus, Search, Trash2, UserCheck, UserPlus } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountry } from "@/features/country/country-provider";
 import { useDialogs } from "@/features/ui/dialogs";
-import { fetchHomeMarketId } from "@/features/products/publish-market-dialog";
+import { useHomeMarket } from "@/features/media/use-home-market";
 import { appIntentUrl } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -25,18 +23,7 @@ import {
 import { Cover, MusicNav, MusicPage, PlayAllButton, PremiumTag, ReleaseGrid, TrackList, playlistMessage, toQueue } from "./music-ui";
 
 /** Marché d'écoute : marché d'origine du compte, sinon le pays choisi (comme l'app). */
-export function useMusicMarket(): string | null {
-  const { user } = useAuth();
-  const { country } = useCountry();
-  const [home, setHome] = useState<string | null>(null);
-  useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    void fetchHomeMarketId(supabase, user.id).then((m) => { if (alive) setHome(m); });
-    return () => { alive = false; };
-  }, [user]);
-  return (user ? home : null) ?? country?.id ?? null;
-}
+export const useMusicMarket = useHomeMarket;
 
 function Spinner() {
   return <div className="py-10 text-center text-white/60"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>;

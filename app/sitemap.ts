@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { CATEGORIES } from "@/types/rivendy";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { absoluteUrl, HOME_MARKET_ID, marketHomePath, storesPath } from "@/lib/seo";
+import { titlePath } from "@/features/play/play-logic";
+import { listPublishedTitles } from "@/features/play/server/play-server";
 
 // Plafond raisonnable pour rester dans la limite d'un sitemap (50 000 URLs) et
 // borner le coût du build. Au-delà, il faudrait un index de sitemaps paginés.
@@ -35,6 +37,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Rivendy Musique (Omnicanal lot D, 2026-10-21).
     { url: absoluteUrl("/music"), lastModified: now, changeFrequency: "daily", priority: 0.7 },
     { url: absoluteUrl("/music/hit"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
+    // Rivendy Play (Omnicanal lot C, 2026-10-22).
+    { url: absoluteUrl("/play"), lastModified: now, changeFrequency: "daily", priority: 0.7 },
+    { url: absoluteUrl("/play/movies"), lastModified: now, changeFrequency: "daily", priority: 0.5 },
+    { url: absoluteUrl("/play/series"), lastModified: now, changeFrequency: "daily", priority: 0.5 },
+    { url: absoluteUrl("/play/clips"), lastModified: now, changeFrequency: "daily", priority: 0.5 },
   ];
 
   let dynamic: MetadataRoute.Sitemap = [];
@@ -123,5 +130,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     albums = [];
   }
 
-  return [...base, ...dynamic, ...albums];
+  // Films, séries et clips publiés : une fiche complète chacun.
+  let videos: MetadataRoute.Sitemap = [];
+  try {
+    videos = (await listPublishedTitles(1000)).map((t) => ({
+      url: absoluteUrl(titlePath(t)),
+      lastModified: new Date(t.published_at || now),
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    }));
+  } catch {
+    videos = [];
+  }
+
+  return [...base, ...dynamic, ...albums, ...videos];
 }

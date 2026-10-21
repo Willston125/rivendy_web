@@ -4,7 +4,9 @@ import { ProductVideoPlayer } from "@/features/products/product-video-player";
 
 /**
  * Rivendy Play — page de repli d'un lien partagé (lot K de l'audit 16,
- * 2026-10-14) : `/play/title/{id}` et `/play/short/{rivendy|public}/{id}`.
+ * 2026-10-14) : `/play/short/{rivendy|public}/{id}`, et l'écran « indisponible »
+ * de /play. `/play/title/{id}` redirige désormais vers la fiche complète
+ * (Omnicanal lot C).
  *
  * Avec l'application Rivendy (1.3.4 et suivantes), Android ouvre le lien
  * DIRECTEMENT dans l'app (App Link, même hôte vérifié que /store). Cette page

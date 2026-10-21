@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { useDialogs } from "@/features/ui/dialogs";
+import { MEDIA_PLAY_EVENT, deviceId } from "@/features/media/device-id";
 import {
   countPlay, fetchStreamGrant, listenProgress, playbackClose, playbackPing, type StreamGrant,
 } from "../music-api";
@@ -61,21 +62,6 @@ type PlayerContext = {
 const Ctx = createContext<PlayerContext | null>(null);
 
 const STORE_KEY = "rivendy_music_queue_v1";
-const DEVICE_KEY = "rivendy_device_id";
-/** Une vidéo (lot C) ou la musique : un seul média à la fois sur le site. */
-export const MEDIA_PLAY_EVENT = "rivendy:media-play";
-
-function deviceId(): string {
-  try {
-    const kept = localStorage.getItem(DEVICE_KEY);
-    if (kept && /^[A-Za-z0-9_-]{8,100}$/.test(kept)) return kept;
-    const fresh = crypto.randomUUID();
-    localStorage.setItem(DEVICE_KEY, fresh);
-    return fresh;
-  } catch {
-    return `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
 
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const { user, session } = useAuth();

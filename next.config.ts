@@ -19,7 +19,10 @@ const scriptSources = [
 // ⚠️ Ajouter un service tiers (analytics, carte, paiement) = l'ajouter ICI,
 // sinon il est bloqué en silence (visible seulement dans la console).
 // Cloudflare Stream : miniatures, lecteur (iframe) et envoi direct des vidéos
-// depuis le navigateur (parité vidéo app/site du 2026-10-04).
+// depuis le navigateur (parité vidéo app/site du 2026-10-04). Rivendy Play sur
+// le site (Omnicanal lot C) : hls.js charge le manifeste et les segments
+// (connexions), Safari les lit en HLS natif (médias), et hls.js travaille dans
+// un worker créé depuis un blob: (worker-src).
 const STREAM_HOST = "https://customer-22iqkw4cwdg7uf5h.cloudflarestream.com";
 const STREAM_UPLOAD = "https://upload.cloudflarestream.com https://upload.videodelivery.net";
 
@@ -28,12 +31,13 @@ const csp = [
   `img-src 'self' data: blob: ${SUPABASE_HOST} ${STREAM_HOST}`,
   // Notes vocales (Storage Supabase), préécoute d'un enregistrement (blob:) et
   // Rivendy Music (Omnicanal lot D) : liens audio signés du stockage R2.
-  `media-src 'self' blob: ${SUPABASE_HOST} https://*.r2.cloudflarestorage.com`,
+  `media-src 'self' blob: ${SUPABASE_HOST} https://*.r2.cloudflarestorage.com ${STREAM_HOST}`,
   `frame-src ${STREAM_HOST}`,
   "style-src 'self' 'unsafe-inline'",
   scriptSources,
   "font-src 'self' data:",
-  `connect-src 'self' ${SUPABASE_HOST} wss://eiifosnczbgymcbhycwe.supabase.co ${STREAM_UPLOAD}`,
+  `connect-src 'self' ${SUPABASE_HOST} wss://eiifosnczbgymcbhycwe.supabase.co ${STREAM_UPLOAD} ${STREAM_HOST}`,
+  "worker-src 'self' blob:",
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",

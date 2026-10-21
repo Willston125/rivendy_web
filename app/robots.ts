@@ -25,6 +25,11 @@ export default function robots(): MetadataRoute.Robots {
           "/music/favorites",
           "/music/history",
           "/music/search",
+          // Rivendy Play (Omnicanal lot C) : lecteur et pages du compte.
+          "/play/watch",
+          "/play/my-list",
+          "/play/history",
+          "/play/search",
         ],
       },
     ],

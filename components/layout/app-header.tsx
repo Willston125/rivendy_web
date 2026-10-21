@@ -35,6 +35,8 @@ const navItems = [
   { href: "/hotels", label: "Hôtels" },
   // Rivendy Musique complète sur le site (Omnicanal lot D, 2026-10-21)
   { href: "/music", label: "Musique" },
+  // Rivendy Play complet sur le site (Omnicanal lot C, 2026-10-22)
+  { href: "/play", label: "Play" },
   { href: "/seller", label: "Ma boutique" },
 ];
 

@@ -16,6 +16,7 @@ const ACHETER = [
   { href: "/boutiques", label: "Toutes les boutiques" },
   { href: "/preorders", label: "Sur commande" },
   { href: "/music", label: "Rivendy Musique" },
+  { href: "/play", label: "Rivendy Play" },
   { href: "/favorites", label: "Mes favoris" },
   { href: "/cart", label: "Mon panier" },
 ];
