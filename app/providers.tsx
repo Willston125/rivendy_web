@@ -9,6 +9,8 @@ import { MarketUrlSync } from "@/features/country/market-url-sync";
 import { NotificationsProvider } from "@/features/notifications/use-notifications";
 import { FavoritesProvider } from "@/features/products/favorites-provider";
 import { DialogsProvider } from "@/features/ui/dialogs";
+import { MusicPlayerProvider } from "@/features/music/player/music-player-provider";
+import { MiniPlayer } from "@/features/music/player/mini-player";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -23,7 +25,14 @@ export function Providers({ children }: { children: ReactNode }) {
           <MarketUrlSync />
         </Suspense>
         <FavoritesProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            {/* Rivendy Music (Omnicanal lot D) : un seul lecteur pour tout le site,
+                monté ici pour que la navigation interne ne coupe pas le son. */}
+            <MusicPlayerProvider>
+              {children}
+              <MiniPlayer />
+            </MusicPlayerProvider>
+          </CartProvider>
         </FavoritesProvider>
       </CountryProvider>
       </NotificationsProvider>

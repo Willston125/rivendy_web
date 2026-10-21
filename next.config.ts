@@ -26,8 +26,9 @@ const STREAM_UPLOAD = "https://upload.cloudflarestream.com https://upload.videod
 const csp = [
   "default-src 'self'",
   `img-src 'self' data: blob: ${SUPABASE_HOST} ${STREAM_HOST}`,
-  // Notes vocales (Storage Supabase) et préécoute d'un enregistrement (blob:).
-  `media-src 'self' blob: ${SUPABASE_HOST}`,
+  // Notes vocales (Storage Supabase), préécoute d'un enregistrement (blob:) et
+  // Rivendy Music (Omnicanal lot D) : liens audio signés du stockage R2.
+  `media-src 'self' blob: ${SUPABASE_HOST} https://*.r2.cloudflarestorage.com`,
   `frame-src ${STREAM_HOST}`,
   "style-src 'self' 'unsafe-inline'",
   scriptSources,
@@ -60,6 +61,15 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
+  },
+  // Rivendy Music (Omnicanal lot D, 2026-10-21) : les sorties ont leur page
+  // complète sous /music. L'app intercepte toujours ses liens /musique/… avant
+  // toute requête (App Links) : la redirection ne concerne que le navigateur.
+  async redirects() {
+    return [
+      { source: "/musique/release/:id", destination: "/music/album/:id", permanent: true },
+      { source: "/musique", destination: "/music", permanent: true },
+    ];
   },
   async headers() {
     return [

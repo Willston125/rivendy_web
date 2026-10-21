@@ -33,6 +33,8 @@ const navItems = [
   { href: "/preorders", label: "Sur commande" },
   // Réservation hôtelière en ligne (parité app, 2026-10-04)
   { href: "/hotels", label: "Hôtels" },
+  // Rivendy Musique complète sur le site (Omnicanal lot D, 2026-10-21)
+  { href: "/music", label: "Musique" },
   { href: "/seller", label: "Ma boutique" },
 ];
 

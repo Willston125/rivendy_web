@@ -55,7 +55,7 @@ function CountryRow({
  * S'affiche quand needsMarketSelection = true — pas de bouton fermer.
  * Parity Flutter : _CountryPickerSheet (bottom-sheet draggable).
  */
-const MARKET_FREE_PATHS = ["/play", "/musique", "/legal", "/delete-account", "/auth/reset-password"];
+const MARKET_FREE_PATHS = ["/play", "/musique", "/music", "/artist", "/legal", "/delete-account", "/auth/reset-password"];
 
 export function MarketSelectorModal() {
   const { needsMarketSelection: marketMissing, countries, setCountryId, reloadCountries } = useCountry();

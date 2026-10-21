@@ -32,6 +32,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl("/help"), lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: absoluteUrl("/legal"), lastModified: now, changeFrequency: "yearly", priority: 0.1 },
     { url: absoluteUrl("/droits-auteur"), lastModified: now, changeFrequency: "yearly", priority: 0.1 },
+    // Rivendy Musique (Omnicanal lot D, 2026-10-21).
+    { url: absoluteUrl("/music"), lastModified: now, changeFrequency: "daily", priority: 0.7 },
+    { url: absoluteUrl("/music/hit"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
   ];
 
   let dynamic: MetadataRoute.Sitemap = [];
@@ -100,5 +103,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     dynamic = [];
   }
 
-  return [...base, ...dynamic];
+  // Sorties musicales publiées : une page complète chacune (/music/album).
+  let albums: MetadataRoute.Sitemap = [];
+  try {
+    const supabase = createAnonServerClient();
+    const { data } = await supabase
+      .from("music_releases")
+      .select("id, published_at")
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(1000);
+    albums = (data ?? []).map((r) => ({
+      url: absoluteUrl(`/music/album/${r.id as string}`),
+      lastModified: new Date((r.published_at as string) || now),
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    }));
+  } catch {
+    albums = [];
+  }
+
+  return [...base, ...dynamic, ...albums];
 }

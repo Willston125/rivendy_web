@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { X, Smartphone, Download } from "lucide-react";
 import { HAS_APP_LINKS, storeUrlForUA } from "@/lib/config/app-links";
+import { useMusicPlayerOptional } from "@/features/music/player/music-player-provider";
 
 /**
  * Bannière "Télécharger l'app Rivendy".
@@ -16,6 +17,8 @@ const LS_KEY = "rivendy_app_banner_dismissed_at";
 const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 
 export function AppDownloadBanner() {
+  // Le mini-lecteur Rivendy Music occupe le bas de l'écran : le bandeau s'efface.
+  const musicPlaying = !!useMusicPlayerOptional()?.current;
   const [platform, setPlatform] = useState<"mobile" | "desktop" | null>(null);
   const [storeUrl, setStoreUrl] = useState("/");
 
@@ -44,7 +47,7 @@ export function AppDownloadBanner() {
     setPlatform(null);
   }
 
-  if (!platform) return null;
+  if (!platform || musicPlaying) return null;
 
   const AppIcon = (
     <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
