@@ -200,6 +200,10 @@ export function notificationDestination(n: AppNotification): string | null {
     case "order_placed":
     case "delivery_code":
       return "/orders";
+    case "play_pass":
+      // Rivendy+ et Pass (Omnicanal lot B, 2026-10-21) : statut, demandes,
+      // reçus. Le site seul montre le motif d'un refus.
+      return "/plus/abonnement";
     default:
       // "security", "delivery_assigned" (espace livreur : app uniquement)
       // et les types inconnus n'ont pas de destination sur le site.
@@ -212,5 +216,6 @@ export function notificationLinkLabel(destination: string): string {
   if (destination === "/wallet") return "Voir mon portefeuille";
   if (destination === "/orders") return "Voir ma commande";
   if (destination === "/seller/sales") return "Voir mes articles";
+  if (destination === "/plus/abonnement") return "Voir mon abonnement";
   return "Voir le produit";
 }

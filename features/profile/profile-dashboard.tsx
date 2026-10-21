@@ -17,6 +17,7 @@ import {
   Store,
   UserRound,
   Wallet,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
@@ -65,6 +66,7 @@ const NAV_LINKS = [
   { href: "/profile/password",         icon: KeyRound,  label: "Sécurité & mot de passe" },
   { href: "/profile/payment-methods",  icon: Wallet,    label: "Modes de paiement" },
   { href: "/hotels/bookings",          icon: BedDouble, label: "Mes réservations d'hôtel" },
+  { href: "/plus/abonnement",          icon: Sparkles,  label: "Rivendy+ — mon abonnement" },
   { href: "/profile/settings",         icon: Settings,  label: "Paramètres" },
   { href: "/seller",                   icon: Store,     label: "Mon espace vendeur" },
 ];
