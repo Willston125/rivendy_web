@@ -8,11 +8,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
+import { useCountry } from "@/features/country/country-provider";
 import { PLAY_STORE_URL } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
+import { marketHomePath } from "@/lib/seo";
 import { useMusicLibrary } from "./music-library";
 import { loginHref } from "./music-pending";
-import { useMusicPlayer } from "./player/music-player-provider";
 
 /**
  * Coque de l'espace Musique du site (refonte du 2026-10-22, maquette
@@ -38,7 +39,6 @@ export function MusicShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/music";
   const { user } = useAuth();
   const library = useMusicLibrary();
-  const player = useMusicPlayer();
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Hauteur réelle de l'en-tête global (une ou deux lignes selon l'écran) :
@@ -79,9 +79,11 @@ export function MusicShell({ children }: { children: ReactNode }) {
   return (
     <div ref={rootRef} className="rvm-scope min-h-[calc(100dvh-var(--rvm-top,64px))] bg-rvm-ground text-rvm-text [--rvm-top:64px]">
       <div className="mx-auto flex max-w-[1680px]">
+        {/* Hauteur utile = écran − en-tête global − lecteur fixe (--rvm-player-h,
+            publié par le lecteur) : le bloc artiste du bas reste visible. */}
         <aside aria-label="Navigation Musique"
-          className="sticky top-[var(--rvm-top)] hidden h-[calc(100dvh-var(--rvm-top))] w-64 shrink-0 flex-col border-r border-rvm-line bg-rvm-panel lg:flex">
-          <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6", player.current ? "pb-28" : "pb-6")}>
+          className="sticky top-[var(--rvm-top)] hidden h-[calc(100dvh-var(--rvm-top)-var(--rvm-player-h,0px))] w-64 shrink-0 flex-col border-r border-rvm-line bg-rvm-panel lg:flex">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-5 pt-6">
             <Link href="/music" className="mb-6 flex items-center gap-3 rounded-xl px-3 py-1">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rvm-accent/15 text-rvm-accent">
                 <AudioLines className="h-5 w-5" aria-hidden />
@@ -97,7 +99,7 @@ export function MusicShell({ children }: { children: ReactNode }) {
 
             <div className="mt-6">
               <div className="flex items-center justify-between px-3">
-                <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-rvm-muted">Mes playlists</h2>
+                <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-rvm-muted">Mes playlists</h2>
                 <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist"
                   className="flex h-8 w-8 items-center justify-center rounded-full text-rvm-accent hover:bg-rvm-accent/15">
                   <Plus className="h-4 w-4" aria-hidden />
@@ -147,10 +149,11 @@ export function MusicShell({ children }: { children: ReactNode }) {
 
         <div className="min-w-0 flex-1">
           <MobileTabs items={[...discover, ...mine]} pathname={pathname} />
-          <div className="px-4 pb-12 pt-5 sm:px-6 lg:px-10 lg:pt-7">
+          <div className="px-4 pb-10 pt-5 sm:px-6 lg:px-10 lg:pt-7">
             {pathname.startsWith("/music/explore") || pathname.startsWith("/music/search") ? null : <TopSearch />}
             {children}
           </div>
+          <MusicFooter />
         </div>
       </div>
     </div>
@@ -160,14 +163,14 @@ export function MusicShell({ children }: { children: ReactNode }) {
 function NavGroup({ title, items, pathname }: { title: string; items: NavItem[]; pathname: string }) {
   return (
     <nav aria-label={title} className="mt-2 first-of-type:mt-0">
-      <h2 className="px-3 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[0.16em] text-rvm-muted">{title}</h2>
+      <h2 className="px-3 pb-1 pt-3 text-xs font-bold uppercase tracking-[0.14em] text-rvm-muted">{title}</h2>
       <ul className="space-y-0.5">
         {items.map((it) => {
           const active = it.match(pathname);
           return (
             <li key={it.href}>
               <Link href={it.href} aria-current={active ? "page" : undefined}
-                className={cn("relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                className={cn("relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors",
                   active ? "bg-rvm-accent/15 text-rvm-accent" : "text-rvm-soft hover:bg-white/5 hover:text-rvm-text")}>
                 {active ? <span aria-hidden className="absolute -left-3 top-2 bottom-2 w-1 rounded-r-full bg-rvm-accent" /> : null}
                 <it.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
@@ -221,5 +224,45 @@ function TopSearch() {
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Un titre, un artiste, une envie…" aria-label="Un titre, un artiste, une envie"
         className="h-11 min-w-0 flex-1 bg-transparent text-sm text-rvm-text placeholder:text-rvm-muted focus:outline-none focus-visible:outline-none" />
     </form>
+  );
+}
+
+/**
+ * Fin de page de l'espace Musique (finitions du 2026-10-22) : compacte et
+ * sombre, à la place du grand pied de page clair de la marketplace, avec les
+ * liens utiles du site (marketplace, Play, aide, droits d'auteur, conditions).
+ */
+function MusicFooter() {
+  const { country } = useCountry();
+  const year = new Date().getFullYear();
+  const links = [
+    { href: country?.id ? marketHomePath(country.id) : "/", label: "La marketplace" },
+    { href: "/play", label: "Rivendy Play" },
+    { href: "/help", label: "Aide" },
+    { href: "/droits-auteur", label: "Droits d’auteur" },
+    { href: "/legal?tab=cgu", label: "Conditions" },
+    { href: "/legal?tab=privacy", label: "Confidentialité" },
+  ];
+  return (
+    <footer className="border-t border-rvm-line bg-rvm-panel">
+      <div className="flex flex-col gap-3 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
+        <p className="text-sm text-rvm-muted">© {year} Rivendy — Rivendy Musique</p>
+        <nav aria-label="Liens du site">
+          <ul className="flex flex-wrap gap-x-5 gap-y-1">
+            {links.map((l) => (
+              <li key={l.label}>
+                <Link href={l.href} className="inline-block py-1.5 text-sm text-rvm-soft transition-colors hover:text-rvm-accent">{l.label}</Link>
+              </li>
+            ))}
+            <li>
+              <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 py-1.5 text-sm font-semibold text-rvm-accent hover:underline">
+                <Smartphone className="h-4 w-4" aria-hidden /> Application Android
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </footer>
   );
 }

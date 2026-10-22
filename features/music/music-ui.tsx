@@ -134,14 +134,14 @@ export function Section({ title, subtitle, href, hrefLabel = "Tout voir", childr
   title: string; subtitle?: string; href?: string; hrefLabel?: string; children: ReactNode; className?: string;
 }) {
   return (
-    <section className={cn("mt-10", className)}>
-      <div className="mb-4 flex items-end justify-between gap-3">
+    <section className={cn("mt-8", className)}>
+      <div className="mb-3.5 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-bold text-rvm-text sm:text-xl">{title}</h2>
-          {subtitle ? <p className="mt-0.5 text-xs text-rvm-muted sm:text-sm">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-0.5 text-sm text-rvm-muted">{subtitle}</p> : null}
         </div>
         {href ? (
-          <Link href={href} className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs font-semibold text-rvm-soft hover:text-rvm-accent sm:text-sm">
+          <Link href={href} className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1.5 text-sm font-semibold text-rvm-soft hover:text-rvm-accent">
             {hrefLabel} <ChevronRight className="h-4 w-4" aria-hidden />
           </Link>
         ) : null}
@@ -395,8 +395,8 @@ export function ReleaseCard({ release, priority = false }: { release: MusicRelea
             className="w-full transition duration-300 motion-safe:group-hover:scale-[1.03]" />
           {release.is_premium ? <PremiumTag className="absolute left-2 top-2" /> : null}
         </div>
-        <p className={cn("mt-2.5 truncate text-sm font-semibold", isThis ? "text-rvm-accent" : "text-rvm-text")}>{release.title}</p>
-        <p className="truncate text-xs text-rvm-muted">{artistName(release)} · {releaseKindLabel(release.kind)}</p>
+        <p className={cn("mt-2.5 truncate text-[15px] font-semibold", isThis ? "text-rvm-accent" : "text-rvm-text")}>{release.title}</p>
+        <p className="truncate text-[13px] text-rvm-soft">{artistName(release)} · {releaseKindLabel(release.kind)}</p>
       </Link>
       <div className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
         <PlayReleaseButton release={release}
@@ -404,6 +404,76 @@ export function ReleaseCard({ release, priority = false }: { release: MusicRelea
             isThis ? "opacity-100" : "opacity-100 sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 sm:group-focus-within:translate-y-0 sm:group-focus-within:opacity-100")} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Sortie en tuile large (petit catalogue) : pochette nette, titre, artiste,
+ * type et année, lecture directe. Remplit la largeur sans grand vide.
+ */
+export function ReleaseTile({ release }: { release: MusicRelease }) {
+  const player = useMusicPlayer();
+  const isThis = player.current?.release.id === release.id;
+  const year = release.release_date?.slice(0, 4) || release.published_at?.slice(0, 4) || "";
+  return (
+    <div className={cn("group relative flex items-center gap-4 rounded-2xl border bg-rvm-surface p-3 transition-colors hover:bg-rvm-raised",
+      isThis ? "border-rvm-accent/70" : "border-rvm-line")}>
+      <Link href={`/music/album/${release.id}`} className="relative shrink-0" tabIndex={-1} aria-hidden>
+        <Cover url={release.cover_url} size={320} alt="" className="h-24 w-24 shadow-lg shadow-black/40 sm:h-28 sm:w-28" rounded="rounded-xl" />
+        {release.is_premium ? <PremiumTag className="absolute left-1.5 top-1.5" /> : null}
+      </Link>
+      <div className="min-w-0 flex-1">
+        <Link href={`/music/album/${release.id}`}
+          className={cn("block truncate text-base font-bold after:absolute after:inset-0 after:rounded-2xl", isThis ? "text-rvm-accent" : "text-rvm-text")}>
+          {release.title}
+        </Link>
+        <p className="mt-0.5 truncate text-sm text-rvm-soft">{artistName(release)}</p>
+        <p className="mt-0.5 truncate text-[13px] text-rvm-muted">{releaseKindLabel(release.kind)}{year ? ` · ${year}` : ""}</p>
+      </div>
+      <PlayReleaseButton release={release} className="relative z-10 shrink-0" />
+    </div>
+  );
+}
+
+/**
+ * Étagère de sorties qui suit le catalogue : jusqu'à 3 sorties, des tuiles
+ * larges (pas de rangée à moitié vide) ; au-delà, une rangée défilante.
+ */
+export function ReleaseShelf({ releases, label }: { releases: MusicRelease[]; label: string }) {
+  if (releases.length <= 3) {
+    return (
+      <div role="list" aria-label={label}
+        className={cn("grid gap-3", releases.length === 1 ? "max-w-2xl" : releases.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3")}>
+        {releases.map((r) => <div key={r.id} role="listitem" className="min-w-0"><ReleaseTile release={r} /></div>)}
+      </div>
+    );
+  }
+  return <CardRow label={label}>{releases.map((r, i) => <ReleaseCard key={r.id} release={r} priority={i < 2} />)}</CardRow>;
+}
+
+/** Artistes en liste compacte (colonne secondaire) : avatar ou initiale, nom, genre. */
+export function ArtistList({ artists }: { artists: MusicArtist[] }) {
+  return (
+    <ul className="divide-y divide-rvm-line overflow-hidden rounded-2xl border border-rvm-line bg-rvm-surface">
+      {artists.map((a) => (
+        <li key={a.id}>
+          <Link href={`/artist/${a.id}`} className="group flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-rvm-raised">
+            {a.avatar_url ? (
+              <Cover url={a.avatar_url} size={160} alt="" className="h-11 w-11 shrink-0" rounded="rounded-full" />
+            ) : (
+              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/45 to-rvm-raised text-base font-black text-rvm-text">
+                {a.name.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold text-rvm-text group-hover:text-rvm-accent">{a.name}</span>
+              <span className="block truncate text-[13px] text-rvm-soft">{a.genre || "Artiste"}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-rvm-muted" aria-hidden />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -419,18 +489,18 @@ export function ReleaseGrid({ releases, empty = "Rien pour l’instant." }: { re
 export function ArtistCard({ artist }: { artist: MusicArtist }) {
   return (
     <Link href={`/artist/${artist.id}`} className="group block rounded-xl p-1 text-center">
-      <div className="mx-auto w-full overflow-hidden rounded-full shadow-lg shadow-black/30 ring-1 ring-white/5">
+      <div className="mx-auto w-full max-w-[160px] overflow-hidden rounded-full shadow-lg shadow-black/30 ring-1 ring-white/5">
         {artist.avatar_url ? (
           <Cover url={artist.avatar_url} size={320} alt="" rounded="rounded-full"
             className="w-full transition duration-300 motion-safe:group-hover:scale-[1.04]" />
         ) : (
-          <div className="flex aspect-square items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/40 to-rvm-raised text-3xl font-black text-rvm-text">
+          <div className="flex aspect-square items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/40 to-rvm-raised text-2xl font-black text-rvm-text sm:text-3xl">
             {artist.name.trim().charAt(0).toUpperCase() || <UserRound className="h-1/3 w-1/3" aria-hidden />}
           </div>
         )}
       </div>
-      <p className="mt-2.5 truncate text-sm font-semibold text-rvm-text group-hover:text-rvm-accent">{artist.name}</p>
-      <p className="truncate text-xs text-rvm-muted">{artist.genre || "Artiste"}</p>
+      <p className="mt-2.5 truncate text-[15px] font-semibold text-rvm-text group-hover:text-rvm-accent">{artist.name}</p>
+      <p className="truncate text-[13px] text-rvm-soft">{artist.genre || "Artiste"}</p>
     </Link>
   );
 }
@@ -474,7 +544,7 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
 
   return (
     <div>
-      <div aria-hidden className="mb-1 hidden items-center gap-3 border-b border-rvm-line px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-rvm-muted md:flex">
+      <div aria-hidden className="mb-1 hidden items-center gap-3 border-b border-rvm-line px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-rvm-soft md:flex">
         <span className="w-8 text-center">#</span>
         <span className="min-w-0 flex-1">Titre</span>
         {showAlbum ? <span className="hidden w-[26%] lg:block">Album</span> : null}
@@ -513,15 +583,15 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
               {showCover ? <Cover url={r.cover_url} size={160} alt="" className="h-10 w-10 shrink-0" rounded="rounded-md" /> : null}
               <div className="min-w-0 flex-1">
                 <button type="button" onClick={play} disabled={!playable} tabIndex={-1}
-                  className={cn("block max-w-full truncate text-left text-sm font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>
+                  className={cn("block max-w-full truncate text-left text-[15px] font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>
                   {t.title}{t.explicit ? <ExplicitTag /> : null}
                 </button>
-                <span className="block truncate text-xs text-rvm-muted">
+                <span className="block truncate text-[13px] text-rvm-soft">
                   {r.artist_id ? <Link href={`/artist/${r.artist_id}`} className="hover:text-rvm-text hover:underline">{trackSubtitle(t, r)}</Link> : trackSubtitle(t, r)}
                 </span>
               </div>
               {showAlbum ? (
-                <span className="hidden w-[26%] min-w-0 truncate text-sm text-rvm-muted lg:block">
+                <span className="hidden w-[26%] min-w-0 truncate text-sm text-rvm-soft lg:block">
                   {hideRelease ? r.title : <Link href={`/music/album/${r.id}`} className="hover:text-rvm-text hover:underline">{r.title}</Link>}
                 </span>
               ) : null}
@@ -529,7 +599,7 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
                 {!playable ? <span className="text-xs text-rvm-muted">Bientôt</span>
                   : locked ? <Lock className="h-3.5 w-3.5 text-rvm-premium" aria-label="Premium" />
                   : r.is_premium && t.is_free ? <span className="text-xs font-semibold text-rvm-premium">Offert</span> : null}
-                <span className="hidden w-12 text-right text-xs tabular-nums text-rvm-muted sm:block">{formatDuration(t.duration_seconds)}</span>
+                <span className="hidden w-12 text-right text-[13px] tabular-nums text-rvm-soft sm:block">{formatDuration(t.duration_seconds)}</span>
               </span>
               <LikeButton track={t} size="h-[18px] w-[18px]" className="hidden sm:inline-flex" />
               <TrackMenuButton item={item} extra={menuExtra?.(item, i)} hideRelease={hideRelease} />
@@ -641,7 +711,7 @@ function TrackMenu({ item, anchor, extra = [], hideRelease, onClose, onOpenPage 
           <button key={e.label} type="button" role="menuitem" tabIndex={-1}
             onClick={() => { onClose(); e.onSelect(); }}
             className={cn("flex w-full items-center gap-3 text-left text-sm hover:bg-white/10 focus:bg-white/10 focus:outline-none",
-              sheet ? "min-h-12 px-5" : "min-h-10 px-3.5", e.danger ? "text-red-300" : "text-rvm-text")}>
+              sheet ? "min-h-12 px-5 text-base" : "min-h-11 px-3.5", e.danger ? "text-red-300" : "text-rvm-text")}>
             <e.icon className={cn("h-[18px] w-[18px] shrink-0", e.danger ? "text-red-300" : "text-rvm-muted")} aria-hidden />
             {e.label}
           </button>

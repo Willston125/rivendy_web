@@ -69,7 +69,14 @@ const Ctx = createContext<PlayerContext | null>(null);
  * fois par seconde ; seules les barres de progression la lisent, les listes
  * de titres ne se redessinent plus à chaque instant.
  */
-const ProgressCtx = createContext<{ position: number; duration: number }>({ position: 0, duration: 0 });
+type Progress = {
+  position: number;
+  /** Durée connue : celle du fichier si `ready`, sinon celle du titre en base (ou 0). */
+  duration: number;
+  /** Le fichier du titre en cours est chargé (métadonnées lues) : on peut s'y déplacer. */
+  ready: boolean;
+};
+const ProgressCtx = createContext<Progress>({ position: 0, duration: 0, ready: false });
 
 const STORE_KEY = "rivendy_music_queue_v1";
 /** Volume et son coupé : un confort du navigateur, jamais envoyé au serveur. */
@@ -89,6 +96,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>("off");
   const [shuffled, setShuffled] = useState(false);
@@ -171,6 +179,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     setPosition(0);
+    setReady(false);
     setDuration(Number(item.track.duration_seconds ?? 0));
     const res = await grantFor(item.track.id, takeOver);
     if (seq !== loadSeq.current) return; // un autre titre a été demandé entre-temps
@@ -357,6 +366,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     finishListen();
     if (audio) { audio.pause(); audio.removeAttribute("src"); audio.load(); }
+    setReady(false);
+    setPosition(0);
+    setDuration(0);
     loadSeq.current += 1;
     setQueue([]);
     setIndex(0);
@@ -392,7 +404,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         }
       }
     };
-    const onMeta = () => { if (Number.isFinite(audio.duration)) setDuration(audio.duration); };
+    const onMeta = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) { setDuration(audio.duration); setReady(true); }
+    };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onWaiting = () => setLoading(true);
@@ -533,7 +547,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   }), [queue, index, current, playing, loading, duration, preview, repeat, shuffled, volume, muted, expanded, error,
     playQueue, playAt, toggle, next, previous, seek, setVolume, toggleMute, cycleRepeat, toggleShuffle, playNext, addToQueue,
     removeAt, close, pause]);
-  const progress = useMemo(() => ({ position, duration }), [position, duration]);
+  const progress = useMemo(() => ({ position, duration, ready }), [position, duration, ready]);
 
   return (
     <Ctx.Provider value={value}>
@@ -547,7 +561,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 }
 
 /** Position et durée du titre en cours (barres de progression seulement). */
-export function useMusicProgress(): { position: number; duration: number } {
+export function useMusicProgress(): Progress {
   return useContext(ProgressCtx);
 }
 

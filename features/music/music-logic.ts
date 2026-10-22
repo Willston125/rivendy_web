@@ -320,3 +320,62 @@ export function samePath(a: string, b: string): boolean {
   const clean = (p: string) => (p.split("?")[0].replace(/\/+$/, "") || "/");
   return clean(a) === clean(b);
 }
+
+// ── Finitions du 2026-10-22 (lecteur, composition de l'accueil) ───────────
+
+/**
+ * Durée affichée par le lecteur. Celle du fichier dès qu'il est chargé ;
+ * avant, la durée VÉRIFIÉE du titre en base (une file reprise après un
+ * rechargement n'a encore rien chargé : elle affichait « 0:00 / 0:00 »).
+ * `null` = inconnue (chargement en cours, ou titre sans durée enregistrée).
+ */
+export function playerDuration(p: { ready: boolean; mediaDuration: number; trackDuration: number | null | undefined }): number | null {
+  if (p.ready && Number.isFinite(p.mediaDuration) && p.mediaDuration > 0) return p.mediaDuration;
+  const t = Number(p.trackDuration ?? 0);
+  return Number.isFinite(t) && t > 0 ? t : null;
+}
+
+/** « 3:29 », ou « –:–– » quand la durée n'est pas (encore) connue. */
+export function formatPlayerTime(seconds: number | null): string {
+  return seconds === null ? "–:––" : formatDuration(seconds);
+}
+
+/**
+ * Sélection et nouveautés : quand les nouveautés n'ajoutent presque rien à
+ * la sélection (moins de 3 sorties à elles), UNE seule rangée regroupée —
+ * jamais les mêmes cartes deux fois de suite. Sinon deux rangées, les
+ * nouveautés sans les sorties déjà dans la sélection.
+ */
+export type HomeShelves<R> =
+  | { mode: "one"; title: string; releases: R[] }
+  | { mode: "two"; selection: R[]; news: R[] };
+
+export function homeShelves<R extends Pick<MusicRelease, "id">>(featured: R[], fresh: R[]): HomeShelves<R> {
+  if (featured.length === 0) return { mode: "one", title: "Nouveautés", releases: fresh };
+  const inSelection = new Set(featured.map((r) => r.id));
+  const news = fresh.filter((r) => !inSelection.has(r.id));
+  if (news.length < 3) {
+    return { mode: "one", title: news.length > 0 ? "La sélection et les nouveautés" : "La sélection Rivendy", releases: uniqueReleases([featured, news]) };
+  }
+  return { mode: "two", selection: featured, news };
+}
+
+/**
+ * « Écoutés récemment » sur l'accueil : seulement s'il apporte quelque
+ * chose — au moins deux titres de sorties qui ne sont pas déjà affichées.
+ * L'historique complet reste dans la bibliothèque.
+ */
+export function recentIsUseful(recentReleaseIds: string[], shownReleaseIds: Set<string>): boolean {
+  return new Set(recentReleaseIds.filter((id) => !shownReleaseIds.has(id))).size >= 2;
+}
+
+/**
+ * Mention du Rivendy Hit dans la bannière : « N° 1 » seulement si le titre
+ * est VRAIMENT premier de la dernière semaine ; collée à la sortie mise en
+ * avant si c'est la même, sinon une carte à part.
+ */
+export function heroHitBadge(top: { rank: number; releaseId: string | null } | null, spotlightId: string):
+  | { kind: "none" } | { kind: "same" } | { kind: "other" } {
+  if (!top || top.rank !== 1 || !top.releaseId) return { kind: "none" };
+  return top.releaseId === spotlightId ? { kind: "same" } : { kind: "other" };
+}

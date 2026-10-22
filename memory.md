@@ -184,6 +184,17 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   toutes les sorties). Nouvelles pages : `/music/explore`, `/music/artists`.
 - Dev local avec une copie dont `node_modules` est une jonction : Turbopack
   refuse (« points out of the filesystem root ») → `next dev --webpack`.
+- **Finitions (même jour, branche `feat/musique-finitions`)** : le lecteur
+  affiche la durée VÉRIFIÉE du titre tant que le fichier n'est pas chargé
+  (`playerDuration`, `ready` dans `useMusicProgress`) — une file reprise après
+  rechargement montrait « 0:00 / 0:00 » ; déplacement inactif avant chargement.
+  Accueil : `homeShelves` (jamais deux rangées des mêmes sorties), tuiles
+  larges jusqu'à 3 sorties (`ReleaseShelf`), titres populaires + artistes en
+  2 colonnes (xl), « Écoutés récemment » seulement s'il montre 2 autres
+  sorties, « N° 1 du Rivendy Hit » seulement s'il l'est (`heroHitBadge`).
+  Fin de page Musique sombre et compacte (`MusicFooter` ; le grand pied de
+  page est masqué par `HideInMusic`). Hauteur du lecteur publiée dans
+  `--rvm-player-h` (barre latérale, file d'attente).
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 

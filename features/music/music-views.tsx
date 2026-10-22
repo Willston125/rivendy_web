@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  AudioLines, Headphones, LoaderCircle, Lock, Mic2, Search, Share2, Smartphone, UserCheck, UserPlus, X,
+  AudioLines, Headphones, LoaderCircle, Lock, Mic2, Search, Share2, Smartphone, Trophy, UserCheck, UserPlus, X,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useDialogs } from "@/features/ui/dialogs";
@@ -20,13 +20,13 @@ import {
 } from "./music-api";
 import { MUSIC_LIBRARY_EVENT, useMusicLibrary, type LibraryEventDetail } from "./music-library";
 import {
-  artistName, availableGenres, distinctArtistIds, filterByGenre, hitMovement, releaseKindLabel, releaseMeta,
-  releaseYear, searchable, thumbUrl, uniqueReleases,
+  artistName, availableGenres, distinctArtistIds, filterByGenre, heroHitBadge, hitMovement, homeShelves, recentIsUseful,
+  releaseKindLabel, releaseMeta, releaseYear, searchable, thumbUrl, uniqueReleases,
   type MusicRelease, type MusicTrack,
 } from "./music-logic";
 import {
-  ArtistCard, CardRow, CardRowSkeleton, Cover, EmptyState, ErrorState, ListSkeleton, PageTitle, PlayAllButton,
-  PlayReleaseLabelButton, PremiumTag, ReleaseCard, ReleaseGrid, SaveReleaseButton, Section, TrackList, iconButton,
+  ArtistCard, ArtistList, CardRow, CardRowSkeleton, Cover, EmptyState, ErrorState, ListSkeleton, PageTitle, PlayAllButton,
+  PlayReleaseLabelButton, PremiumTag, ReleaseCard, ReleaseGrid, ReleaseShelf, SaveReleaseButton, Section, TrackList, iconButton,
   secondaryButton, toQueue, useLoad,
 } from "./music-ui";
 import { useMusicPlayer } from "./player/music-player-provider";
@@ -43,6 +43,13 @@ function fold(s: string): string {
 
 // ── Découvrir ──────────────────────────────────────────────────────────────
 
+/**
+ * Accueil de la Musique (finitions du 2026-10-22) : il suit le catalogue
+ * RÉEL. Jamais deux rangées des mêmes sorties (`homeShelves`), des tuiles
+ * larges tant qu'il y a peu de sorties, titres populaires et artistes côte
+ * à côte sur grand écran, « Écoutés récemment » seulement s'il apporte
+ * d'autres sorties. Aucun contenu inventé.
+ */
 export function MusicHomeView() {
   const market = useMusicMarket();
   const { user } = useAuth();
@@ -67,70 +74,86 @@ export function MusicHomeView() {
   }, [data, genre]);
   const ranks = useMemo(() => new Map(hitQueue.rows.map((h) => [h.music_tracks?.id ?? "", { rank: h.rank, move: hitMovement(h.rank, h.previous_rank) }])), [hitQueue]);
 
-  if (home.error) return <><HomeTitle /><div className="mt-6"><ErrorState onRetry={home.reload} /></div></>;
+  if (home.error) return <><HomeTitle /><div className="mt-5"><ErrorState onRetry={home.reload} /></div></>;
   if (!data) {
     return (
       <>
         <HomeTitle />
-        <div aria-hidden className="mt-6 h-64 rounded-3xl bg-rvm-surface motion-safe:animate-pulse sm:h-80" />
-        <div className="mt-10"><CardRowSkeleton /></div>
-        <div className="mt-10"><ListSkeleton /></div>
+        <div aria-hidden className="mt-5 h-60 rounded-3xl bg-rvm-surface motion-safe:animate-pulse sm:h-72" />
+        <div className="mt-8"><CardRowSkeleton /></div>
+        <div className="mt-8"><ListSkeleton /></div>
       </>
     );
   }
 
-  const featured = filterByGenre(data.featured, genre);
-  const fresh = filterByGenre(data.fresh, genre);
+  const shelves = homeShelves(filterByGenre(data.featured, genre), filterByGenre(data.fresh, genre));
   const artists = genre ? data.artists.filter((a) => data.all.some((r) => r.genre_id === genre && r.artist_id === a.id)) : data.artists;
   const spotlight = (data.featured.length > 0 ? data.featured : data.fresh).slice(0, 5);
   const genreName = genres.find((g) => g.id === genre)?.name;
+  const genreOf = (r: MusicRelease) => data.genres.find((g) => g.id === r.genre_id)?.name ?? null;
   const nothing = data.all.length === 0 && data.hit.length === 0;
+  const shown = new Set([...spotlight, ...(shelves.mode === "one" ? shelves.releases : [...shelves.selection, ...shelves.news])].map((r) => r.id));
+  const showRecent = !!recent.data && recentIsUseful(recent.data.map((r) => r.track.release_id), shown);
+  const hasHit = hitQueue.items.length > 0;
+  const hasArtists = artists.length > 0;
 
   return (
     <>
       <HomeTitle />
       {!user ? (
-        <p className="mt-4 rounded-xl border border-rvm-line bg-rvm-surface px-4 py-3 text-sm text-rvm-soft">
+        <p className="mt-4 rounded-xl border border-rvm-line bg-rvm-surface px-4 py-2.5 text-sm text-rvm-soft">
           <Link href="/auth/login?next=/music" className="font-bold text-rvm-accent hover:underline">Connectez-vous</Link>{" "}
           pour écouter, aimer des titres et retrouver vos playlists — les mêmes que dans l’application.
         </p>
       ) : null}
 
       {nothing ? (
-        <div className="mt-6">
+        <div className="mt-5">
           <EmptyState title="Les premiers titres arrivent bientôt"
             text="Singles, EP et albums des artistes de l’archipel et d’ailleurs. Chaque sortie est validée par Rivendy avant d’être publiée." />
         </div>
       ) : (
         <>
-          {spotlight.length > 0 ? <Hero releases={spotlight} top={data.hit[0] ?? null} hit={data.hit} /> : null}
+          {spotlight.length > 0 ? <Hero releases={spotlight} hit={data.hit} genreOf={genreOf} /> : null}
           {genres.length > 0 ? <GenreChips genres={genres} value={genre} onChange={setGenre} /> : null}
 
-          {featured.length > 0 ? (
-            <Section title="La sélection Rivendy" subtitle="Les sorties choisies par l’équipe.">
-              <CardRow label="La sélection Rivendy">{featured.map((r, i) => <ReleaseCard key={r.id} release={r} priority={i < 2} />)}</CardRow>
+          {shelves.mode === "one" ? (
+            <Section title={shelves.title}
+              subtitle={shelves.title === "Nouveautés" ? "Les dernières sorties validées par Rivendy."
+                : shelves.title === "La sélection Rivendy" ? "Les sorties choisies par l’équipe."
+                : "Choisies par l’équipe et dernières sorties validées par Rivendy."}
+              href={genre ? `/music/explore?genre=${genre}` : "/music/explore"}>
+              {shelves.releases.length > 0
+                ? <ReleaseShelf releases={shelves.releases} label={shelves.title} />
+                : <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />}
             </Section>
+          ) : (
+            <>
+              <Section title="La sélection Rivendy" subtitle="Les sorties choisies par l’équipe.">
+                <ReleaseShelf releases={shelves.selection} label="La sélection Rivendy" />
+              </Section>
+              <Section title="Nouveautés" subtitle="Les dernières sorties validées par Rivendy." href={genre ? `/music/explore?genre=${genre}` : "/music/explore"}>
+                <ReleaseShelf releases={shelves.news} label="Nouveautés" />
+              </Section>
+            </>
+          )}
+
+          {hasHit || hasArtists ? (
+            <div className={cn("grid gap-x-8", hasHit && hasArtists && "xl:grid-cols-[minmax(0,1fr)_340px]")}>
+              {hasHit ? (
+                <Section title="Titres populaires" subtitle="Le Rivendy Hit de la semaine, selon le nombre d’auditeurs." href="/music/hit" hrefLabel="Voir le Hit">
+                  <TrackList items={hitQueue.items} ranks={ranks} label="Titres populaires" />
+                </Section>
+              ) : null}
+              {hasArtists ? (
+                <Section title="Artistes à découvrir" href="/music/artists">
+                  <ArtistList artists={artists.slice(0, 8)} />
+                </Section>
+              ) : null}
+            </div>
           ) : null}
 
-          {hitQueue.items.length > 0 ? (
-            <Section title="Titres populaires" subtitle="Le Rivendy Hit de la semaine, selon le nombre d’auditeurs." href="/music/hit" hrefLabel="Voir le Hit">
-              <TrackList items={hitQueue.items} ranks={ranks} label="Titres populaires" />
-            </Section>
-          ) : null}
-
-          <Section title="Nouveautés" subtitle="Les dernières sorties validées par Rivendy." href={genre ? `/music/explore?genre=${genre}` : "/music/explore"}>
-            {fresh.length > 0
-              ? <CardRow label="Nouveautés">{fresh.map((r) => <ReleaseCard key={r.id} release={r} />)}</CardRow>
-              : <EmptyState title={genreName ? `Pas encore de nouveauté ${genreName}` : "Pas encore de nouveauté"} text="Revenez bientôt : les sorties arrivent chaque semaine." />}
-          </Section>
-
-          {artists.length > 0 ? (
-            <Section title="Artistes à découvrir" href="/music/artists">
-              <CardRow label="Artistes à découvrir">{artists.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
-            </Section>
-          ) : null}
-
-          {recent.data && recent.data.length > 0 ? (
+          {showRecent && recent.data ? (
             <Section title="Écoutés récemment" href="/music/history">
               <RecentRow rows={recent.data} />
             </Section>
@@ -144,58 +167,71 @@ export function MusicHomeView() {
 function HomeTitle() {
   return (
     <PageTitle title="À découvrir" subtitle="Vos îles. Votre rythme."
-      aside={<span className="hidden items-center gap-2 text-xs text-rvm-muted sm:flex"><Headphones className="h-4 w-4 text-rvm-accent" aria-hidden /> Trouvez votre prochain coup de cœur.</span>} />
+      aside={<span className="hidden items-center gap-2 text-sm text-rvm-soft sm:flex"><Headphones className="h-4 w-4 text-rvm-accent" aria-hidden /> Trouvez votre prochain coup de cœur.</span>} />
   );
 }
 
 /**
- * Bannière : les sorties mises en avant au dashboard (sinon les plus
- * récentes). La pochette carrée s'affiche entière — jamais un visage coupé —
- * et floutée en fond ; sans visuel, un dégradé vert.
+ * Bannière : la sortie mise en avant au dashboard (sinon la plus récente).
+ * Fond = sa VRAIE pochette agrandie, floutée et assombrie, dégradé pour lire
+ * le texte ; pochette nette au premier plan, jamais déformée ni recadrée.
+ * « N° 1 du Rivendy Hit » seulement si le classement le dit (`heroHitBadge`).
  */
-function Hero({ releases, top, hit }: { releases: MusicRelease[]; top: HitRow | null; hit: HitRow[] }) {
+function Hero({ releases, hit, genreOf }: { releases: MusicRelease[]; hit: HitRow[]; genreOf: (r: MusicRelease) => string | null }) {
   const [i, setI] = useState(0);
   const player = useMusicPlayer();
   const r = releases[Math.min(i, releases.length - 1)];
-  const bg = thumbUrl(r.cover_url, 480);
+  const bg = thumbUrl(r.cover_url, 720);
   const year = releaseYear(r);
+  const g = genreOf(r);
+  const top = hit[0] ?? null;
   const topTrack = top?.music_tracks ?? null;
   const topRelease = topTrack?.music_releases ?? null;
+  const badge = heroHitBadge(top ? { rank: top.rank, releaseId: topTrack?.release_id ?? null } : null, r.id);
+  const kicker = r.featured_rank != null ? "La sélection Rivendy" : "À découvrir";
 
   return (
-    <section aria-roledescription="carrousel" aria-label="La sélection Rivendy"
-      className="relative mt-6 overflow-hidden rounded-3xl border border-rvm-line bg-rvm-surface">
+    <section aria-roledescription="carrousel" aria-label="Sortie mise en avant"
+      className="relative mt-5 overflow-hidden rounded-3xl border border-rvm-line bg-rvm-surface">
       <div aria-hidden className="pointer-events-none absolute inset-0">
         {bg && bg.startsWith("https://") ? (
-          <Image key={bg} src={bg} alt="" fill unoptimized sizes="100vw" className="scale-125 object-cover opacity-40 blur-3xl" />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-r from-rvm-ground via-rvm-ground/85 to-rvm-ground/30" />
-        <div className="absolute -left-24 -top-32 h-80 w-80 rounded-full bg-rvm-brand/35 blur-3xl" />
+          <Image key={bg} src={bg} alt="" fill unoptimized sizes="100vw"
+            className="scale-125 object-cover opacity-90 blur-2xl brightness-[0.55] saturate-[1.25]" />
+        ) : <div className="absolute -left-24 -top-32 h-80 w-80 rounded-full bg-rvm-brand/35 blur-3xl" />}
+        <div className="absolute inset-0 bg-gradient-to-r from-rvm-ground/95 via-rvm-ground/75 to-rvm-ground/20" />
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-rvm-ground/70 to-transparent" />
       </div>
 
-      <div className="relative grid items-center gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,1fr)_auto] lg:px-10 lg:py-9">
+      <div className="relative grid items-center gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,1fr)_auto] lg:px-10 lg:py-10">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-black/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-rvm-soft">
-            <AudioLines className="h-3.5 w-3.5 text-rvm-accent" aria-hidden /> La sélection Rivendy
+          <span className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-black/30 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-rvm-text">
+            <AudioLines className="h-3.5 w-3.5 text-rvm-accent" aria-hidden /> {kicker}
           </span>
           <div className="mt-4 flex items-center gap-4">
             <Link href={`/music/album/${r.id}`} className="shrink-0 md:hidden" tabIndex={-1} aria-hidden>
-              <Cover url={r.cover_url} size={320} alt="" className="h-20 w-20 shadow-xl shadow-black/40" rounded="rounded-xl" />
+              <Cover url={r.cover_url} size={320} alt="" className="h-28 w-28 shadow-xl shadow-black/50 ring-1 ring-white/10" rounded="rounded-xl" />
             </Link>
             <div className="min-w-0">
-              <h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+              <h2 className="line-clamp-2 text-3xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                 <Link href={`/music/album/${r.id}`} className="hover:underline">{r.title}</Link>
               </h2>
-              <p className="mt-1.5 truncate text-sm text-rvm-soft">
-                {r.artist_id ? <Link href={`/artist/${r.artist_id}`} className="font-semibold text-rvm-text hover:underline">{artistName(r)}</Link> : artistName(r)}
-                {" · "}{releaseKindLabel(r.kind)}{year ? ` · ${year}` : ""}
-                {r.is_premium ? <PremiumTag className="ml-2 align-middle" /> : null}
+              <p className="mt-2 text-base font-semibold text-rvm-text">
+                {r.artist_id ? <Link href={`/artist/${r.artist_id}`} className="hover:underline">{artistName(r)}</Link> : artistName(r)}
               </p>
             </div>
           </div>
-          <p className="mt-3 line-clamp-2 max-w-xl text-sm leading-relaxed text-rvm-muted">
-            {r.description?.trim() || "Des pépites des îles aux sons qui vous emmènent ailleurs. Appuyez sur lecture."}
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-rvm-soft">
+            <span>{releaseKindLabel(r.kind)}</span>
+            {g ? <><span aria-hidden>·</span><span>{g}</span></> : null}
+            {year ? <><span aria-hidden>·</span><span>{year}</span></> : null}
+            {r.is_premium ? <PremiumTag /> : null}
+            {badge.kind === "same" ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-rvm-accent/15 px-2.5 py-0.5 text-xs font-bold text-rvm-accent">
+                <Trophy className="h-3.5 w-3.5" aria-hidden /> N° 1 du Rivendy Hit
+              </span>
+            ) : null}
           </p>
+          {r.description?.trim() ? <p className="mt-3 line-clamp-2 max-w-xl text-sm leading-relaxed text-rvm-soft">{r.description.trim()}</p> : null}
           <div className="mt-6 flex flex-wrap gap-3">
             <PlayReleaseLabelButton release={r} />
             <SaveReleaseButton release={r} />
@@ -203,17 +239,18 @@ function Hero({ releases, top, hit }: { releases: MusicRelease[]; top: HitRow | 
         </div>
 
         <div className="relative hidden md:block">
-          <Link href={`/music/album/${r.id}`} aria-label={`Ouvrir ${r.title}`} className="block w-56 lg:w-64">
+          <Link href={`/music/album/${r.id}`} aria-label={`Ouvrir ${r.title}`} className="block w-52 lg:w-60 xl:w-72">
             <Cover url={r.cover_url} size={720} alt="" priority className="w-full shadow-2xl shadow-black/60 ring-1 ring-white/10" rounded="rounded-2xl" />
           </Link>
-          {topTrack && topRelease ? (
+          {badge.kind === "other" && topTrack && topRelease ? (
             <button type="button" onClick={() => player.playQueue(toQueue(hit.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)), 0)}
-              className="absolute -bottom-4 -left-16 hidden w-60 items-center gap-3 rounded-2xl border border-white/10 bg-rvm-panel/90 p-3 text-left shadow-2xl backdrop-blur hover:border-rvm-accent/60 xl:flex">
-              <AudioLines className="h-6 w-6 shrink-0 text-rvm-accent" aria-hidden />
+              aria-label={`Écouter ${topTrack.title}, numéro 1 du Rivendy Hit`}
+              className="absolute -bottom-4 -left-16 hidden w-64 items-center gap-3 rounded-2xl border border-white/10 bg-rvm-panel/90 p-3 text-left shadow-2xl backdrop-blur hover:border-rvm-accent/60 xl:flex">
+              <Trophy className="h-6 w-6 shrink-0 text-rvm-accent" aria-hidden />
               <span className="min-w-0">
-                <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-rvm-muted">N° 1 du Rivendy Hit</span>
+                <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-rvm-soft">N° 1 du Rivendy Hit</span>
                 <span className="block truncate text-sm font-semibold">{topTrack.title}</span>
-                <span className="block truncate text-xs text-rvm-muted">{artistName(topRelease)}</span>
+                <span className="block truncate text-[13px] text-rvm-soft">{artistName(topRelease)}</span>
               </span>
             </button>
           ) : null}
@@ -239,7 +276,7 @@ function Hero({ releases, top, hit }: { releases: MusicRelease[]; top: HitRow | 
 function GenreChips({ genres, value, onChange }: { genres: MusicGenre[]; value: string | null; onChange: (g: string | null) => void }) {
   const all: Array<{ id: string | null; name: string }> = [{ id: null, name: "Tout" }, ...genres];
   return (
-    <div role="group" aria-label="Filtrer par genre" className="no-scrollbar -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:px-0">
+    <div role="group" aria-label="Filtrer par genre" className="no-scrollbar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:px-0">
       {all.map((g) => {
         const active = value === g.id;
         return (
@@ -268,8 +305,8 @@ function RecentRow({ rows }: { rows: Array<{ track: MusicTrack }> }) {
             <div className={cn("overflow-hidden rounded-xl shadow-lg shadow-black/30 ring-1 ring-white/5", isCurrent && "ring-2 ring-rvm-accent")}>
               <Cover url={it.release.cover_url} size={320} alt="" className="w-full transition duration-300 motion-safe:group-hover:scale-[1.03]" />
             </div>
-            <span className={cn("mt-2.5 block truncate text-sm font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>{it.track.title}</span>
-            <span className="block truncate text-xs text-rvm-muted">{artistName(it.release)}</span>
+            <span className={cn("mt-2.5 block truncate text-[15px] font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>{it.track.title}</span>
+            <span className="block truncate text-[13px] text-rvm-soft">{artistName(it.release)}</span>
           </button>
         );
       })}

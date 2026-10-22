@@ -5,6 +5,7 @@ import "./site.css";
 import { Providers } from "@/app/providers";
 import { AppHeader } from "@/components/layout/app-header";
 import { HideInPlay } from "@/components/layout/hide-in-play";
+import { HideInMusic } from "@/components/layout/hide-in-music";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { AppDownloadBanner } from "@/features/app-banner/app-download-banner";
 import { PLAY_LISTING_URL, SITE_URL } from "@/lib/seo";
@@ -91,8 +92,11 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             </HideInPlay>
           </Suspense>
           <main className="min-h-screen">{children}</main>
+          {/* Play et Musique ont leur fin de page sombre. */}
           <HideInPlay>
-            <SiteFooter />
+            <HideInMusic>
+              <SiteFooter />
+            </HideInMusic>
           </HideInPlay>
           <AppDownloadBanner />
         </Providers>

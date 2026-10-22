@@ -8,7 +8,7 @@ import {
   Volume1, Volume2, VolumeX, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { artistName, formatDuration, thumbUrl } from "../music-logic";
+import { artistName, formatPlayerTime, playerDuration, thumbUrl } from "../music-logic";
 import { Cover, Equalizer, LikeButton, TrackMenuButton, iconButton } from "../music-ui";
 import { useMusicPlayer, useMusicProgress, type QueueItem } from "./music-player-provider";
 
@@ -18,18 +18,33 @@ import { useMusicPlayer, useMusicProgress, type QueueItem } from "./music-player
  * de page garde le titre, sa position et la file. Sur ordinateur : titre,
  * favori, commandes, progression, file d'attente, volume, vue agrandie ; sur
  * téléphone : barre compacte, tout le reste dans la vue agrandie. Un espace
- * réservé garde accessible le bas de chaque page.
+ * réservé garde accessible le bas de chaque page ; sa hauteur réelle est
+ * publiée dans `--rvm-player-h` (barre latérale, file d'attente).
  */
 export function MiniPlayer() {
   const p = useMusicPlayer();
   const [queueOpen, setQueueOpen] = useState(false);
+  const bar = useRef<HTMLElement>(null);
   const cur = p.current;
+  const shown = !!cur;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = bar.current;
+    if (!shown || !el) { root.style.setProperty("--rvm-player-h", "0px"); return; }
+    const set = () => root.style.setProperty("--rvm-player-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    set();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(set) : null;
+    ro?.observe(el);
+    return () => { ro?.disconnect(); root.style.setProperty("--rvm-player-h", "0px"); };
+  }, [shown]);
+
   if (!cur) return null;
 
   return (
     <>
-      <div aria-hidden className="h-[76px] md:h-[92px]" />
-      <section aria-label="Lecteur Rivendy Musique"
+      <div aria-hidden className="h-[calc(var(--rvm-player-h,76px)+8px)]" />
+      <section ref={bar} aria-label="Lecteur Rivendy Musique"
         className="rvm-scope fixed inset-x-0 bottom-0 z-[45] border-t border-rvm-line bg-rvm-panel/95 pb-[env(safe-area-inset-bottom)] text-rvm-text shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
         <MobileProgress />
         <div className="mx-auto grid h-[74px] max-w-[1680px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 md:h-[90px] md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)] md:gap-4 md:px-5">
@@ -84,13 +99,13 @@ function NowPlaying({ item }: { item: QueueItem }) {
       </button>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <Link href={`/music/album/${r.id}?t=${t.id}`} className="hidden truncate text-sm font-semibold hover:underline md:block">{t.title}</Link>
-          <button type="button" onClick={() => p.setExpanded(true)} className="min-h-7 truncate text-left text-sm font-semibold md:hidden">{t.title}</button>
+          <Link href={`/music/album/${r.id}?t=${t.id}`} className="hidden truncate text-[15px] font-semibold hover:underline md:block">{t.title}</Link>
+          <button type="button" onClick={() => p.setExpanded(true)} className="min-h-7 truncate text-left text-[15px] font-semibold md:hidden">{t.title}</button>
           {p.preview ? <span className="shrink-0 rounded bg-rvm-premium/20 px-1.5 text-[10px] font-bold text-rvm-premium">Extrait</span> : null}
         </div>
         {r.artist_id
-          ? <Link href={`/artist/${r.artist_id}`} className="block truncate text-xs text-rvm-muted hover:text-rvm-text hover:underline">{artistName(r)}</Link>
-          : <span className="block truncate text-xs text-rvm-muted">{artistName(r)}</span>}
+          ? <Link href={`/artist/${r.artist_id}`} className="block truncate text-[13px] text-rvm-soft hover:text-rvm-text hover:underline">{artistName(r)}</Link>
+          : <span className="block truncate text-[13px] text-rvm-soft">{artistName(r)}</span>}
       </div>
       <LikeButton track={t} className="hidden md:inline-flex" />
     </div>
@@ -142,34 +157,50 @@ function Controls({ size }: { size: "bar" | "full" }) {
  * Progression : glisser déplace dans le titre au relâchement ; au clavier
  * (flèches), le déplacement est immédiat.
  */
+/** Durée affichée : fichier chargé, sinon durée vérifiée du titre en base (jamais « 0:00 » à tort). */
+function useShownDuration(): { position: number; total: number | null; ready: boolean } {
+  const p = useMusicPlayer();
+  const { position, duration, ready } = useMusicProgress();
+  const total = playerDuration({ ready, mediaDuration: duration, trackDuration: p.current?.track.duration_seconds });
+  return { position, total, ready };
+}
+
+/**
+ * Progression : glisser déplace dans le titre au relâchement ; au clavier
+ * (flèches), le déplacement est immédiat. Tant que le fichier n'est pas
+ * chargé (file reprise, chargement), la barre est inactive et la durée
+ * affichée est celle du titre ; « –:–– » si elle n'est pas connue.
+ */
 function Seek({ className }: { className?: string }) {
   const p = useMusicPlayer();
-  const { position, duration } = useMusicProgress();
+  const { position, total, ready } = useShownDuration();
   const [drag, setDrag] = useState<number | null>(null);
   const dragging = useRef(false);
-  const max = Math.max(1, Math.floor(duration));
+  const max = Math.max(1, Math.floor(total ?? 0));
   const value = Math.min(drag ?? position, max);
-  const pct = duration > 0 ? Math.min(100, (value / duration) * 100) : 0;
+  const pct = total ? Math.min(100, (value / total) * 100) : 0;
   const commit = (v: number) => { dragging.current = false; p.seek(v); setDrag(null); };
+  const loadingLabel = p.loading && !ready;
   return (
-    <div className={cn("flex items-center gap-2 text-[11px] tabular-nums text-rvm-muted", className)}>
-      <span className="w-10 text-right">{formatDuration(value)}</span>
-      <input type="range" min={0} max={max} step={1} value={Math.floor(value)} disabled={duration <= 0}
+    <div className={cn("flex items-center gap-2 text-xs tabular-nums text-rvm-soft", className)}>
+      <span className="w-10 text-right">{formatPlayerTime(value)}</span>
+      <input type="range" min={0} max={max} step={1} value={Math.floor(value)} disabled={!ready}
         onPointerDown={() => { dragging.current = true; }}
         onChange={(e) => { const v = Number(e.target.value); if (dragging.current) setDrag(v); else p.seek(v); }}
         onPointerUp={(e) => { if (dragging.current) commit(Number(e.currentTarget.value)); }}
         onPointerCancel={() => { dragging.current = false; setDrag(null); }}
-        aria-label="Position dans le titre" aria-valuetext={`${formatDuration(value)} sur ${formatDuration(duration)}`}
+        aria-label="Position dans le titre"
+        aria-valuetext={loadingLabel ? "Chargement du titre" : `${formatPlayerTime(value)} sur ${formatPlayerTime(total)}`}
         style={{ "--pct": `${pct}%` } as CSSProperties}
         className="rvm-range min-w-0 flex-1" />
-      <span className="w-10">{formatDuration(duration)}</span>
+      <span className="w-10" title={ready ? undefined : "Durée du titre (fichier pas encore chargé)"}>{formatPlayerTime(total)}</span>
     </div>
   );
 }
 
 function MobileProgress() {
-  const { position, duration } = useMusicProgress();
-  const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+  const { position, total } = useShownDuration();
+  const pct = total ? Math.min(100, (position / total) * 100) : 0;
   return (
     <div role="progressbar" aria-label="Progression du titre" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}
       className="h-[3px] bg-white/10 md:hidden">
@@ -264,7 +295,7 @@ function QueuePanel({ onClose }: { onClose: () => void }) {
   }, []);
   return (
     <aside aria-label="File d’attente" style={{ top }}
-      className="rvm-scope fixed bottom-[calc(90px+env(safe-area-inset-bottom))] right-0 z-[46] hidden w-[380px] flex-col border-l border-rvm-line bg-rvm-panel text-rvm-text shadow-2xl md:flex">
+      className="rvm-scope fixed bottom-[var(--rvm-player-h,90px)] right-0 z-[46] hidden w-[380px] flex-col border-l border-rvm-line bg-rvm-panel text-rvm-text shadow-2xl md:flex">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <h2 className="text-lg font-bold">File d’attente</h2>
         <button ref={closeBtn} type="button" onClick={onClose} aria-label="Fermer la file d’attente" className={iconButton}>
