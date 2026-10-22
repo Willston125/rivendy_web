@@ -1,154 +1,457 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Clock, Heart, Library, Loader2, Lock, Plus, Search, Trash2, UserCheck, UserPlus } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  AudioLines, Headphones, LoaderCircle, Lock, Mic2, Search, Share2, Smartphone, UserCheck, UserPlus, X,
+} from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useDialogs } from "@/features/ui/dialogs";
 import { useHomeMarket } from "@/features/media/use-home-market";
 import { appIntentUrl } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
 import {
-  clearHistory, createPlaylist, deletePlaylist, fetchArtistTopTracks, fetchFeatured, fetchFollowedArtists,
-  fetchHistory, fetchHit, fetchLikedTracks, fetchMyPlaylists, fetchNewReleases, fetchPlaylist, fetchRelease,
-  fetchReleasesByArtist, fetchSavedReleases, isFollowing, isReleaseSaved, removeFromPlaylist, searchMusic,
-  setFollowing, setReleaseSaved, updatePlaylist, fetchTracksByIds,
-  type HitRow, type MusicArtist, type Playlist, type SearchRow,
+  fetchArtistTopTracks, fetchArtistsByIds, fetchArtistsWithMusic, fetchFeatured, fetchFollowedArtists, fetchGenres,
+  fetchHistory, fetchHit, fetchNewReleases, fetchRelease, fetchReleasesByArtist, fetchTracksByIds, isFollowing,
+  searchMusic, setFollowing,
+  type HitRow, type MusicArtist, type MusicGenre, type SearchRow,
 } from "./music-api";
+import { MUSIC_LIBRARY_EVENT, useMusicLibrary, type LibraryEventDetail } from "./music-library";
 import {
-  artistName, hitMovement, isValidPlaylistName, releaseKindLabel, releaseMeta, searchable,
+  artistName, availableGenres, distinctArtistIds, filterByGenre, hitMovement, releaseKindLabel, releaseMeta,
+  releaseYear, searchable, thumbUrl, uniqueReleases,
   type MusicRelease, type MusicTrack,
 } from "./music-logic";
-import { Cover, MusicNav, MusicPage, PlayAllButton, PremiumTag, ReleaseGrid, TrackList, playlistMessage, toQueue } from "./music-ui";
+import {
+  ArtistCard, CardRow, CardRowSkeleton, Cover, EmptyState, ErrorState, ListSkeleton, PageTitle, PlayAllButton,
+  PlayReleaseLabelButton, PremiumTag, ReleaseCard, ReleaseGrid, SaveReleaseButton, Section, TrackList, iconButton,
+  secondaryButton, toQueue, useLoad,
+} from "./music-ui";
+import { useMusicPlayer } from "./player/music-player-provider";
+
+export { FavoritesView, HistoryView, LibraryView, PlaylistView } from "./music-library-views";
 
 /** Marché d'écoute : marché d'origine du compte, sinon le pays choisi (comme l'app). */
 export const useMusicMarket = useHomeMarket;
 
-function Spinner() {
-  return <div className="py-10 text-center text-white/60"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>;
+/** Comparaison tolérante aux accents et à la casse (filtres locaux). */
+function fold(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 }
 
-function Section({ title, href, children }: { title: string; href?: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-10">
-      <div className="mb-3 flex items-end justify-between">
-        <h2 className="text-xl font-black">{title}</h2>
-        {href ? <Link href={href} className="text-sm font-semibold text-[#F5B83D] hover:underline">Tout voir</Link> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-// ── Accueil ────────────────────────────────────────────────────────────────
+// ── Découvrir ──────────────────────────────────────────────────────────────
 
 export function MusicHomeView() {
   const market = useMusicMarket();
   const { user } = useAuth();
-  const [featured, setFeatured] = useState<MusicRelease[] | null>(null);
-  const [fresh, setFresh] = useState<MusicRelease[] | null>(null);
-  const [hit, setHit] = useState<HitRow[] | null>(null);
+  const [genre, setGenre] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    void Promise.all([fetchFeatured(market), fetchNewReleases(market, 24), fetchHit("all", "", market)])
-      .then(([f, n, h]) => { if (alive) { setFeatured(f); setFresh(n); setHit(h); } });
-    return () => { alive = false; };
-  }, [market]);
+  const home = useLoad(`home:${market ?? ""}`, async () => {
+    const [featured, fresh, hit, genres] = await Promise.all([
+      fetchFeatured(market), fetchNewReleases(market, 48), fetchHit("all", "", market),
+      fetchGenres().catch(() => [] as MusicGenre[]),
+    ]);
+    const all = uniqueReleases([featured, fresh]);
+    const artists = await fetchArtistsByIds(distinctArtistIds(all).slice(0, 18)).catch(() => [] as MusicArtist[]);
+    return { featured, fresh, hit, genres, artists, all };
+  });
+  const recent = useLoad(user ? `recent:${user.id}` : null, () => fetchHistory().then((rows) => rows.slice(0, 12)));
 
-  const hitQueue = useMemo(() => toQueue((hit ?? []).map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)), [hit]);
+  const data = home.data;
+  const genres = useMemo(() => (data ? availableGenres(data.all, data.genres) : []), [data]);
+  const hitQueue = useMemo(() => {
+    const rows = (data?.hit ?? []).filter((h) => !genre || h.music_tracks?.music_releases?.genre_id === genre);
+    return { items: toQueue(rows.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)).slice(0, 8), rows };
+  }, [data, genre]);
+  const ranks = useMemo(() => new Map(hitQueue.rows.map((h) => [h.music_tracks?.id ?? "", { rank: h.rank, move: hitMovement(h.rank, h.previous_rank) }])), [hitQueue]);
+
+  if (home.error) return <><HomeTitle /><div className="mt-6"><ErrorState onRetry={home.reload} /></div></>;
+  if (!data) {
+    return (
+      <>
+        <HomeTitle />
+        <div aria-hidden className="mt-6 h-64 rounded-3xl bg-rvm-surface motion-safe:animate-pulse sm:h-80" />
+        <div className="mt-10"><CardRowSkeleton /></div>
+        <div className="mt-10"><ListSkeleton /></div>
+      </>
+    );
+  }
+
+  const featured = filterByGenre(data.featured, genre);
+  const fresh = filterByGenre(data.fresh, genre);
+  const artists = genre ? data.artists.filter((a) => data.all.some((r) => r.genre_id === genre && r.artist_id === a.id)) : data.artists;
+  const spotlight = (data.featured.length > 0 ? data.featured : data.fresh).slice(0, 5);
+  const genreName = genres.find((g) => g.id === genre)?.name;
+  const nothing = data.all.length === 0 && data.hit.length === 0;
 
   return (
-    <MusicPage>
-      <header className="rounded-3xl bg-gradient-to-br from-[#2A2346] to-[#0D0B19] px-6 py-8">
-        <p className="text-sm font-bold uppercase tracking-widest text-[#F5B83D]">Rivendy Musique</p>
-        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Le son des Comores et d’ailleurs</h1>
-        <p className="mt-2 max-w-2xl text-sm text-white/70">
-          Singles, EP et albums des artistes Rivendy. La même bibliothèque que dans l’application, avec le même compte.
-        </p>
-      </header>
-      <div className="mt-6"><MusicNav /></div>
+    <>
+      <HomeTitle />
       {!user ? (
-        <p className="rounded-xl bg-white/5 px-4 py-3 text-sm text-white/80">
-          <Link href="/auth/login?next=/music" className="font-bold text-[#F5B83D] underline">Connectez-vous</Link> pour écouter, aimer des titres et créer vos playlists.
+        <p className="mt-4 rounded-xl border border-rvm-line bg-rvm-surface px-4 py-3 text-sm text-rvm-soft">
+          <Link href="/auth/login?next=/music" className="font-bold text-rvm-accent hover:underline">Connectez-vous</Link>{" "}
+          pour écouter, aimer des titres et retrouver vos playlists — les mêmes que dans l’application.
         </p>
       ) : null}
 
-      {featured === null ? <Spinner /> : (
+      {nothing ? (
+        <div className="mt-6">
+          <EmptyState title="Les premiers titres arrivent bientôt"
+            text="Singles, EP et albums des artistes de l’archipel et d’ailleurs. Chaque sortie est validée par Rivendy avant d’être publiée." />
+        </div>
+      ) : (
         <>
-          {featured.length > 0 ? <Section title="À la une"><ReleaseGrid releases={featured.slice(0, 10)} /></Section> : null}
-          <Section title="Rivendy Hit" href="/music/hit">
-            {hitQueue.length === 0 ? <p className="text-sm text-white/60">Le classement de la semaine arrive bientôt.</p>
-              : <TrackList items={hitQueue.slice(0, 5)} showCover numbered={false} />}
+          {spotlight.length > 0 ? <Hero releases={spotlight} top={data.hit[0] ?? null} hit={data.hit} /> : null}
+          {genres.length > 0 ? <GenreChips genres={genres} value={genre} onChange={setGenre} /> : null}
+
+          {featured.length > 0 ? (
+            <Section title="La sélection Rivendy" subtitle="Les sorties choisies par l’équipe.">
+              <CardRow label="La sélection Rivendy">{featured.map((r, i) => <ReleaseCard key={r.id} release={r} priority={i < 2} />)}</CardRow>
+            </Section>
+          ) : null}
+
+          {hitQueue.items.length > 0 ? (
+            <Section title="Titres populaires" subtitle="Le Rivendy Hit de la semaine, selon le nombre d’auditeurs." href="/music/hit" hrefLabel="Voir le Hit">
+              <TrackList items={hitQueue.items} ranks={ranks} label="Titres populaires" />
+            </Section>
+          ) : null}
+
+          <Section title="Nouveautés" subtitle="Les dernières sorties validées par Rivendy." href={genre ? `/music/explore?genre=${genre}` : "/music/explore"}>
+            {fresh.length > 0
+              ? <CardRow label="Nouveautés">{fresh.map((r) => <ReleaseCard key={r.id} release={r} />)}</CardRow>
+              : <EmptyState title={genreName ? `Pas encore de nouveauté ${genreName}` : "Pas encore de nouveauté"} text="Revenez bientôt : les sorties arrivent chaque semaine." />}
           </Section>
-          <Section title="Nouveautés"><ReleaseGrid releases={fresh ?? []} /></Section>
+
+          {artists.length > 0 ? (
+            <Section title="Artistes à découvrir" href="/music/artists">
+              <CardRow label="Artistes à découvrir">{artists.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
+            </Section>
+          ) : null}
+
+          {recent.data && recent.data.length > 0 ? (
+            <Section title="Écoutés récemment" href="/music/history">
+              <RecentRow rows={recent.data} />
+            </Section>
+          ) : null}
         </>
       )}
-    </MusicPage>
+    </>
   );
 }
 
-// ── Sortie (album, single, EP) ─────────────────────────────────────────────
-
-export function AlbumView({ release, tracks, highlight }: { release: MusicRelease; tracks: MusicTrack[]; highlight?: string | null }) {
-  const { user } = useAuth();
-  const dialogs = useDialogs();
-  const [saved, setSaved] = useState(false);
-  const queue = useMemo(() => toQueue(tracks, release), [tracks, release]);
-
-  useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    void isReleaseSaved(release.id).then((v) => { if (alive) setSaved(v); });
-    return () => { alive = false; };
-  }, [user, release.id]);
-
-  useEffect(() => {
-    if (!highlight) return;
-    document.getElementById(`t-${highlight}`)?.scrollIntoView({ block: "center" });
-  }, [highlight]);
-
-  async function toggleSave() {
-    if (!user) { dialogs.notify("Connectez-vous pour enregistrer cet album.", "info"); return; }
-    const ok = await setReleaseSaved(release.id, !saved);
-    if (ok) setSaved(!saved); else dialogs.notify("Action impossible pour l’instant.", "error");
-  }
-
-  const year = release.release_date?.slice(0, 4) ?? release.published_at?.slice(0, 4) ?? "";
+function HomeTitle() {
   return (
-    <MusicPage>
-      <MusicNav />
-      <div className="flex flex-col gap-6 md:flex-row md:items-end">
-        <Cover url={release.cover_url} size={720} alt={release.title} className="w-56 shadow-2xl md:w-64" />
+    <PageTitle title="À découvrir" subtitle="Vos îles. Votre rythme."
+      aside={<span className="hidden items-center gap-2 text-xs text-rvm-muted sm:flex"><Headphones className="h-4 w-4 text-rvm-accent" aria-hidden /> Trouvez votre prochain coup de cœur.</span>} />
+  );
+}
+
+/**
+ * Bannière : les sorties mises en avant au dashboard (sinon les plus
+ * récentes). La pochette carrée s'affiche entière — jamais un visage coupé —
+ * et floutée en fond ; sans visuel, un dégradé vert.
+ */
+function Hero({ releases, top, hit }: { releases: MusicRelease[]; top: HitRow | null; hit: HitRow[] }) {
+  const [i, setI] = useState(0);
+  const player = useMusicPlayer();
+  const r = releases[Math.min(i, releases.length - 1)];
+  const bg = thumbUrl(r.cover_url, 480);
+  const year = releaseYear(r);
+  const topTrack = top?.music_tracks ?? null;
+  const topRelease = topTrack?.music_releases ?? null;
+
+  return (
+    <section aria-roledescription="carrousel" aria-label="La sélection Rivendy"
+      className="relative mt-6 overflow-hidden rounded-3xl border border-rvm-line bg-rvm-surface">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        {bg && bg.startsWith("https://") ? (
+          <Image key={bg} src={bg} alt="" fill unoptimized sizes="100vw" className="scale-125 object-cover opacity-40 blur-3xl" />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-r from-rvm-ground via-rvm-ground/85 to-rvm-ground/30" />
+        <div className="absolute -left-24 -top-32 h-80 w-80 rounded-full bg-rvm-brand/35 blur-3xl" />
+      </div>
+
+      <div className="relative grid items-center gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,1fr)_auto] lg:px-10 lg:py-9">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#F5B83D]">{releaseKindLabel(release.kind)}</p>
-          <h1 className="mt-1 text-3xl font-black sm:text-4xl">{release.title}</h1>
-          <p className="mt-2 text-white/70">
-            {release.artist_id ? <Link href={`/artist/${release.artist_id}`} className="font-semibold text-white hover:underline">{artistName(release)}</Link> : artistName(release)}
-            {year ? ` · ${year}` : ""} · {releaseMeta(tracks)}
-          </p>
-          <div className="mt-2 flex gap-2">{release.is_premium ? <PremiumTag /> : null}{release.explicit ? <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold">E</span> : null}</div>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <PlayAllButton items={queue} />
-            <button type="button" onClick={toggleSave}
-              className={cn("rounded-full border px-4 py-2 text-sm font-semibold", saved ? "border-[#F5B83D] text-[#F5B83D]" : "border-white/30 text-white")}>
-              {saved ? "Enregistré" : "Enregistrer"}
-            </button>
-            <a href={appIntentUrl(`/musique/release/${release.id}`)} className="text-sm text-white/60 underline md:hidden">Ouvrir dans l’application</a>
+          <span className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-black/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-rvm-soft">
+            <AudioLines className="h-3.5 w-3.5 text-rvm-accent" aria-hidden /> La sélection Rivendy
+          </span>
+          <div className="mt-4 flex items-center gap-4">
+            <Link href={`/music/album/${r.id}`} className="shrink-0 md:hidden" tabIndex={-1} aria-hidden>
+              <Cover url={r.cover_url} size={320} alt="" className="h-20 w-20 shadow-xl shadow-black/40" rounded="rounded-xl" />
+            </Link>
+            <div className="min-w-0">
+              <h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+                <Link href={`/music/album/${r.id}`} className="hover:underline">{r.title}</Link>
+              </h2>
+              <p className="mt-1.5 truncate text-sm text-rvm-soft">
+                {r.artist_id ? <Link href={`/artist/${r.artist_id}`} className="font-semibold text-rvm-text hover:underline">{artistName(r)}</Link> : artistName(r)}
+                {" · "}{releaseKindLabel(r.kind)}{year ? ` · ${year}` : ""}
+                {r.is_premium ? <PremiumTag className="ml-2 align-middle" /> : null}
+              </p>
+            </div>
           </div>
-          {release.is_premium ? (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-white/60">
-              <Lock className="h-3.5 w-3.5 text-[#F5B83D]" /> Sortie Premium : écoute complète avec <Link href="/plus" className="font-semibold text-[#F5B83D] underline">Rivendy+</Link>, extraits de 30 s sinon.
-            </p>
+          <p className="mt-3 line-clamp-2 max-w-xl text-sm leading-relaxed text-rvm-muted">
+            {r.description?.trim() || "Des pépites des îles aux sons qui vous emmènent ailleurs. Appuyez sur lecture."}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <PlayReleaseLabelButton release={r} />
+            <SaveReleaseButton release={r} />
+          </div>
+        </div>
+
+        <div className="relative hidden md:block">
+          <Link href={`/music/album/${r.id}`} aria-label={`Ouvrir ${r.title}`} className="block w-56 lg:w-64">
+            <Cover url={r.cover_url} size={720} alt="" priority className="w-full shadow-2xl shadow-black/60 ring-1 ring-white/10" rounded="rounded-2xl" />
+          </Link>
+          {topTrack && topRelease ? (
+            <button type="button" onClick={() => player.playQueue(toQueue(hit.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)), 0)}
+              className="absolute -bottom-4 -left-16 hidden w-60 items-center gap-3 rounded-2xl border border-white/10 bg-rvm-panel/90 p-3 text-left shadow-2xl backdrop-blur hover:border-rvm-accent/60 xl:flex">
+              <AudioLines className="h-6 w-6 shrink-0 text-rvm-accent" aria-hidden />
+              <span className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-rvm-muted">N° 1 du Rivendy Hit</span>
+                <span className="block truncate text-sm font-semibold">{topTrack.title}</span>
+                <span className="block truncate text-xs text-rvm-muted">{artistName(topRelease)}</span>
+              </span>
+            </button>
           ) : null}
         </div>
       </div>
-      {release.description ? <p className="mt-6 max-w-3xl whitespace-pre-line text-sm text-white/70">{release.description}</p> : null}
-      <div className="mt-8">
-        <TrackList items={queue} extra={(item) => <span id={`t-${item.track.id}`} className={cn(highlight === item.track.id && "h-2 w-2 rounded-full bg-[#F5B83D]")} />} />
-      </div>
-    </MusicPage>
+
+      {releases.length > 1 ? (
+        <div className="relative flex gap-1.5 px-5 pb-5 sm:px-8 lg:px-10">
+          {releases.map((x, k) => (
+            <button key={x.id} type="button" onClick={() => setI(k)} aria-label={`Afficher ${x.title} (${k + 1} sur ${releases.length})`}
+              aria-current={k === i ? "true" : undefined}
+              className="flex h-6 items-center">
+              <span className={cn("block h-1.5 rounded-full transition-all", k === i ? "w-6 bg-rvm-accent" : "w-1.5 bg-white/30 hover:bg-white/50")} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Filtres de genre : seulement les genres présents dans le catalogue affiché. */
+function GenreChips({ genres, value, onChange }: { genres: MusicGenre[]; value: string | null; onChange: (g: string | null) => void }) {
+  const all: Array<{ id: string | null; name: string }> = [{ id: null, name: "Tout" }, ...genres];
+  return (
+    <div role="group" aria-label="Filtrer par genre" className="no-scrollbar -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:px-0">
+      {all.map((g) => {
+        const active = value === g.id;
+        return (
+          <button key={g.id ?? "all"} type="button" onClick={() => onChange(g.id)} aria-pressed={active}
+            className={cn("h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors",
+              active ? "border-rvm-accent bg-rvm-accent text-rvm-on-accent" : "border-rvm-line bg-rvm-surface text-rvm-soft hover:border-rvm-accent/60 hover:text-rvm-text")}>
+            {g.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** « Écoutés récemment » : cartes de titres, toucher relance la liste. */
+function RecentRow({ rows }: { rows: Array<{ track: MusicTrack }> }) {
+  const player = useMusicPlayer();
+  const items = toQueue(rows.map((r) => r.track));
+  return (
+    <CardRow label="Écoutés récemment">
+      {items.map((it, i) => {
+        const isCurrent = player.current?.track.id === it.track.id;
+        return (
+          <button key={`${it.track.id}-${i}`} type="button" onClick={() => (isCurrent ? player.toggle() : player.playQueue(items, i))}
+            aria-label={`Écouter ${it.track.title}`} className="group block w-full text-left">
+            <div className={cn("overflow-hidden rounded-xl shadow-lg shadow-black/30 ring-1 ring-white/5", isCurrent && "ring-2 ring-rvm-accent")}>
+              <Cover url={it.release.cover_url} size={320} alt="" className="w-full transition duration-300 motion-safe:group-hover:scale-[1.03]" />
+            </div>
+            <span className={cn("mt-2.5 block truncate text-sm font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>{it.track.title}</span>
+            <span className="block truncate text-xs text-rvm-muted">{artistName(it.release)}</span>
+          </button>
+        );
+      })}
+    </CardRow>
+  );
+}
+
+// ── Explorer : recherche, genres, toutes les sorties ───────────────────────
+
+export function ExploreView() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const market = useMusicMarket();
+  const genre = params.get("genre");
+  const [q, setQ] = useState(() => params.get("q") ?? "");
+  const [query, setQuery] = useState(() => (params.get("q") ?? "").trim());
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setQuery(q.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  // L'adresse garde la recherche et le genre (lien partageable, retour arrière).
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (query) sp.set("q", query); else sp.delete("q");
+    const next = `/music/explore${sp.toString() ? `?${sp}` : ""}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) router.replace(next, { scroll: false });
+  }, [query, router]);
+
+  const setGenre = (g: string | null) => {
+    const sp = new URLSearchParams(window.location.search);
+    if (g) sp.set("genre", g); else sp.delete("genre");
+    router.replace(`/music/explore${sp.toString() ? `?${sp}` : ""}`, { scroll: false });
+  };
+
+  const search = useLoad(searchable(query) ? `s:${query}` : null, async () => {
+    const rows = await searchMusic(query);
+    const tracks = await fetchTracksByIds(rows.filter((r) => r.kind === "track").map((r) => r.id));
+    return { rows, tracks };
+  });
+  const catalog = useLoad(`cat:${market ?? ""}`, async () => {
+    const [genres, releases] = await Promise.all([fetchGenres(), fetchNewReleases(market, 200)]);
+    return { genres: availableGenres(releases, genres), releases };
+  });
+  const byGenre = useLoad(genre ? `g:${market ?? ""}:${genre}` : null, () => fetchNewReleases(market, 120, genre));
+
+  const genreName = catalog.data?.genres.find((g) => g.id === genre)?.name ?? null;
+  const releases = genre ? byGenre.data : catalog.data?.releases ?? null;
+
+  return (
+    <>
+      <PageTitle title="Explorer" subtitle="Cherchez un titre, un artiste, un album, ou parcourez les genres." />
+      <form role="search" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); }}
+        className="mt-5 flex max-w-2xl items-center gap-2 rounded-full border border-rvm-line bg-rvm-surface px-4 transition-colors focus-within:border-rvm-accent">
+        <Search className="h-5 w-5 shrink-0 text-rvm-muted" aria-hidden />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Un titre, un artiste, une envie…"
+          aria-label="Rechercher de la musique" enterKeyHint="search"
+          className="h-12 min-w-0 flex-1 bg-transparent text-rvm-text placeholder:text-rvm-muted focus:outline-none focus-visible:outline-none" />
+        {search.loading ? <LoaderCircle className="h-4 w-4 text-rvm-muted motion-safe:animate-spin" aria-hidden /> : null}
+        {q ? (
+          <button type="button" onClick={() => { setQ(""); setQuery(""); }} aria-label="Effacer la recherche" className={cn(iconButton, "h-9 w-9")}>
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        ) : null}
+      </form>
+
+      {searchable(query) ? (
+        <div aria-live="polite">
+          {search.error ? <div className="mt-8"><ErrorState onRetry={search.reload} /></div>
+            : !search.data ? <div className="mt-8"><ListSkeleton /></div>
+            : search.data.rows.length === 0 ? (
+              <div className="mt-8"><EmptyState icon={Search} title={`Aucun résultat pour « ${query} »`} text="Vérifiez l’orthographe ou essayez un autre mot." /></div>
+            ) : <SearchResults rows={search.data.rows} tracks={search.data.tracks} />}
+        </div>
+      ) : (
+        <>
+          {q.trim().length === 1 ? <p className="mt-3 text-sm text-rvm-muted">Tapez au moins 2 caractères.</p> : null}
+          <Section title="Genres">
+            {catalog.error ? <ErrorState onRetry={catalog.reload} />
+              : !catalog.data ? <div aria-hidden className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 5 }, (_, k) => <div key={k} className="h-24 rounded-2xl bg-rvm-surface motion-safe:animate-pulse" />)}</div>
+              : catalog.data.genres.length === 0 ? <p className="text-sm text-rvm-muted">Les genres apparaîtront avec les premières sorties.</p>
+              : (
+                <div role="group" aria-label="Genres" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {catalog.data.genres.map((g, k) => {
+                    const active = genre === g.id;
+                    return (
+                      <button key={g.id} type="button" aria-pressed={active} onClick={() => setGenre(active ? null : g.id)}
+                        className={cn("relative h-24 overflow-hidden rounded-2xl border p-4 text-left transition",
+                          active ? "border-rvm-accent bg-rvm-accent/20" : "border-rvm-line bg-rvm-surface hover:border-rvm-accent/50")}>
+                        <span aria-hidden className={cn("absolute -bottom-8 -right-6 h-24 w-24 rounded-full blur-2xl", k % 2 ? "bg-rvm-brand/40" : "bg-rvm-accent/25")} />
+                        <span className="relative block text-base font-bold text-rvm-text">{g.name}</span>
+                        <AudioLines className={cn("absolute bottom-3 right-3 h-5 w-5", active ? "text-rvm-accent" : "text-rvm-muted")} aria-hidden />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+          </Section>
+
+          <Section title={genreName ? `Sorties · ${genreName}` : "Toutes les sorties"} subtitle={genreName ? undefined : "Des plus récentes aux plus anciennes."}>
+            {(genre ? byGenre.error : catalog.error) ? <ErrorState onRetry={genre ? byGenre.reload : catalog.reload} />
+              : releases === null ? <CardRowSkeleton count={5} />
+              : <ReleaseGrid releases={releases} empty={genreName ? `Pas encore de sortie ${genreName}.` : "Les premières sorties arrivent bientôt."} />}
+          </Section>
+        </>
+      )}
+    </>
+  );
+}
+
+function SearchResults({ rows, tracks }: { rows: SearchRow[]; tracks: MusicTrack[] }) {
+  const artists = rows.filter((r) => r.kind === "artist");
+  const releases = rows.filter((r) => r.kind === "release");
+  const podcasts = rows.filter((r) => r.kind === "podcast");
+  const queue = toQueue(tracks);
+  const tile = (r: SearchRow, href: string, round = false) => (
+    <li key={`${r.kind}-${r.id}`}>
+      <Link href={href} className="flex items-center gap-3 rounded-xl border border-transparent bg-rvm-surface p-2.5 hover:border-rvm-line hover:bg-rvm-raised">
+        <Cover url={r.cover_url} size={160} alt="" className="h-14 w-14 shrink-0" rounded={round ? "rounded-full" : "rounded-lg"} />
+        <span className="min-w-0">
+          <span className="block truncate font-semibold">{r.title}</span>
+          {r.subtitle ? <span className="block truncate text-xs text-rvm-muted">{r.subtitle}</span> : null}
+        </span>
+      </Link>
+    </li>
+  );
+  return (
+    <>
+      {queue.length > 0 ? <Section title="Titres"><TrackList items={queue} label="Titres trouvés" /></Section> : null}
+      {artists.length > 0 ? (
+        <Section title="Artistes"><ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{artists.map((r) => tile(r, `/artist/${r.id}`, true))}</ul></Section>
+      ) : null}
+      {releases.length > 0 ? (
+        <Section title="Albums et singles"><ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{releases.map((r) => tile(r, `/music/album/${r.id}`))}</ul></Section>
+      ) : null}
+      {podcasts.length > 0 ? (
+        <Section title="Podcasts"><ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{podcasts.map((r) => tile(r, `/musique/podcast/${r.id}`))}</ul></Section>
+      ) : null}
+    </>
+  );
+}
+
+// ── Artistes ───────────────────────────────────────────────────────────────
+
+export function ArtistsView() {
+  const market = useMusicMarket();
+  const { user } = useAuth();
+  const [filter, setFilter] = useState("");
+  const all = useLoad(`artists:${market ?? ""}`, () => fetchArtistsWithMusic(market));
+  const followed = useLoad(user ? `followed:${user.id}` : null, () => fetchFollowedArtists());
+  const f = fold(filter);
+  const shown = (all.data ?? []).filter((a) => !f || fold(a.name).includes(f) || fold(a.genre ?? "").includes(f));
+
+  return (
+    <>
+      <PageTitle title="Artistes" subtitle="Les artistes qui ont de la musique à écouter sur Rivendy."
+        aside={(all.data?.length ?? 0) > 8 ? (
+          <label className="flex h-10 w-full max-w-xs items-center gap-2 rounded-full border border-rvm-line bg-rvm-surface px-3 focus-within:border-rvm-accent sm:w-64">
+            <Search className="h-4 w-4 text-rvm-muted" aria-hidden />
+            <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer les artistes" aria-label="Filtrer les artistes"
+              className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-rvm-muted focus:outline-none focus-visible:outline-none" />
+          </label>
+        ) : undefined} />
+      {followed.data && followed.data.length > 0 && !f ? (
+        <Section title="Vos artistes suivis">
+          <CardRow label="Vos artistes suivis">{followed.data.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
+        </Section>
+      ) : null}
+      <Section title="Tous les artistes">
+        {all.error ? <ErrorState onRetry={all.reload} />
+          : !all.data ? <CardRowSkeleton round />
+          : shown.length === 0 ? (
+            <EmptyState icon={Mic2} title={f ? "Aucun artiste ne correspond" : "Les premiers artistes arrivent bientôt"}
+              text={f ? "Essayez un autre nom." : "Chaque artiste est validé par Rivendy avant de publier."} />
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              {shown.map((a) => <ArtistCard key={a.id} artist={a} />)}
+            </div>
+          )}
+      </Section>
+    </>
   );
 }
 
@@ -157,113 +460,117 @@ export function AlbumView({ release, tracks, highlight }: { release: MusicReleas
 export function HitView() {
   const market = useMusicMarket();
   const [scope, setScope] = useState<"all" | "country">("all");
-  const [rows, setRows] = useState<HitRow[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void fetchHit(scope, scope === "all" ? "" : market ?? "", market).then((r) => { if (alive) setRows(r); });
-    return () => { alive = false; setRows(null); };
-  }, [scope, market]);
-  const queue = useMemo(() => toQueue((rows ?? []).map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)), [rows]);
-  const byTrack = useMemo(() => new Map((rows ?? []).map((h) => [h.music_tracks?.id ?? "", h])), [rows]);
+  const hit = useLoad(`hit:${scope}:${market ?? ""}`, () => fetchHit(scope, scope === "all" ? "" : market ?? "", market));
+  const rows = useMemo(() => hit.data ?? [], [hit.data]);
+  const queue = useMemo(() => toQueue(rows.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)), [rows]);
+  const ranks = useMemo(() => new Map(rows.map((h) => [h.music_tracks?.id ?? "", { rank: h.rank, move: hitMovement(h.rank, h.previous_rank) }])), [rows]);
+  const week = rows[0]?.week_start;
 
   return (
-    <MusicPage>
-      <MusicNav />
-      <h1 className="text-3xl font-black">Rivendy Hit</h1>
-      <p className="mt-1 text-sm text-white/60">Le classement de la semaine, selon le nombre d’auditeurs.</p>
-      <div className="mt-4 flex gap-2">
+    <>
+      <PageTitle title="Rivendy Hit"
+        subtitle={week ? `Semaine du ${new Date(`${week}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} · classés selon le nombre d’auditeurs.` : "Le classement de la semaine, selon le nombre d’auditeurs."} />
+      <div role="group" aria-label="Classement" className="mt-5 flex gap-2">
         {([["all", "Général"], ["country", "Mon pays"]] as const).map(([v, l]) => (
           <button key={v} type="button" onClick={() => setScope(v)} aria-pressed={scope === v}
-            className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", scope === v ? "bg-[#F5B83D] text-[#0D0B19]" : "bg-white/10 text-white")}>{l}</button>
+            className={cn("h-10 rounded-full border px-4 text-sm font-semibold transition-colors",
+              scope === v ? "border-rvm-accent bg-rvm-accent text-rvm-on-accent" : "border-rvm-line bg-rvm-surface text-rvm-soft hover:text-rvm-text")}>{l}</button>
         ))}
       </div>
       <div className="mt-6">
-        {rows === null ? <Spinner /> : queue.length === 0 ? <p className="text-sm text-white/60">Pas encore de classement pour cette semaine.</p> : (
-          <>
-            <PlayAllButton items={queue} label="Écouter le Hit" />
-            <div className="mt-4">
-              <TrackList items={queue} showCover numbered={false} extra={(item) => {
-                const h = byTrack.get(item.track.id);
-                if (!h) return null;
-                return (
-                  <span className="flex w-20 shrink-0 items-center justify-end gap-2 text-xs">
-                    <span className={cn("font-black", h.rank <= 3 ? "text-[#F5B83D]" : "text-white/70")}>#{h.rank}</span>
-                    <span className="text-white/50">{hitMovement(h.rank, h.previous_rank)}</span>
-                  </span>
-                );
-              }} />
-            </div>
-          </>
-        )}
+        {hit.error ? <ErrorState onRetry={hit.reload} />
+          : hit.loading ? <ListSkeleton rows={8} />
+          : queue.length === 0 ? <EmptyState title="Pas encore de classement pour cette semaine" text="Chaque lundi, les titres les plus écoutés de la semaine passée." />
+          : (
+            <>
+              <PlayAllButton items={queue} label="Écouter le Hit" />
+              <div className="mt-6"><TrackList items={queue} ranks={ranks} label="Rivendy Hit" /></div>
+            </>
+          )}
       </div>
-    </MusicPage>
+    </>
   );
 }
 
-// ── Recherche ──────────────────────────────────────────────────────────────
+// ── Sortie (album, single, EP) ─────────────────────────────────────────────
 
-export function SearchView() {
-  const router = useRouter();
-  const [q, setQ] = useState("");
-  const [rows, setRows] = useState<SearchRow[] | null>(null);
-  const [opening, setOpening] = useState(false);
+export function AlbumView({ release, tracks, highlight }: { release: MusicRelease; tracks: MusicTrack[]; highlight?: string | null }) {
+  const library = useMusicLibrary();
+  const market = useMusicMarket();
+  const queue = useMemo(() => toQueue(tracks, release), [tracks, release]);
+  const more = useLoad(release.artist_id ? `more:${release.artist_id}:${market ?? ""}` : null,
+    () => fetchReleasesByArtist(release.artist_id as string, market));
+  const others = (more.data ?? []).filter((r) => r.id !== release.id);
+  const bg = thumbUrl(release.cover_url, 480);
+  const year = releaseYear(release);
 
   useEffect(() => {
-    if (!searchable(q)) return;
-    let alive = true;
-    const t = window.setTimeout(() => { void searchMusic(q).then((r) => { if (alive) setRows(r); }); }, 350);
-    return () => { alive = false; window.clearTimeout(t); };
-  }, [q]);
+    if (!highlight) return;
+    document.getElementById(`t-${highlight}`)?.scrollIntoView({ block: "center" });
+  }, [highlight]);
 
-  async function open(r: SearchRow) {
-    if (r.kind === "release") { router.push(`/music/album/${r.id}`); return; }
-    if (r.kind === "artist") { router.push(`/artist/${r.id}`); return; }
-    if (r.kind === "track") {
-      setOpening(true);
-      const [t] = await fetchTracksByIds([r.id]);
-      setOpening(false);
-      router.push(t ? `/music/album/${t.release_id}?t=${t.id}` : `/music/album/${r.release_id}`);
-      return;
-    }
-    router.push(`/musique/podcast/${r.id}`);
-  }
-
-  const kinds: Array<[SearchRow["kind"], string]> = [["artist", "Artistes"], ["release", "Albums et singles"], ["track", "Titres"], ["podcast", "Podcasts"]];
   return (
-    <MusicPage>
-      <MusicNav />
-      <label className="flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3">
-        <Search className="h-5 w-5 text-white/60" />
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Artiste, titre, album…"
-          className="min-w-0 flex-1 bg-transparent text-white placeholder:text-white/40 focus:outline-none" />
-        {opening ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-      </label>
-      {!searchable(q) ? <p className="mt-6 text-sm text-white/60">Tapez au moins 2 caractères.</p>
-        : rows === null ? <Spinner />
-        : rows.length === 0 ? <p className="mt-6 text-sm text-white/60">Aucun résultat.</p>
-        : kinds.map(([k, label]) => {
-          const list = rows.filter((r) => r.kind === k);
-          if (list.length === 0) return null;
-          return (
-            <Section key={k} title={label}>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {list.map((r) => (
-                  <li key={`${r.kind}-${r.id}`}>
-                    <button type="button" onClick={() => open(r)} className="flex w-full items-center gap-3 rounded-xl bg-white/5 p-2 text-left hover:bg-white/10">
-                      <Cover url={r.cover_url} size={160} alt="" className="h-12 w-12 shrink-0" rounded={k === "artist" ? "rounded-full" : "rounded-md"} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">{r.title}</span>
-                        {r.subtitle ? <span className="block truncate text-xs text-white/60">{r.subtitle}</span> : null}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          );
-        })}
-    </MusicPage>
+    <>
+      <section className="relative overflow-hidden rounded-3xl border border-rvm-line bg-rvm-surface">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          {bg && bg.startsWith("https://") ? <Image src={bg} alt="" fill unoptimized sizes="100vw" className="scale-125 object-cover opacity-35 blur-3xl" /> : null}
+          <div className="absolute inset-0 bg-gradient-to-t from-rvm-surface via-rvm-surface/70 to-transparent" />
+        </div>
+        <div className="relative flex flex-col gap-6 p-5 sm:p-8 md:flex-row md:items-end">
+          <Cover url={release.cover_url} size={720} alt={`Pochette de ${release.title}`} priority
+            className="w-44 shadow-2xl shadow-black/60 ring-1 ring-white/10 sm:w-56 md:w-60" rounded="rounded-2xl" />
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-rvm-accent">
+              {releaseKindLabel(release.kind)}
+              {release.is_premium ? <PremiumTag /> : null}
+              {release.explicit ? <span className="rounded-sm bg-white/20 px-1 text-[10px] text-rvm-text">E</span> : null}
+            </p>
+            <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight sm:text-5xl">{release.title}</h1>
+            <p className="mt-3 text-sm text-rvm-soft">
+              {release.artist_id ? <Link href={`/artist/${release.artist_id}`} className="font-semibold text-rvm-text hover:underline">{artistName(release)}</Link> : artistName(release)}
+              {year ? ` · ${year}` : ""} · {releaseMeta(tracks)}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <PlayAllButton items={queue} />
+              <SaveReleaseButton release={release} />
+              <button type="button" onClick={() => void library.share("release", release.id, `${release.title} — ${artistName(release)}`)}
+                aria-label="Partager" className={cn(iconButton, "h-11 w-11 border border-white/15")}>
+                <Share2 className="h-4 w-4" aria-hidden />
+              </button>
+              <a href={appIntentUrl(`/musique/release/${release.id}`)} className="inline-flex items-center gap-1.5 text-sm text-rvm-muted underline md:hidden">
+                <Smartphone className="h-4 w-4" aria-hidden /> Ouvrir dans l’application
+              </a>
+            </div>
+            {release.is_premium ? (
+              <p className="mt-4 flex items-center gap-1.5 text-xs text-rvm-muted">
+                <Lock className="h-3.5 w-3.5 text-rvm-premium" aria-hidden /> Sortie Premium : écoute complète avec{" "}
+                <Link href="/plus" className="font-semibold text-rvm-accent hover:underline">Rivendy+</Link>, extraits de 30 s sinon.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+      {release.description ? <p className="mt-6 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-rvm-soft">{release.description}</p> : null}
+      <div className="mt-8">
+        {queue.length === 0 ? <EmptyState title="Les titres de cette sortie arrivent bientôt" />
+          : <TrackList items={queue} numbered showCover={false} showAlbum={false} hideRelease highlight={highlight} label={`Titres de ${release.title}`} />}
+      </div>
+      {others.length > 0 ? (
+        <Section title={`Plus de ${artistName(release)}`} href={release.artist_id ? `/artist/${release.artist_id}` : undefined} hrefLabel="Voir l’artiste">
+          <CardRow label={`Plus de ${artistName(release)}`}>{others.map((r) => <ReleaseCard key={r.id} release={r} />)}</CardRow>
+        </Section>
+      ) : null}
+    </>
   );
+}
+
+/** Page d'une sortie chargée côté navigateur (titre ouvert par la recherche). */
+export function AlbumClientLoader({ id, highlight }: { id: string; highlight?: string | null }) {
+  const data = useLoad(`album:${id}`, () => fetchRelease(id));
+  if (data.error) return <ErrorState onRetry={data.reload} />;
+  if (!data.data) return <ListSkeleton rows={8} />;
+  if (!data.data.release) return <EmptyState title="Cette sortie n’est pas disponible" />;
+  return <AlbumView release={data.data.release} tracks={data.data.tracks} highlight={highlight} />;
 }
 
 // ── Artiste ────────────────────────────────────────────────────────────────
@@ -271,275 +578,94 @@ export function SearchView() {
 export function ArtistView({ artist }: { artist: MusicArtist }) {
   const { user } = useAuth();
   const dialogs = useDialogs();
+  const library = useMusicLibrary();
   const market = useMusicMarket();
-  const [top, setTop] = useState<MusicTrack[] | null>(null);
-  const [releases, setReleases] = useState<MusicRelease[] | null>(null);
   const [following, setFollowingState] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const page = useLoad(`artist:${artist.id}:${market ?? ""}`, async () => {
+    const [top, releases] = await Promise.all([
+      fetchArtistTopTracks(artist.id, market).catch(() => [] as MusicTrack[]),
+      fetchReleasesByArtist(artist.id, market),
+    ]);
+    return { top, releases };
+  });
 
   useEffect(() => {
+    if (!user || !artist.user_id) { setFollowingState(false); return; }
     let alive = true;
-    void Promise.all([fetchArtistTopTracks(artist.id, market), fetchReleasesByArtist(artist.id, market)])
-      .then(([t, r]) => { if (alive) { setTop(t); setReleases(r); } });
-    return () => { alive = false; };
-  }, [artist.id, market]);
-
-  useEffect(() => {
-    if (!user || !artist.user_id) return;
-    let alive = true;
-    void isFollowing(artist.user_id).then((v) => { if (alive) setFollowingState(v); });
+    void isFollowing(artist.user_id).then((v) => { if (alive) setFollowingState(v); }).catch(() => {});
     return () => { alive = false; };
   }, [user, artist.user_id]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<LibraryEventDetail>).detail;
+      if (d?.kind === "follow" && d.id === artist.user_id) setFollowingState(d.on);
+    };
+    window.addEventListener(MUSIC_LIBRARY_EVENT, on);
+    return () => window.removeEventListener(MUSIC_LIBRARY_EVENT, on);
+  }, [artist.user_id]);
 
   async function toggleFollow() {
-    if (!user) { dialogs.notify("Connectez-vous pour suivre cet artiste.", "info"); return; }
     if (!artist.user_id) return;
+    if (!user) { library.requireLogin({ kind: "follow", id: artist.user_id, label: artist.name }); return; }
+    setBusy(true);
     const err = await setFollowing(artist.user_id, !following);
+    setBusy(false);
     if (err) { dialogs.notify(err === "blocked" ? "Action impossible avec ce compte." : "Action impossible pour l’instant.", "error"); return; }
     setFollowingState(!following);
   }
 
-  const queue = useMemo(() => toQueue(top ?? []), [top]);
+  const queue = useMemo(() => toQueue(page.data?.top ?? []), [page.data]);
+  const banner = thumbUrl(artist.banner_url, 720);
+
   return (
-    <MusicPage>
-      <MusicNav />
-      <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-end">
-        <Cover url={artist.avatar_url} size={480} alt={artist.name} className="w-40" rounded="rounded-full" />
-        <div className="min-w-0 text-center sm:text-left">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#F5B83D]">Artiste</p>
-          <h1 className="text-3xl font-black sm:text-4xl">{artist.name}</h1>
-          {artist.genre ? <p className="mt-1 text-sm text-white/60">{artist.genre}</p> : null}
-          <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
-            <PlayAllButton items={queue} />
-            {artist.user_id ? (
-              <button type="button" onClick={toggleFollow}
-                className={cn("inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold",
-                  following ? "border-[#F5B83D] text-[#F5B83D]" : "border-white/30 text-white")}>
-                {following ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />} {following ? "Abonné" : "Suivre"}
+    <>
+      <section className="relative overflow-hidden rounded-3xl border border-rvm-line bg-rvm-surface">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          {banner && banner.startsWith("https://") ? (
+            // Bannière large : cadrée sur le haut, où sont les visages.
+            <Image src={banner} alt="" fill unoptimized sizes="100vw" className="object-cover object-[50%_30%] opacity-60" />
+          ) : <div className="absolute -right-20 -top-24 h-80 w-80 rounded-full bg-rvm-brand/35 blur-3xl" />}
+          <div className="absolute inset-0 bg-gradient-to-t from-rvm-surface via-rvm-surface/75 to-rvm-surface/10" />
+        </div>
+        <div className="relative flex flex-col items-center gap-5 px-5 pb-7 pt-16 text-center sm:flex-row sm:items-end sm:px-8 sm:text-left">
+          <div className="w-32 shrink-0 overflow-hidden rounded-full shadow-2xl shadow-black/60 ring-4 ring-rvm-surface sm:w-40">
+            <Cover url={artist.avatar_url} size={480} alt={artist.name} rounded="rounded-full" className="w-full" priority />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-rvm-accent">Artiste</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-5xl">{artist.name}</h1>
+            {artist.genre ? <p className="mt-1 text-sm text-rvm-soft">{artist.genre}</p> : null}
+            <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
+              <PlayAllButton items={queue} />
+              {artist.user_id ? (
+                <button type="button" onClick={toggleFollow} disabled={busy} aria-pressed={following}
+                  className={cn(secondaryButton, following && "border-rvm-accent text-rvm-accent")}>
+                  {following ? <UserCheck className="h-4 w-4" aria-hidden /> : <UserPlus className="h-4 w-4" aria-hidden />}
+                  {following ? "Abonné" : "Suivre"}
+                </button>
+              ) : null}
+              <button type="button" onClick={() => void library.share("artist", artist.id, artist.name)} aria-label="Partager"
+                className={cn(iconButton, "h-11 w-11 border border-white/15")}>
+                <Share2 className="h-4 w-4" aria-hidden />
               </button>
-            ) : null}
+            </div>
           </div>
         </div>
-      </div>
-      {artist.bio ? <p className="mt-6 max-w-3xl whitespace-pre-line text-sm text-white/70">{artist.bio}</p> : null}
-      <Section title="Titres populaires">
-        {top === null ? <Spinner /> : queue.length === 0 ? <p className="text-sm text-white/60">Pas encore de titres populaires.</p>
-          : <TrackList items={queue} showCover numbered={false} />}
-      </Section>
-      <Section title="Sorties">{releases === null ? <Spinner /> : <ReleaseGrid releases={releases} />}</Section>
-    </MusicPage>
-  );
-}
-
-// ── Ma musique : playlists, albums enregistrés, artistes suivis ────────────
-
-export function LibraryView() {
-  const dialogs = useDialogs();
-  const [tab, setTab] = useState<"playlists" | "albums" | "artists">("playlists");
-  const [playlists, setPlaylists] = useState<Playlist[] | null>(null);
-  const [albums, setAlbums] = useState<MusicRelease[] | null>(null);
-  const [artists, setArtists] = useState<MusicArtist[] | null>(null);
-  const [name, setName] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    if (tab === "playlists") void fetchMyPlaylists().then((x) => { if (alive) setPlaylists(x); });
-    if (tab === "albums") void fetchSavedReleases().then((x) => { if (alive) setAlbums(x); });
-    if (tab === "artists") void fetchFollowedArtists().then((x) => { if (alive) setArtists(x); });
-    return () => { alive = false; };
-  }, [tab]);
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isValidPlaylistName(name)) return;
-    const res = await createPlaylist(name);
-    if (res.error || !res.playlist) { dialogs.notify(playlistMessage(res.error ?? ""), "error"); return; }
-    setName("");
-    setPlaylists((l) => [res.playlist as Playlist, ...(l ?? [])]);
-  }
-
-  return (
-    <MusicPage>
-      <MusicNav />
-      <h1 className="flex items-center gap-2 text-3xl font-black"><Library className="h-7 w-7 text-[#F5B83D]" /> Ma musique</h1>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/music/favorites" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold"><Heart className="h-4 w-4 text-[#F5B83D]" /> Titres aimés</Link>
-        <Link href="/music/history" className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold"><Clock className="h-4 w-4 text-[#F5B83D]" /> Historique</Link>
-      </div>
-      <div className="mt-6 flex gap-2 border-b border-white/10">
-        {([["playlists", "Playlists"], ["albums", "Albums"], ["artists", "Artistes"]] as const).map(([v, l]) => (
-          <button key={v} type="button" onClick={() => setTab(v)} aria-pressed={tab === v}
-            className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-semibold", tab === v ? "border-[#F5B83D] text-white" : "border-transparent text-white/60")}>{l}</button>
-        ))}
-      </div>
-      <div className="mt-6">
-        {tab === "playlists" ? (
-          <>
-            <form onSubmit={create} className="mb-4 flex max-w-md gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Nouvelle playlist"
-                className="h-10 min-w-0 flex-1 rounded-xl border border-white/20 bg-white/5 px-3 text-sm text-white placeholder:text-white/40" />
-              <button type="submit" disabled={!isValidPlaylistName(name)}
-                className="inline-flex items-center gap-1 rounded-xl bg-[#F5B83D] px-3 text-sm font-bold text-[#0D0B19] disabled:opacity-40"><Plus className="h-4 w-4" /> Créer</button>
-            </form>
-            {playlists === null ? <Spinner /> : playlists.length === 0 ? <p className="text-sm text-white/60">Aucune playlist pour l’instant.</p> : (
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {playlists.map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/music/playlist/${p.id}`} className="block rounded-xl bg-white/5 p-3 hover:bg-white/10">
-                      <span className="block truncate font-semibold">{p.name}</span>
-                      <span className="text-xs text-white/60">{p.music_playlist_items?.[0]?.count ?? 0} titres · {p.is_public ? "publique" : "privée"}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        ) : tab === "albums" ? (albums === null ? <Spinner /> : <ReleaseGrid releases={albums} />)
-          : artists === null ? <Spinner /> : artists.length === 0 ? <p className="text-sm text-white/60">Vous ne suivez aucun artiste.</p> : (
-            <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {artists.map((a) => (
-                <li key={a.id}>
-                  <Link href={`/artist/${a.id}`} className="block text-center">
-                    <Cover url={a.avatar_url} size={320} alt={a.name} className="mx-auto w-28" rounded="rounded-full" />
-                    <span className="mt-2 block truncate text-sm font-semibold">{a.name}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-      </div>
-    </MusicPage>
-  );
-}
-
-export function FavoritesView() {
-  const [tracks, setTracks] = useState<MusicTrack[] | null>(null);
-  useEffect(() => { void fetchLikedTracks().then(setTracks); }, []);
-  const queue = useMemo(() => toQueue(tracks ?? []), [tracks]);
-  return (
-    <MusicPage>
-      <MusicNav />
-      <h1 className="flex items-center gap-2 text-3xl font-black"><Heart className="h-7 w-7 fill-[#F5B83D] text-[#F5B83D]" /> Titres aimés</h1>
-      <div className="mt-6">
-        {tracks === null ? <Spinner /> : queue.length === 0 ? <p className="text-sm text-white/60">Aucun titre aimé pour l’instant.</p> : (
-          <><PlayAllButton items={queue} /><div className="mt-4"><TrackList items={queue} showCover numbered={false} /></div></>
-        )}
-      </div>
-    </MusicPage>
-  );
-}
-
-export function HistoryView() {
-  const dialogs = useDialogs();
-  const [rows, setRows] = useState<Array<{ track: MusicTrack; last_played_at: string; play_count: number }> | null>(null);
-  useEffect(() => { void fetchHistory().then(setRows); }, []);
-  const queue = useMemo(() => toQueue((rows ?? []).map((r) => r.track)), [rows]);
-
-  async function clear() {
-    const ok = await dialogs.confirm({ title: "Effacer l’historique ?", message: "Sur le site et dans l’application.", confirmLabel: "Effacer", danger: true });
-    if (!ok) return;
-    if (await clearHistory()) setRows([]); else dialogs.notify("Action impossible pour l’instant.", "error");
-  }
-
-  return (
-    <MusicPage>
-      <MusicNav />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2 text-3xl font-black"><Clock className="h-7 w-7 text-[#F5B83D]" /> Historique d’écoute</h1>
-        {rows && rows.length > 0 ? (
-          <button type="button" onClick={clear} className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-sm text-white/80">
-            <Trash2 className="h-4 w-4" /> Effacer
-          </button>
-        ) : null}
-      </div>
-      <p className="mt-1 text-sm text-white/60">Les titres écoutés au moins 30 secondes, sur le site et dans l’application (90 derniers jours).</p>
-      <div className="mt-6">
-        {rows === null ? <Spinner /> : queue.length === 0 ? <p className="text-sm text-white/60">Rien pour l’instant.</p>
-          : <TrackList items={queue} showCover numbered={false} />}
-      </div>
-    </MusicPage>
-  );
-}
-
-export function PlaylistView({ id }: { id: string }) {
-  const { user } = useAuth();
-  const dialogs = useDialogs();
-  const router = useRouter();
-  const [data, setData] = useState<{ playlist: Playlist | null; tracks: MusicTrack[] } | null>(null);
-  useEffect(() => { void fetchPlaylist(id).then(setData); }, [id, user]);
-  const queue = useMemo(() => toQueue(data?.tracks ?? []), [data]);
-  const mine = !!user && data?.playlist?.owner_id === user.id;
-
-  async function rename() {
-    if (!data?.playlist) return;
-    const name = await dialogs.ask({ title: "Renommer la playlist", placeholder: data.playlist.name, confirmLabel: "Renommer", maxLength: 60 });
-    if (name === null || !isValidPlaylistName(name)) return;
-    const err = await updatePlaylist(id, { name: name.trim() });
-    if (err) { dialogs.notify(playlistMessage(err), "error"); return; }
-    setData((d) => d && d.playlist ? { ...d, playlist: { ...d.playlist, name: name.trim() } } : d);
-  }
-
-  async function togglePublic() {
-    if (!data?.playlist) return;
-    const err = await updatePlaylist(id, { is_public: !data.playlist.is_public });
-    if (err) { dialogs.notify(playlistMessage(err), "error"); return; }
-    setData((d) => d && d.playlist ? { ...d, playlist: { ...d.playlist, is_public: !d.playlist.is_public } } : d);
-  }
-
-  async function remove() {
-    const ok = await dialogs.confirm({ title: "Supprimer cette playlist ?", message: "Sur le site et dans l’application.", confirmLabel: "Supprimer", danger: true });
-    if (!ok) return;
-    if (await deletePlaylist(id)) router.push("/music/library"); else dialogs.notify("Suppression impossible.", "error");
-  }
-
-  async function removeTrack(trackId: string) {
-    if (await removeFromPlaylist(id, trackId)) {
-      setData((d) => d ? { ...d, tracks: d.tracks.filter((t) => t.id !== trackId) } : d);
-    }
-  }
-
-  return (
-    <MusicPage>
-      <MusicNav />
-      {data === null ? <Spinner /> : !data.playlist ? (
-        <p className="text-white/70">Cette playlist est privée ou n’existe plus.</p>
-      ) : (
+      </section>
+      {artist.bio ? <p className="mt-6 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-rvm-soft">{artist.bio}</p> : null}
+      {page.error ? <div className="mt-8"><ErrorState onRetry={page.reload} /></div> : (
         <>
-          <p className="text-xs font-bold uppercase tracking-widest text-[#F5B83D]">Playlist {data.playlist.is_public ? "publique" : "privée"}</p>
-          <h1 className="mt-1 text-3xl font-black">{data.playlist.name}</h1>
-          {data.playlist.description ? <p className="mt-2 text-sm text-white/70">{data.playlist.description}</p> : null}
-          <p className="mt-1 text-sm text-white/60">{releaseMeta(data.tracks)}</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <PlayAllButton items={queue} />
-            {mine ? (
-              <>
-                <button type="button" onClick={rename} className="rounded-full border border-white/30 px-4 py-2 text-sm">Renommer</button>
-                <button type="button" onClick={togglePublic} className="rounded-full border border-white/30 px-4 py-2 text-sm">
-                  {data.playlist.is_public ? "Rendre privée" : "Rendre publique"}
-                </button>
-                <button type="button" onClick={remove} className="rounded-full border border-red-300/40 px-4 py-2 text-sm text-red-300">Supprimer</button>
-              </>
-            ) : null}
-          </div>
-          <div className="mt-6">
-            {queue.length === 0 ? <p className="text-sm text-white/60">Cette playlist est vide.</p> : (
-              <TrackList items={queue} showCover numbered={false} extra={mine ? (item) => (
-                <button type="button" onClick={() => removeTrack(item.track.id)} aria-label="Retirer de la playlist" className="rounded-full p-1.5 text-white/50 hover:text-white">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              ) : undefined} />
-            )}
-          </div>
+          <Section title="Titres populaires">
+            {!page.data ? <ListSkeleton /> : queue.length === 0
+              ? <p className="text-sm text-rvm-muted">Pas encore de titres populaires.</p>
+              : <TrackList items={queue} label={`Titres populaires de ${artist.name}`} />}
+          </Section>
+          <Section title="Sorties">
+            {!page.data ? <CardRowSkeleton count={5} /> : <ReleaseGrid releases={page.data.releases} empty="Pas encore de sortie." />}
+          </Section>
         </>
       )}
-    </MusicPage>
+    </>
   );
-}
-
-/** Page d'une sortie chargée côté navigateur (titre ouvert par la recherche). */
-export function AlbumClientLoader({ id, highlight }: { id: string; highlight?: string | null }) {
-  const [data, setData] = useState<{ release: MusicRelease | null; tracks: MusicTrack[] } | null>(null);
-  useEffect(() => { void fetchRelease(id).then(setData); }, [id]);
-  if (data === null) return <MusicPage><Spinner /></MusicPage>;
-  if (!data.release) return <MusicPage><p className="text-white/70">Cette sortie n’est pas disponible.</p></MusicPage>;
-  return <AlbumView release={data.release} tracks={data.tracks} highlight={highlight} />;
 }

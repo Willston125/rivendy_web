@@ -16,6 +16,7 @@ import {
   previousAction, shouldCount, shouldPrefetchNext, shuffleKeepingCurrent, streamErrorMessage, thumbUrl,
   type MusicRelease, type MusicTrack, type RepeatMode,
 } from "../music-logic";
+import { loginHref, savePending } from "../music-pending";
 
 /**
  * Lecteur Rivendy Music du site (Omnicanal lot D, 2026-10-21) : UN élément
@@ -35,20 +36,23 @@ type PlayerContext = {
   current: QueueItem | null;
   playing: boolean;
   loading: boolean;
-  position: number;
   duration: number;
   preview: boolean;
   repeat: RepeatMode;
   shuffled: boolean;
   volume: number;
+  muted: boolean;
   expanded: boolean;
   error: string | null;
   playQueue: (items: QueueItem[], start?: number) => void;
+  /** Joue l'élément i de la file en cours (file d'attente, « À suivre »). */
+  playAt: (i: number) => void;
   toggle: () => void;
   next: () => void;
   previous: () => void;
   seek: (seconds: number) => void;
   setVolume: (v: number) => void;
+  toggleMute: () => void;
   cycleRepeat: () => void;
   toggleShuffle: () => void;
   playNext: (item: QueueItem) => void;
@@ -60,8 +64,16 @@ type PlayerContext = {
 };
 
 const Ctx = createContext<PlayerContext | null>(null);
+/**
+ * Position de lecture à part (refonte du 2026-10-22) : elle change plusieurs
+ * fois par seconde ; seules les barres de progression la lisent, les listes
+ * de titres ne se redessinent plus à chaque instant.
+ */
+const ProgressCtx = createContext<{ position: number; duration: number }>({ position: 0, duration: 0 });
 
 const STORE_KEY = "rivendy_music_queue_v1";
+/** Volume et son coupé : un confort du navigateur, jamais envoyé au serveur. */
+const VOLUME_KEY = "rivendy_music_volume_v1";
 
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const { user, session } = useAuth();
@@ -81,6 +93,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const [repeat, setRepeat] = useState<RepeatMode>("off");
   const [shuffled, setShuffled] = useState(false);
   const [volume, setVolumeState] = useState(1);
+  const [muted, setMuted] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -174,7 +187,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       }
       if (res.error === "not_authenticated") {
         setPlaying(false);
-        router.push(`/auth/login?next=${encodeURIComponent(pathname || "/music")}`);
+        savePending({ kind: "play", id: item.track.id, path: pathname || "/music", label: item.track.title }, items.slice(i));
+        router.push(loginHref(pathname || "/music"));
         return;
       }
       if (SKIPPABLE_STREAM_ERRORS.has(res.error) && failures.current < 5) {
@@ -207,17 +221,26 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const playQueue = useCallback((items: QueueItem[], start = 0) => {
     const playable = items.filter((x) => isPlayable(x.track));
     if (playable.length === 0) { dialogs.notify("Aucun titre disponible pour l’instant.", "info"); return; }
-    if (!user) {
-      router.push(`/auth/login?next=${encodeURIComponent(pathname || "/music")}`);
-      return;
-    }
     const startId = items[start]?.track.id;
     const i = Math.max(0, playable.findIndex((x) => x.track.id === startId));
+    if (!user) {
+      // Écouter exige un compte : la file est gardée, la page d'origine
+      // propose de la reprendre après la connexion (un geste reste requis).
+      const first = playable[i];
+      savePending({ kind: "play", id: first.track.id, path: pathname || "/music", label: first.track.title }, playable.slice(i));
+      router.push(loginHref(pathname || "/music"));
+      return;
+    }
     originalOrder.current = null;
     setShuffled(false);
     setQueue(playable);
     void loadAt(playable, i);
   }, [dialogs, loadAt, pathname, router, user]);
+
+  const playAt = useCallback((i: number) => {
+    if (i < 0 || i >= queueRef.current.length) return;
+    void loadAt(queueRef.current, i);
+  }, [loadAt]);
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
@@ -258,8 +281,36 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.min(1, Math.max(0, v));
-    if (audioRef.current) audioRef.current.volume = clamped;
+    if (audioRef.current) {
+      audioRef.current.volume = clamped;
+      if (clamped > 0) audioRef.current.muted = false;
+    }
     setVolumeState(clamped);
+    if (clamped > 0) setMuted(false);
+    try { localStorage.setItem(VOLUME_KEY, JSON.stringify({ v: clamped, m: false })); } catch { /* rien */ }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const audio = audioRef.current;
+    setMuted((m) => {
+      const next = !m;
+      if (audio) audio.muted = next;
+      try { localStorage.setItem(VOLUME_KEY, JSON.stringify({ v: audio?.volume ?? 1, m: next })); } catch { /* rien */ }
+      return next;
+    });
+  }, []);
+
+  // Volume du navigateur retrouvé à l'ouverture du site.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(VOLUME_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { v?: number; m?: boolean };
+      const v = typeof saved.v === "number" && saved.v >= 0 && saved.v <= 1 ? saved.v : 1;
+      if (audioRef.current) { audioRef.current.volume = v; audioRef.current.muted = !!saved.m; }
+      setVolumeState(v);
+      setMuted(!!saved.m);
+    } catch { /* stockage indisponible */ }
   }, []);
 
   const cycleRepeat = useCallback(() => setRepeat((m) => nextRepeat(m)), []);
@@ -476,20 +527,28 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   }, [current, next, previous, seek, toggle]);
 
   const value = useMemo<PlayerContext>(() => ({
-    queue, index, current, playing, loading, position, duration, preview, repeat, shuffled, volume, expanded, error,
-    playQueue, toggle, next, previous, seek, setVolume, cycleRepeat, toggleShuffle, playNext, addToQueue, removeAt,
-    close, setExpanded, pause,
-  }), [queue, index, current, playing, loading, position, duration, preview, repeat, shuffled, volume, expanded, error,
-    playQueue, toggle, next, previous, seek, setVolume, cycleRepeat, toggleShuffle, playNext, addToQueue, removeAt,
-    close, pause]);
+    queue, index, current, playing, loading, duration, preview, repeat, shuffled, volume, muted, expanded, error,
+    playQueue, playAt, toggle, next, previous, seek, setVolume, toggleMute, cycleRepeat, toggleShuffle, playNext, addToQueue,
+    removeAt, close, setExpanded, pause,
+  }), [queue, index, current, playing, loading, duration, preview, repeat, shuffled, volume, muted, expanded, error,
+    playQueue, playAt, toggle, next, previous, seek, setVolume, toggleMute, cycleRepeat, toggleShuffle, playNext, addToQueue,
+    removeAt, close, pause]);
+  const progress = useMemo(() => ({ position, duration }), [position, duration]);
 
   return (
     <Ctx.Provider value={value}>
-      {children}
+      <ProgressCtx.Provider value={progress}>
+        {children}
+      </ProgressCtx.Provider>
       {/* Pas de crossOrigin : le stockage audio n'ouvre pas ses règles CORS au site. */}
       <audio ref={audioRef} preload="auto" className="hidden" />
     </Ctx.Provider>
   );
+}
+
+/** Position et durée du titre en cours (barres de progression seulement). */
+export function useMusicProgress(): { position: number; duration: number } {
+  return useContext(ProgressCtx);
 }
 
 export function useMusicPlayer(): PlayerContext {

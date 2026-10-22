@@ -108,3 +108,52 @@ test("playlist et recherche", () => {
   assert.ok(searchable("ab"));
   assert.ok(!searchable(" a "));
 });
+
+// ── Refonte du 2026-10-22 ──────────────────────────────────────────────────
+import {
+  availableGenres, filterByGenre, distinctArtistIds, uniqueReleases, releaseYear, musicSharePath,
+  parsePendingAction, samePath, PENDING_MAX_AGE_MS,
+} from "./music-logic.ts";
+
+test("genres : seulement ceux qui ont une sortie, dans l'ordre du dashboard", () => {
+  const genres = [
+    { id: "rap", name: "Rap", position: 40 },
+    { id: "twarab", name: "Twarab", position: 10 },
+    { id: "zouk", name: "Zouk", position: 50 },
+  ];
+  const releases = [{ genre_id: "rap" }, { genre_id: "twarab" }, { genre_id: null }, { genre_id: "rap" }];
+  assert.deepEqual(availableGenres(releases, genres).map((g) => g.id), ["twarab", "rap"]);
+  assert.deepEqual(availableGenres([], genres), []);
+  assert.equal(filterByGenre(releases, "rap").length, 2);
+  assert.equal(filterByGenre(releases, null).length, 4);
+});
+
+test("artistes et sorties sans doublon, année", () => {
+  assert.deepEqual(distinctArtistIds([{ artist_id: "a" }, { artist_id: null }, { artist_id: "b" }, { artist_id: "a" }]), ["a", "b"]);
+  assert.deepEqual(uniqueReleases([[{ id: "1" }, { id: "2" }], [{ id: "2" }, { id: "3" }]]).map((r) => r.id), ["1", "2", "3"]);
+  assert.equal(releaseYear({ release_date: "2026-05-01", published_at: "2025-01-01" }), "2026");
+  assert.equal(releaseYear({ release_date: null, published_at: "2025-01-01T10:00:00Z" }), "2025");
+  assert.equal(releaseYear({ release_date: null, published_at: null }), "");
+});
+
+test("liens partagés", () => {
+  assert.equal(musicSharePath("track", "t1"), "/music/track/t1");
+  assert.equal(musicSharePath("release", "r1"), "/music/album/r1");
+  assert.equal(musicSharePath("artist", "a1"), "/artist/a1");
+  assert.equal(musicSharePath("playlist", "p1"), "/music/playlist/p1");
+});
+
+test("action en attente de connexion : valide, récente, chemin interne", () => {
+  const now = 1_000_000_000;
+  const ok = JSON.stringify({ kind: "like", id: "t1", path: "/music/album/r1", label: "Bahari", at: now - 1000 });
+  assert.deepEqual(parsePendingAction(ok, now), { kind: "like", id: "t1", path: "/music/album/r1", label: "Bahari", at: now - 1000 });
+  const old = JSON.stringify({ kind: "like", id: "t1", path: "/music", label: "", at: now - PENDING_MAX_AGE_MS - 1 });
+  assert.equal(parsePendingAction(old, now), null);
+  assert.equal(parsePendingAction(JSON.stringify({ kind: "pay", id: "t1", path: "/music", at: now }), now), null);
+  assert.equal(parsePendingAction(JSON.stringify({ kind: "like", id: "t1", path: "https://x.com", at: now }), now), null);
+  assert.equal(parsePendingAction(JSON.stringify({ kind: "like", id: "t1", path: "//x.com", at: now }), now), null);
+  assert.equal(parsePendingAction("{oops", now), null);
+  assert.equal(parsePendingAction(null, now), null);
+  assert.ok(samePath("/music/album/r1?t=2", "/music/album/r1/"));
+  assert.ok(!samePath("/music", "/music/hit"));
+});

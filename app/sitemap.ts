@@ -37,6 +37,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Rivendy Musique (Omnicanal lot D, 2026-10-21).
     { url: absoluteUrl("/music"), lastModified: now, changeFrequency: "daily", priority: 0.7 },
     { url: absoluteUrl("/music/hit"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
+    // Refonte du 2026-10-22 : Explorer (genres) et Artistes.
+    { url: absoluteUrl("/music/explore"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
+    { url: absoluteUrl("/music/artists"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
     // Rivendy Play (Omnicanal lot C, 2026-10-22).
     { url: absoluteUrl("/play"), lastModified: now, changeFrequency: "daily", priority: 0.7 },
     { url: absoluteUrl("/play/movies"), lastModified: now, changeFrequency: "daily", priority: 0.5 },

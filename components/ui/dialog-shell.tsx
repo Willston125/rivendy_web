@@ -17,11 +17,17 @@ export function DialogShell({
   describedBy,
   onClose,
   children,
+  panelClassName,
+  layerClassName,
 }: {
   labelledBy: string;
   describedBy?: string;
   onClose: () => void;
   children: React.ReactNode;
+  /** Remplace le panneau blanc (fenêtres sombres de la Musique). */
+  panelClassName?: string;
+  /** Remplace le plan d'affichage (z-50), pour passer au-dessus du lecteur agrandi. */
+  layerClassName?: string;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   // Référence stable : le parent peut passer une fonction neuve à chaque
@@ -68,7 +74,7 @@ export function DialogShell({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center"
+      className={`fixed inset-0 ${layerClassName ?? "z-50"} flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center`}
       onClick={(event) => {
         event.stopPropagation();
         onCloseRef.current();
@@ -80,7 +86,7 @@ export function DialogShell({
         aria-modal="true"
         aria-labelledby={labelledBy}
         aria-describedby={describedBy}
-        className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-xl sm:rounded-3xl"
+        className={panelClassName ?? "w-full max-w-md rounded-t-3xl bg-white p-6 shadow-xl sm:rounded-3xl"}
         onClick={(event) => event.stopPropagation()}
       >
         {children}

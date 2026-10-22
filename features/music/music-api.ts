@@ -36,52 +36,96 @@ const PLAYLIST_COLUMNS = "id, owner_id, name, description, is_public, updated_at
 const published = (r: MusicRelease | null | undefined): r is MusicRelease =>
   !!r && (r as MusicRelease & { status?: string }).status !== "draft";
 
+/**
+ * Lecture du catalogue : une panne (réseau, serveur) LÈVE une erreur, pour
+ * que la page dise « impossible de charger » au lieu d'un catalogue vide.
+ */
+function must<T>(res: { data: T | null; error: { message: string } | null }): T | null {
+  if (res.error) throw new Error(res.error.message);
+  return res.data;
+}
+
+export type MusicGenre = { id: string; name: string; position: number };
+
 // ── Catalogue ──────────────────────────────────────────────────────────────
 
 export async function fetchFeatured(market: string | null): Promise<MusicRelease[]> {
-  const { data } = await supabase.from("music_releases").select(RELEASE_WITH_TERRITORY)
+  const data = must(await supabase.from("music_releases").select(RELEASE_WITH_TERRITORY)
     .eq("status", "published").not("featured_rank", "is", null)
-    .order("featured_rank", { ascending: true }).limit(30);
+    .order("featured_rank", { ascending: true }).limit(30));
   return ((data ?? []) as unknown as MusicRelease[]).filter((r) => availableIn(r, market));
 }
 
-export async function fetchNewReleases(market: string | null, limit = 60): Promise<MusicRelease[]> {
-  const { data } = await supabase.from("music_releases").select(RELEASE_WITH_TERRITORY)
-    .eq("status", "published").order("published_at", { ascending: false }).limit(limit);
+/** Sorties récentes, d'un genre si demandé (`genre` = id de music_genres). */
+export async function fetchNewReleases(market: string | null, limit = 60, genre: string | null = null): Promise<MusicRelease[]> {
+  let q = supabase.from("music_releases").select(RELEASE_WITH_TERRITORY).eq("status", "published");
+  if (genre) q = q.eq("genre_id", genre);
+  const data = must(await q.order("published_at", { ascending: false }).limit(limit));
   return ((data ?? []) as unknown as MusicRelease[]).filter((r) => availableIn(r, market));
+}
+
+/** Genres ouverts au dashboard, dans leur ordre. */
+export async function fetchGenres(): Promise<MusicGenre[]> {
+  const data = must(await supabase.from("music_genres").select("id, name, position")
+    .eq("is_active", true).order("position"));
+  return (data ?? []) as MusicGenre[];
+}
+
+/** Profils d'artistes, dans l'ordre des identifiants donnés. */
+export async function fetchArtistsByIds(ids: string[]): Promise<MusicArtist[]> {
+  if (ids.length === 0) return [];
+  const data = must(await supabase.from("play_artists").select(ARTIST_COLUMNS).in("id", ids.slice(0, 200)));
+  const byId = new Map(((data ?? []) as MusicArtist[]).map((a) => [a.id, a]));
+  return ids.map((id) => byId.get(id)).filter((a): a is MusicArtist => !!a);
+}
+
+/**
+ * Artistes qui ont de la musique publiée dans ce marché (les plus récents
+ * d'abord) : seuls ceux-là ont une page à écouter.
+ */
+export async function fetchArtistsWithMusic(market: string | null): Promise<MusicArtist[]> {
+  const data = must(await supabase.from("music_releases").select("artist_id, published_at, music_release_countries(country_id)")
+    .eq("status", "published").not("artist_id", "is", null).order("published_at", { ascending: false }).limit(400));
+  const rows = ((data ?? []) as unknown as Array<Pick<MusicRelease, "artist_id" | "music_release_countries">>)
+    .filter((r) => availableIn(r, market));
+  const seen = new Set<string>();
+  for (const r of rows) if (r.artist_id) seen.add(r.artist_id);
+  return fetchArtistsByIds([...seen]);
 }
 
 export async function fetchReleasesByArtist(artistId: string, market: string | null): Promise<MusicRelease[]> {
-  const { data } = await supabase.from("music_releases").select(RELEASE_WITH_TERRITORY)
-    .eq("status", "published").eq("artist_id", artistId).order("published_at", { ascending: false }).limit(120);
+  const data = must(await supabase.from("music_releases").select(RELEASE_WITH_TERRITORY)
+    .eq("status", "published").eq("artist_id", artistId).order("published_at", { ascending: false }).limit(120));
   return ((data ?? []) as unknown as MusicRelease[]).filter((r) => availableIn(r, market));
 }
 
 export async function fetchRelease(id: string): Promise<{ release: MusicRelease | null; tracks: MusicTrack[] }> {
-  const [{ data: release }, { data: tracks }] = await Promise.all([
+  const [r1, r2] = await Promise.all([
     supabase.from("music_releases").select(`${RELEASE_WITH_TERRITORY}, status`).eq("id", id).eq("status", "published").maybeSingle(),
     supabase.from("music_tracks").select(TRACK_COLUMNS).eq("release_id", id).order("position"),
   ]);
+  const release = must(r1);
+  const tracks = must(r2);
   return { release: (release as unknown as MusicRelease) ?? null, tracks: (tracks ?? []) as unknown as MusicTrack[] };
 }
 
 /** Titres (avec leur sortie) dans l'ordre demandé, en gardant seulement les publiés. */
 export async function fetchTracksByIds(ids: string[]): Promise<MusicTrack[]> {
   if (ids.length === 0) return [];
-  const { data } = await supabase.from("music_tracks").select(TRACK_WITH_RELEASE).in("id", ids);
+  const data = must(await supabase.from("music_tracks").select(TRACK_WITH_RELEASE).in("id", ids));
   const byId = new Map(((data ?? []) as unknown as MusicTrack[]).map((t) => [t.id, t]));
   return ids.map((id) => byId.get(id)).filter((t): t is MusicTrack => !!t && !!t.music_releases);
 }
 
 /** Rivendy Hit : la dernière semaine d'un classement (général, marché, origine). */
 export async function fetchHit(scope: "all" | "country" | "island", scopeId: string, market: string | null): Promise<HitRow[]> {
-  const { data: last } = await supabase.from("music_hit_weekly").select("week_start")
-    .eq("scope", scope).eq("scope_id", scopeId).order("week_start", { ascending: false }).limit(1);
+  const last = must(await supabase.from("music_hit_weekly").select("week_start")
+    .eq("scope", scope).eq("scope_id", scopeId).order("week_start", { ascending: false }).limit(1));
   const week = (last ?? [])[0]?.week_start as string | undefined;
   if (!week) return [];
-  const { data } = await supabase.from("music_hit_weekly")
+  const data = must(await supabase.from("music_hit_weekly")
     .select(`rank, plays, previous_rank, week_start, music_tracks(${TRACK_WITH_RELEASE})`)
-    .eq("scope", scope).eq("scope_id", scopeId).eq("week_start", week).order("rank").limit(50);
+    .eq("scope", scope).eq("scope_id", scopeId).eq("week_start", week).order("rank").limit(50));
   return ((data ?? []) as unknown as HitRow[]).filter((h) => {
     const r = h.music_tracks?.music_releases;
     return published(r) && availableIn(r, market);
@@ -101,7 +145,7 @@ export async function fetchArtistTopTracks(artistId: string, market: string | nu
 }
 
 export async function searchMusic(query: string): Promise<SearchRow[]> {
-  const { data } = await supabase.rpc("music_search", { p_query: query.trim(), p_limit: 20 });
+  const data = must(await supabase.rpc("music_search", { p_query: query.trim(), p_limit: 20 }));
   return (data ?? []) as SearchRow[];
 }
 
@@ -157,6 +201,14 @@ async function uid(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
+/** Nombre de titres aimés par le compte (pastille « Mes favoris »). */
+export async function fetchLikeCount(): Promise<number> {
+  const u = await uid();
+  if (!u) return 0;
+  const { count } = await supabase.from("music_likes").select("track_id", { count: "exact", head: true }).eq("user_id", u);
+  return count ?? 0;
+}
+
 export async function likedTrackIds(trackIds: string[]): Promise<Set<string>> {
   const u = await uid();
   if (!u || trackIds.length === 0) return new Set();
@@ -176,8 +228,8 @@ export async function setLiked(trackId: string, liked: boolean): Promise<boolean
 export async function fetchLikedTracks(): Promise<MusicTrack[]> {
   const u = await uid();
   if (!u) return [];
-  const { data } = await supabase.from("music_likes").select(`created_at, music_tracks(${TRACK_WITH_RELEASE})`)
-    .eq("user_id", u).order("created_at", { ascending: false }).limit(500);
+  const data = must(await supabase.from("music_likes").select(`created_at, music_tracks(${TRACK_WITH_RELEASE})`)
+    .eq("user_id", u).order("created_at", { ascending: false }).limit(500));
   return ((data ?? []) as unknown as Array<{ music_tracks: MusicTrack | null }>)
     .map((r) => r.music_tracks).filter((t): t is MusicTrack => !!t && !!t.music_releases);
 }
@@ -201,8 +253,8 @@ export async function setReleaseSaved(releaseId: string, saved: boolean): Promis
 export async function fetchSavedReleases(): Promise<MusicRelease[]> {
   const u = await uid();
   if (!u) return [];
-  const { data } = await supabase.from("music_saved_releases").select(`created_at, music_releases(${RELEASE_WITH_TERRITORY})`)
-    .eq("user_id", u).order("created_at", { ascending: false }).limit(300);
+  const data = must(await supabase.from("music_saved_releases").select(`created_at, music_releases(${RELEASE_WITH_TERRITORY})`)
+    .eq("user_id", u).order("created_at", { ascending: false }).limit(300));
   return ((data ?? []) as unknown as Array<{ music_releases: MusicRelease | null }>)
     .map((r) => r.music_releases).filter((r): r is MusicRelease => !!r);
 }
@@ -210,17 +262,19 @@ export async function fetchSavedReleases(): Promise<MusicRelease[]> {
 export async function fetchMyPlaylists(): Promise<Playlist[]> {
   const u = await uid();
   if (!u) return [];
-  const { data } = await supabase.from("music_playlists").select(PLAYLIST_COLUMNS)
-    .eq("owner_id", u).order("updated_at", { ascending: false }).limit(200);
+  const data = must(await supabase.from("music_playlists").select(PLAYLIST_COLUMNS)
+    .eq("owner_id", u).order("updated_at", { ascending: false }).limit(200));
   return (data ?? []) as Playlist[];
 }
 
 export async function fetchPlaylist(id: string): Promise<{ playlist: Playlist | null; tracks: MusicTrack[] }> {
-  const [{ data: playlist }, { data: items }] = await Promise.all([
+  const [r1, r2] = await Promise.all([
     supabase.from("music_playlists").select(PLAYLIST_COLUMNS).eq("id", id).maybeSingle(),
     supabase.from("music_playlist_items").select(`position, music_tracks(${TRACK_WITH_RELEASE})`)
       .eq("playlist_id", id).order("position").limit(1000),
   ]);
+  const playlist = must(r1);
+  const items = must(r2);
   const tracks = ((items ?? []) as unknown as Array<{ music_tracks: MusicTrack | null }>)
     .map((r) => r.music_tracks).filter((t): t is MusicTrack => !!t && !!t.music_releases);
   return { playlist: (playlist as Playlist | null) ?? null, tracks };
@@ -268,9 +322,9 @@ export async function removeFromPlaylist(playlistId: string, trackId: string): P
 export async function fetchHistory(): Promise<Array<{ track: MusicTrack; last_played_at: string; play_count: number }>> {
   const u = await uid();
   if (!u) return [];
-  const { data } = await supabase.from("music_play_history")
+  const data = must(await supabase.from("music_play_history")
     .select(`last_played_at, play_count, music_tracks(${TRACK_WITH_RELEASE})`)
-    .eq("user_id", u).order("last_played_at", { ascending: false }).limit(200);
+    .eq("user_id", u).order("last_played_at", { ascending: false }).limit(200));
   return ((data ?? []) as unknown as Array<{ last_played_at: string; play_count: number; music_tracks: MusicTrack | null }>)
     .filter((r) => r.music_tracks && r.music_tracks.music_releases)
     .map((r) => ({ track: r.music_tracks as MusicTrack, last_played_at: r.last_played_at, play_count: r.play_count }));
@@ -287,10 +341,10 @@ export async function clearHistory(): Promise<boolean> {
 export async function fetchFollowedArtists(): Promise<MusicArtist[]> {
   const u = await uid();
   if (!u) return [];
-  const { data: follows } = await supabase.from("play_follows").select("followed_id").eq("follower_id", u).limit(1000);
+  const follows = must(await supabase.from("play_follows").select("followed_id").eq("follower_id", u).limit(1000));
   const ids = ((follows ?? []) as Array<{ followed_id: string }>).map((f) => f.followed_id);
   if (ids.length === 0) return [];
-  const { data } = await supabase.from("play_artists").select(ARTIST_COLUMNS).in("user_id", ids).order("name");
+  const data = must(await supabase.from("play_artists").select(ARTIST_COLUMNS).in("user_id", ids).order("name"));
   return (data ?? []) as MusicArtist[];
 }
 

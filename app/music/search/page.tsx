@@ -1,11 +1,9 @@
-import type { Metadata } from "next";
-import { SearchView } from "@/features/music/music-views";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Recherche — Rivendy Musique",
-  robots: { index: false, follow: true },
-};
+type Props = { searchParams: Promise<{ q?: string }> };
 
-export default function MusicSearchPage() {
-  return <SearchView />;
+/** La recherche vit désormais dans « Explorer » (refonte du 2026-10-22) : les anciens liens y mènent. */
+export default async function MusicSearchPage({ searchParams }: Props) {
+  const { q } = await searchParams;
+  redirect(q ? `/music/explore?q=${encodeURIComponent(q)}` : "/music/explore");
 }

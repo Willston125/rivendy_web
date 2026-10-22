@@ -11,6 +11,7 @@ import { FavoritesProvider } from "@/features/products/favorites-provider";
 import { DialogsProvider } from "@/features/ui/dialogs";
 import { MusicPlayerProvider } from "@/features/music/player/music-player-provider";
 import { MiniPlayer } from "@/features/music/player/mini-player";
+import { MusicLibraryProvider } from "@/features/music/music-library";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -29,8 +30,12 @@ export function Providers({ children }: { children: ReactNode }) {
             {/* Rivendy Music (Omnicanal lot D) : un seul lecteur pour tout le site,
                 monté ici pour que la navigation interne ne coupe pas le son. */}
             <MusicPlayerProvider>
-              {children}
-              <MiniPlayer />
+              {/* Favoris, playlists et partage du compte, communs aux pages
+                  Musique et au lecteur (refonte du 2026-10-22). */}
+              <MusicLibraryProvider>
+                {children}
+                <MiniPlayer />
+              </MusicLibraryProvider>
             </MusicPlayerProvider>
           </CartProvider>
         </FavoritesProvider>

@@ -155,4 +155,34 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 - **Connecté sur l'accueil d'un autre marché** : bandeau « Vous consultez la
   Côte d'Ivoire — revenir aux Comores » (`MarketMismatchBanner`, `theMarket()`).
 
-*Dernière mise à jour : 9 octobre 2026 (audit en ligne)*
+## Refonte de Rivendy Musique du 2026-10-22 (branche `feat/musique-refonte`)
+
+- **Couleurs** : jetons `--rvm-*` dans `app/globals.css` (`:root` + bloc
+  `@theme inline` → classes `bg-rvm-accent`, `text-rvm-muted`…). Le vert est
+  celui de la marque : `--rvm-accent` = `--rv-primary-light` (#00BFA5, lisible
+  sur fond sombre), appuyé = `--rv-primary` (#009688). L'or (`rvm-premium`) est
+  RÉSERVÉ à la marque Premium. Jamais de code couleur écrit dans un composant
+  Musique. Mêmes valeurs dans l'app (`MusiqueColors`).
+- **Coque** : `app/music/layout.tsx` et `app/artist/layout.tsx` → `MusicShell`
+  (barre latérale sous l'en-tête global, onglets défilants sous 1024 px). La
+  hauteur de l'en-tête global est MESURÉE (`--rvm-top`) : il fait 64 px en une
+  ligne, 114 px en deux lignes, et il apparaît après coup (Suspense).
+- **Lecteur** : toujours UN `<audio>` (`music-player-provider.tsx`). La position
+  vit dans un contexte à part (`useMusicProgress`) : les listes ne se
+  redessinent plus 4 fois par seconde. `playAt`, `toggleMute`, volume gardé
+  dans le navigateur.
+- **Bibliothèque** (`music-library.tsx`, monté dans `providers.tsx`) : favoris
+  (vérifiés par lots, `ensureLikes`), playlists du compte, partage, fenêtre
+  « Ajouter à une playlist ». Une action faite sans compte (aimer, enregistrer,
+  suivre, ranger, écouter) est gardée le temps de la connexion
+  (`music-pending.ts`, 30 min) puis reprise sur la page d'origine ; « écouter »
+  demande un geste (bouton « Écouter » proposé), le navigateur l'exige.
+- **Pannes** : les lectures du catalogue et de la bibliothèque LÈVENT une
+  erreur (`must`) → la page dit « Impossible de charger la musique » avec
+  « Réessayer », au lieu d'un catalogue vide.
+- `/music/search` → redirige vers `/music/explore` (recherche + genres +
+  toutes les sorties). Nouvelles pages : `/music/explore`, `/music/artists`.
+- Dev local avec une copie dont `node_modules` est une jonction : Turbopack
+  refuse (« points out of the filesystem root ») → `next dev --webpack`.
+
+*Dernière mise à jour : 22 octobre 2026 (refonte Musique)*

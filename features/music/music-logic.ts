@@ -226,3 +226,93 @@ export function isValidPlaylistName(name: string): boolean {
 export function searchable(query: string): boolean {
   return query.trim().length >= 2;
 }
+
+// ── Découverte (refonte du 2026-10-22) ─────────────────────────────────────
+
+export type GenreRef = { id: string; name: string; position?: number | null };
+
+/**
+ * Filtres de genre : seulement les genres qui ont au moins une sortie dans
+ * ce qui est affiché (jamais une puce qui ne donne rien), dans l'ordre du
+ * dashboard.
+ */
+export function availableGenres<G extends GenreRef>(
+  releases: Array<Pick<MusicRelease, "genre_id">>, genres: G[],
+): G[] {
+  const used = new Set(releases.map((r) => r.genre_id).filter((g): g is string => !!g));
+  return genres
+    .filter((g) => used.has(g.id))
+    .sort((a, b) => (a.position ?? 100) - (b.position ?? 100) || a.name.localeCompare(b.name, "fr"));
+}
+
+/** Sorties d'un genre ; `null` = toutes. */
+export function filterByGenre<R extends Pick<MusicRelease, "genre_id">>(releases: R[], genre: string | null): R[] {
+  return genre ? releases.filter((r) => r.genre_id === genre) : releases;
+}
+
+/** Artistes des sorties, sans doublon, dans l'ordre d'apparition. */
+export function distinctArtistIds(releases: Array<Pick<MusicRelease, "artist_id">>): string[] {
+  const seen = new Set<string>();
+  for (const r of releases) if (r.artist_id) seen.add(r.artist_id);
+  return [...seen];
+}
+
+/** Sorties sans doublon (la sélection et les nouveautés se recouvrent). */
+export function uniqueReleases<R extends Pick<MusicRelease, "id">>(lists: R[][]): R[] {
+  const seen = new Set<string>();
+  const out: R[] = [];
+  for (const list of lists) for (const r of list) if (!seen.has(r.id)) { seen.add(r.id); out.push(r); }
+  return out;
+}
+
+/** Année d'une sortie (date de sortie, sinon de publication). */
+export function releaseYear(r: Pick<MusicRelease, "release_date" | "published_at">): string {
+  return r.release_date?.slice(0, 4) || r.published_at?.slice(0, 4) || "";
+}
+
+/** Chemin public partagé (les pages de titre renvoient vers leur sortie). */
+export function musicSharePath(kind: "track" | "release" | "artist" | "playlist", id: string): string {
+  switch (kind) {
+    case "track": return `/music/track/${id}`;
+    case "release": return `/music/album/${id}`;
+    case "artist": return `/artist/${id}`;
+    case "playlist": return `/music/playlist/${id}`;
+  }
+}
+
+/**
+ * Action demandée sans compte (aimer, enregistrer, suivre, ranger, écouter),
+ * gardée le temps de la connexion puis reprise sur la même page. Une action
+ * périmée (30 min) ou mal formée est ignorée.
+ */
+export type PendingMusicAction = {
+  kind: "like" | "save" | "follow" | "playlist" | "play";
+  id: string;
+  path: string;
+  label: string;
+  at: number;
+};
+
+const PENDING_KINDS = new Set<PendingMusicAction["kind"]>(["like", "save", "follow", "playlist", "play"]);
+export const PENDING_MAX_AGE_MS = 30 * 60_000;
+
+export function parsePendingAction(raw: string | null, now: number): PendingMusicAction | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Partial<PendingMusicAction>;
+    if (!v || typeof v !== "object") return null;
+    if (!v.kind || !PENDING_KINDS.has(v.kind)) return null;
+    if (typeof v.id !== "string" || !v.id || typeof v.path !== "string" || !v.path.startsWith("/")) return null;
+    if (v.path.startsWith("//")) return null;
+    if (typeof v.at !== "number" || now - v.at > PENDING_MAX_AGE_MS || v.at > now + 60_000) return null;
+    return { kind: v.kind, id: v.id, path: v.path, label: typeof v.label === "string" ? v.label.slice(0, 120) : "", at: v.at };
+  } catch {
+    return null;
+  }
+}
+
+/** La page de retour est-elle celle de l'action (sans la requête) ? */
+export function samePath(a: string, b: string): boolean {
+  const clean = (p: string) => (p.split("?")[0].replace(/\/+$/, "") || "/");
+  return clean(a) === clean(b);
+}
