@@ -14,7 +14,10 @@
  * classe de couleur ecrite en dur dans le code aux selecteurs reellement emis.
  * On ne se fie jamais a l'absence d'erreur de build.
  *
- * Usage : node scripts/check-dead-classes.mjs [chemin/globals.css] [dossiers...]
+ * Usage : node scripts/check-dead-classes.mjs [chemin/site.css] [dossiers...]
+ *
+ * La feuille s'appelle app/site.css depuis le 2026-10-22 (ex-globals.css) :
+ * Vercel, cache restauré, avait resservi l'ANCIEN contenu de globals.css.
  */
 import postcss from 'postcss';
 import tw from '@tailwindcss/postcss';
@@ -22,7 +25,7 @@ import fs from 'fs';
 import path from 'path';
 
 const root = process.cwd();
-const cssArg = process.argv[2] || 'app/globals.css';
+const cssArg = process.argv[2] || 'app/site.css';
 const cssPath = path.resolve(root, cssArg);
 const dirs = process.argv.slice(3);
 const roots = (dirs.length ? dirs : ['app', 'components', 'features', 'lib', 'services'])

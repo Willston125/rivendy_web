@@ -84,6 +84,19 @@ jamais faire transiter un fichier par une route Vercel.
 
 ---
 
+## 7. Feuille de style : Vercel peut servir l'ANCIEN contenu
+
+Le 2026-10-22 (refonte Musique), la production construite avec « Restored build
+cache » a servi l'ancien `app/globals.css` : les classes nouvelles du code
+étaient bien générées, mais ni les variables `:root` ni le bloc `@theme`
+ajoutés — la Musique s'affichait sans son fond sombre. Même piège vécu sur le
+dashboard le 2026-10-09. Contournement appliqué : la feuille a changé de nom
+(`app/site.css`). **Après tout changement de la feuille, vérifier la feuille
+SERVIE** (`curl` de la page → fichier `.css` → `grep` d'une règle nouvelle ;
+pour un aperçu protégé : `vercel curl`). Si cela se reproduit : nouveau nom de
+fichier, ou variable `VERCEL_FORCE_NO_BUILD_CACHE=1` sur le projet Vercel
+(réglage du propriétaire).
+
 ## Vérifications avant de livrer
 
 `npx tsc --noEmit` → **0 erreur** (obligatoire)

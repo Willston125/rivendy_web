@@ -26,7 +26,7 @@ import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
  * Briques visuelles de Rivendy Musique (refonte du 2026-10-22, d'après la
  * maquette « Rivendy Musique Studio ») : fond nuit, vert Rivendy pour tout ce
  * qui se joue ou se choisit, or réservé à la marque « Premium ». Les couleurs
- * viennent des jetons `rvm-*` (app/globals.css), jamais d'un code écrit ici.
+ * viennent des jetons `rvm-*` (app/site.css), jamais d'un code écrit ici.
  */
 
 export { playlistMessage } from "./music-library";

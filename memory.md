@@ -157,7 +157,7 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 
 ## Refonte de Rivendy Musique du 2026-10-22 (branche `feat/musique-refonte`)
 
-- **Couleurs** : jetons `--rvm-*` dans `app/globals.css` (`:root` + bloc
+- **Couleurs** : jetons `--rvm-*` dans `app/site.css` (ex-`globals.css`, renommée : voir CLAUDE.md §7) (`:root` + bloc
   `@theme inline` → classes `bg-rvm-accent`, `text-rvm-muted`…). Le vert est
   celui de la marque : `--rvm-accent` = `--rv-primary-light` (#00BFA5, lisible
   sur fond sombre), appuyé = `--rv-primary` (#009688). L'or (`rvm-premium`) est
