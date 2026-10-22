@@ -13,30 +13,45 @@ import {
 import { ListButton, PIXEL, PremiumBadge, btnGhost, btnPrimary } from "./play-ui";
 
 /**
- * Bannière « salle de cinéma » de Rivendy Play (refonte du 2026-10-22).
+ * Bannière « salle de cinéma » de Rivendy Play (refonte du 2026-10-22,
+ * affinée le même jour : une vraie scène d'ouverture).
  *
- * Images : uniquement les VRAIES images du titre. Avec un fond paysage
- * (dashboard, « Image de fond 16:9 ») : plein cadre sur grand écran. Sans
- * fond : l'affiche ENTIÈRE, nette, à droite, sur son ambiance floutée — une
- * affiche portrait recadrée en bandeau coupait les visages (« Mbayé Trambwé »
- * montrait son nez). Sur téléphone, l'affiche entière au-dessus du texte.
- * Chaque format ne télécharge que son image (`<picture>` + pixel vide).
+ * L'image occupe TOUTE la bannière, avec les VRAIES images du titre :
+ * - fond paysage (dashboard, « Image de fond 16:9 ») : plein cadre sur grand
+ *   écran, sujet à droite, aucune affiche posée devant ;
+ * - sinon (cas des titres actuels, qui n'ont qu'une affiche portrait) :
+ *   extension floutée et assombrie de l'affiche sur toute la bannière, et
+ *   l'affiche ENTIÈRE, nette, devant — jamais étirée ni recadrée sur un
+ *   visage.
+ * Voile vert sombre à gauche (titre et boutons lisibles), bas fondu dans la
+ * page. Hauteur : `--rvp-hero` — sur un écran de 1366 × 768, le catalogue
+ * commence dans le premier écran. Chaque format ne télécharge que son image
+ * (`<picture>` + pixel vide).
  *
  * Sélection MANUELLE (aucun défilement automatique) : indicateurs, flèches,
- * touches ← →. Les entrées s'animent par un fondu, coupé si l'on réduit les
- * animations.
+ * touches ← →. Fondus coupés si l'on réduit les animations.
  */
 
-/** Fond du titre : ambiance floutée (toutes tailles) + fond paysage net (grand écran) + voiles. */
-export function TitleBackdrop({ title, priority, tall }: { title: PlayTitle; priority?: boolean; tall?: boolean }) {
+/** Hauteur de la bannière sur grand écran (variable lue par la bannière et les fiches). */
+export const HERO_HEIGHT = "[--rvp-hero:clamp(420px,calc(100svh_-_290px),620px)]";
+
+/** La scène : extension floutée (ou fond paysage net), voile vert à gauche, bas fondu. */
+export function TitleBackdrop({ title, priority }: { title: PlayTitle; priority?: boolean }) {
   const wide = landscapeArt(title);
-  const poster = posterArt(title);
-  const ambient = playImage(poster ?? wide, 160);
+  const source = posterArt(title) ?? wide;
   return (
-    <div aria-hidden className="rvp-fade-in absolute inset-0 -z-10 overflow-hidden">
-      {ambient ? (
+    <div aria-hidden className="rvp-fade-in absolute inset-0 -z-10 overflow-hidden bg-rvp-ground">
+      {source ? (
+        // Extension de l'image du titre, floutée et assombrie : toute la bannière
+        // sur téléphone ; sur grand écran, les trois quarts droits (sujet à
+        // droite), fondus vers le texte.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={ambient} alt="" decoding="async" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-75 blur-3xl saturate-150" />
+        <img src={playImage(source, 720) ?? source} alt="" decoding="async" loading={wide ? "lazy" : "eager"}
+          className={cn(
+            "absolute inset-0 h-full w-full scale-110 object-cover object-[50%_28%] blur-xl brightness-[0.62] saturate-[1.15]",
+            "lg:left-auto lg:w-[78%] lg:[mask-image:linear-gradient(to_right,transparent,black_45%)]",
+            wide && "lg:hidden",
+          )} />
       ) : null}
       {wide ? (
         <picture>
@@ -45,29 +60,34 @@ export function TitleBackdrop({ title, priority, tall }: { title: PlayTitle; pri
             className="absolute inset-0 hidden h-full w-full object-cover object-[70%_30%] lg:block" />
         </picture>
       ) : null}
-      <div className={cn("absolute inset-0 bg-gradient-to-r from-rvp-ground", wide ? "via-rvp-ground/70 to-transparent lg:via-rvp-ground/45" : "via-rvp-ground/75 to-rvp-ground/10")} />
-      {/* Lueur verte discrète derrière l'affiche (signature Rivendy, sans image inventée). */}
-      {!wide ? <div className="absolute right-[4%] top-1/2 hidden h-[80%] w-[38%] -translate-y-1/2 rounded-full bg-rvp-accent/[0.08] blur-3xl lg:block" /> : null}
-      <div className={cn("absolute inset-0 bg-gradient-to-t from-rvp-ground to-rvp-ground/40", tall ? "via-rvp-ground/5" : "via-transparent")} />
+      {/* Voile vert sombre : à gauche sur grand écran, partout sur téléphone. */}
+      <div className="absolute inset-0 bg-rvp-ground/45 lg:bg-transparent lg:bg-gradient-to-r lg:from-rvp-ground lg:from-0% lg:via-rvp-ground/55 lg:via-35% lg:to-transparent lg:to-70%" />
+      {/* Bas fondu dans la page ; haut assombri sous l'en-tête. */}
+      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-rvp-ground via-rvp-ground/50 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-rvp-ground/60 to-transparent" />
     </div>
   );
 }
 
-/** Affiche entière : cadre à droite sur grand écran (sans fond paysage), carte au-dessus du texte sur téléphone. */
+/**
+ * Affiche entière : devant l'extension floutée sur grand écran (seulement sans
+ * fond paysage), carte au-dessus du texte sur téléphone.
+ */
 export function PosterFrame({ title, priority, place }: { title: PlayTitle; priority?: boolean; place: "desktop" | "mobile" }) {
   const poster = posterArt(title);
   if (!poster) return null;
   const desktop = place === "desktop";
   return (
-    <picture>
+    <picture className={desktop ? "hidden lg:block" : "block lg:hidden"}>
       <source media={desktop ? "(min-width: 1024px)" : "(max-width: 1023.98px)"}
         srcSet={playSrcSet(poster, desktop ? [480, 720, 1080] : [320, 480, 720]) ?? poster}
-        sizes={desktop ? "(min-width: 1536px) 400px, 340px" : "min(48vw, 200px)"} />
+        sizes={desktop ? "(min-width: 1536px) 360px, 300px" : "min(48vw, 200px)"} />
       <img src={PIXEL} alt={`Affiche de ${title.title}`} decoding="async" fetchPriority={priority ? "high" : "auto"}
         className={cn(
-          "rvp-fade-in aspect-[2/3] rounded-2xl object-cover shadow-[0_40px_90px_-30px_rgba(0,0,0,0.95)] ring-1 ring-white/10",
+          "rvp-fade-in aspect-[2/3] rounded-2xl object-cover shadow-[0_40px_90px_-30px_rgba(0,0,0,0.95)] ring-1 ring-white/15",
+          // Grand écran : hauteur tirée de la bannière (jamais étirée : largeur d'après les proportions).
           // Téléphone : assez petite pour que la première rangée se voie vite.
-          desktop ? "hidden w-[340px] lg:block 2xl:w-[400px]" : "w-[min(48vw,200px)] lg:hidden",
+          desktop ? "h-[calc(var(--rvp-hero)_-_7rem)] max-h-[520px] w-auto" : "w-[min(48vw,200px)]",
         )} />
     </picture>
   );
@@ -132,6 +152,7 @@ export function PrimaryAction({ title, progress, episodes, size = "lg" }: {
 /** Ligne de métadonnées : année · type · genre · durée, âge, Rivendy+. */
 export function MetaLine({ title, episodes, className }: { title: PlayTitle; episodes?: number; className?: string }) {
   const parts = metaParts(title, episodes);
+  const age = ageLabel(title.age_rating);
   return (
     <div className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm text-rvp-soft", className)}>
       {parts.map((p, i) => (
@@ -140,8 +161,8 @@ export function MetaLine({ title, episodes, className }: { title: PlayTitle; epi
           {p}
         </span>
       ))}
-      {title.age_rating ? (
-        <span className="rounded border border-white/30 px-1.5 text-xs font-semibold leading-5 text-rvp-text">{ageLabel(title.age_rating)}</span>
+      {age ? (
+        <span className="rounded border border-white/30 px-1.5 text-xs font-semibold leading-5 text-rvp-text" title="Classification du titre">{age}</span>
       ) : null}
       {title.is_premium && kindOf(title.kind) !== "clip" ? <PremiumBadge /> : null}
     </div>
@@ -202,24 +223,24 @@ export function PlayHero({ titles, progress }: { titles: PlayTitle[]; progress: 
 
   return (
     <section aria-roledescription="carrousel" aria-label="À la une sur Rivendy Play" onKeyDown={onKeyDown}
-      className="relative isolate overflow-hidden border-b border-white/5">
-      <TitleBackdrop key={`bg-${title.id}`} title={title} priority tall />
-      <div className="relative mx-auto grid w-full max-w-[1600px] items-center gap-6 px-4 pb-8 pt-6 sm:px-6 lg:min-h-[clamp(470px,64vh,640px)] lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-16 lg:px-10 lg:pb-16 lg:pt-12">
+      className={cn("relative isolate overflow-hidden lg:h-[var(--rvp-hero)]", HERO_HEIGHT)}>
+      <TitleBackdrop key={`bg-${title.id}`} title={title} priority />
+      <div className="relative mx-auto grid h-full w-full max-w-[1600px] items-center gap-6 px-4 pb-8 pt-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12 lg:px-10 lg:py-0">
         <div key={`art-${title.id}`} className="flex justify-center lg:hidden">
           <PosterFrame title={title} priority place="mobile" />
           <MobileWideArt title={title} priority />
         </div>
-        <div key={`txt-${title.id}`} className="rvp-rise-in min-w-0 text-center lg:max-w-[640px] lg:text-left"
+        <div key={`txt-${title.id}`} className="rvp-rise-in min-w-0 text-center lg:max-w-[640px] lg:pb-6 lg:text-left"
           role="group" aria-roledescription="diapositive" aria-label={`${i + 1} sur ${count}`}>
           <Kicker>Rivendy Play <span aria-hidden>·</span> {heroKicker(title, now)}</Kicker>
-          <h2 className="mt-4 break-words text-[clamp(2.25rem,5vw,4.75rem)] font-black leading-[0.98] tracking-tight text-rvp-text lg:mt-5">
+          <h2 className="mt-4 break-words text-[clamp(2.25rem,4.6vw,4.5rem)] font-black leading-[0.98] tracking-tight text-rvp-text">
             {title.title}
           </h2>
-          <MetaLine title={title} episodes={episodes?.length} className="mt-4 justify-center lg:mt-5 lg:justify-start" />
+          <MetaLine title={title} episodes={episodes?.length} className="mt-4 justify-center lg:justify-start" />
           {title.synopsis?.trim() ? (
-            <p className="mx-auto mt-4 line-clamp-3 max-w-xl text-[15px] leading-7 text-rvp-soft lg:mx-0">{title.synopsis.trim()}</p>
+            <p className="mx-auto mt-4 line-clamp-3 max-w-xl text-[15px] leading-7 text-rvp-soft lg:mx-0 lg:line-clamp-2">{title.synopsis.trim()}</p>
           ) : null}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:mt-8 lg:justify-start">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:mt-7 lg:justify-start">
             <PrimaryAction title={title} progress={progress} episodes={episodes} />
             <ListButton title={title} />
             {/* Téléphone : l'icône seule, pour garder les trois actions sur une ligne. */}
@@ -229,14 +250,15 @@ export function PlayHero({ titles, progress }: { titles: PlayTitle[]; progress: 
           </div>
           {controls ? <div className="mt-6 flex justify-center lg:hidden">{controls}</div> : null}
         </div>
+        {/* Sans fond paysage : l'affiche entière devant son extension floutée. */}
         {!wide ? (
-          <div key={`frame-${title.id}`} className="hidden lg:block">
+          <div key={`frame-${title.id}`} className="hidden self-start pt-8 lg:block">
             <PosterFrame title={title} priority place="desktop" />
           </div>
         ) : null}
       </div>
       {controls ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-5 hidden lg:block">
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 hidden lg:block">
           <div className="pointer-events-auto mx-auto flex w-full max-w-[1600px] justify-end px-10">{controls}</div>
         </div>
       ) : null}
@@ -245,20 +267,21 @@ export function PlayHero({ titles, progress }: { titles: PlayTitle[]; progress: 
 }
 
 export function HeroSkeleton() {
+  const pulse = "animate-pulse bg-rvp-surface motion-reduce:animate-none";
   return (
-    <div aria-hidden className="border-b border-white/5">
-      <div className="mx-auto grid w-full max-w-[1600px] items-center gap-6 px-4 pb-8 pt-6 sm:px-6 lg:min-h-[clamp(470px,64vh,640px)] lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-16 lg:px-10">
-        <div className="mx-auto aspect-[2/3] w-[min(48vw,200px)] animate-pulse rounded-2xl bg-rvp-surface motion-reduce:animate-none lg:hidden" />
+    <div aria-hidden className={cn("lg:h-[var(--rvp-hero)]", HERO_HEIGHT)}>
+      <div className="mx-auto grid h-full w-full max-w-[1600px] items-center gap-6 px-4 pb-8 pt-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12 lg:px-10 lg:py-0">
+        <div className={cn("mx-auto aspect-[2/3] w-[min(48vw,200px)] rounded-2xl lg:hidden", pulse)} />
         <div className="flex flex-col items-center gap-4 lg:items-start">
-          <div className="h-3 w-48 animate-pulse rounded bg-rvp-surface motion-reduce:animate-none" />
-          <div className="h-14 w-4/5 max-w-lg animate-pulse rounded-lg bg-rvp-surface motion-reduce:animate-none" />
-          <div className="h-4 w-60 animate-pulse rounded bg-rvp-surface motion-reduce:animate-none" />
+          <div className={cn("h-3 w-48 rounded", pulse)} />
+          <div className={cn("h-14 w-4/5 max-w-lg rounded-lg", pulse)} />
+          <div className={cn("h-4 w-60 rounded", pulse)} />
           <div className="mt-4 flex gap-3">
-            <div className="h-12 w-36 animate-pulse rounded-lg bg-rvp-surface motion-reduce:animate-none" />
-            <div className="h-12 w-32 animate-pulse rounded-lg bg-rvp-surface motion-reduce:animate-none" />
+            <div className={cn("h-12 w-36 rounded-lg", pulse)} />
+            <div className={cn("h-12 w-32 rounded-lg", pulse)} />
           </div>
         </div>
-        <div className="hidden aspect-[2/3] w-[340px] animate-pulse rounded-2xl bg-rvp-surface motion-reduce:animate-none lg:block 2xl:w-[400px]" />
+        <div className={cn("hidden aspect-[2/3] h-[calc(var(--rvp-hero)_-_7rem)] max-h-[520px] self-start rounded-2xl lg:mt-8 lg:block", pulse)} />
       </div>
     </div>
   );

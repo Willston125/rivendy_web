@@ -241,4 +241,29 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 - Non vérifié (pas de compte de test) : ajout réel à Ma liste, reprise après
   connexion, « Continuer à regarder », lecture.
 
-*Dernière mise à jour : 22 octobre 2026 (refonte cinéma de Play)*
+### Affinage du 2026-10-22 (soir)
+
+- **Bannière = une scène** : l'image occupe toute la bannière. Fond paysage →
+  plein cadre, sujet à droite, pas d'affiche devant. Sans fond paysage (les
+  titres actuels) → extension floutée et assombrie de l'affiche sur les trois
+  quarts droits (`mask-image` vers le texte) et l'affiche entière, nette,
+  devant. Hauteur `--rvp-hero` = clamp(420px, 100svh − 290px, 620px) : à
+  1366 × 768, « À l'affiche » et le haut des cartes sont dans le premier écran.
+- **Cartes paysage** : l'image REMPLIT la miniature 16:9 (affiche cadrée sur
+  son tiers haut, `object-[50%_30%]`, à défaut d'un vrai visuel paysage),
+  titre et métadonnées DESSOUS ; bouton de lecture vert et « + » posés sur
+  l'image, hors du lien de la carte. Colonnes d'après le nombre réel de titres
+  (`landscapeCols`).
+- **Classification** : `ageLabel` strict — « Tout public » seulement pour la
+  valeur `tous` enregistrée (défaut de la colonne `age_rating`), rien pour une
+  valeur absente ou inconnue.
+- **Pied de page Play** resserré ; sur téléphone, le bandeau de l'application
+  réserve lui-même sa place sur les pages Play (le pied de page de la
+  marketplace garde sa marge : la barre fixe du panier en dépend).
+- **Un seul son à la fois** : la bande-annonce d'une fiche
+  (`ProductVideoPlayer`) envoie `MEDIA_PLAY_EVENT` `video:<uid>` — elle met
+  la musique en pause, et revient à l'image si la musique ou une autre vidéo
+  démarre. (La durée du mini-lecteur pour une file restaurée est traitée par
+  les finitions Musique du même jour, `playerDuration`.)
+
+*Dernière mise à jour : 22 octobre 2026 (affinage de la refonte cinéma de Play)*

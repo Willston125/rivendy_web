@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
+import { MEDIA_PLAY_EVENT } from "@/features/media/device-id";
 
 const STREAM_SUBDOMAIN = "customer-22iqkw4cwdg7uf5h.cloudflarestream.com";
 
@@ -25,6 +26,21 @@ export function ProductVideoPlayer({
   const [playing, setPlaying] = useState(false);
   const poster = thumbnail || streamThumbnail(uid);
 
+  // Un seul média à la fois (2026-10-22) : lancer cette vidéo met la musique
+  // en pause ; si la musique ou une autre vidéo démarre, on revient à l'image
+  // (l'iframe retirée s'arrête) — jamais deux sons en même temps.
+  const self = `video:${uid}`;
+  useEffect(() => {
+    if (!playing) return;
+    const onOther = (e: Event) => { if ((e as CustomEvent).detail !== self) setPlaying(false); };
+    window.addEventListener(MEDIA_PLAY_EVENT, onOther);
+    return () => window.removeEventListener(MEDIA_PLAY_EVENT, onOther);
+  }, [playing, self]);
+  const start = () => {
+    window.dispatchEvent(new CustomEvent(MEDIA_PLAY_EVENT, { detail: self }));
+    setPlaying(true);
+  };
+
   if (playing) {
     return (
       <div className="absolute inset-0 bg-black">
@@ -42,7 +58,7 @@ export function ProductVideoPlayer({
   return (
     <button
       type="button"
-      onClick={() => setPlaying(true)}
+      onClick={start}
       className="absolute inset-0 block h-full w-full bg-black"
       aria-label="Lire la vidéo du produit"
     >

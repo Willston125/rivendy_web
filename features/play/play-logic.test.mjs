@@ -42,6 +42,9 @@ test("territoire et libellés", () => {
   assert.ok(!inTerritory([{ country_id: "DJ" }], null));
   assert.equal(ageLabel("12"), "-12");
   assert.equal(ageLabel("tous"), "Tout public");
+  // Jamais inventée : une valeur absente ou inconnue ne s'affiche pas.
+  assert.equal(ageLabel(null), null);
+  assert.equal(ageLabel("U"), null);
   assert.equal(durationLabel(6720), "1 h 52");
   assert.equal(durationLabel(2700), "45 min");
   assert.equal(durationLabel(3600), "1 h");

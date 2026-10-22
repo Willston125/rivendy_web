@@ -53,7 +53,8 @@ export function PlayShell({ children }: { children: ReactNode }) {
 
 function Wordmark({ className }: { className?: string }) {
   // Logo officiel, proportions d'origine, passé en blanc sur le fond sombre (comme l'app).
-  return <Image src="/brand/rivendy-wordmark.png" alt="" width={1214} height={428} priority className={cn("w-auto brightness-0 invert", className)} />;
+  // Taille d'affichage (≈ 32 px de haut) : sinon l'optimiseur servait la version 3840 px.
+  return <Image src="/brand/rivendy-wordmark.png" alt="" width={91} height={32} priority className={cn("w-auto brightness-0 invert", className)} />;
 }
 
 function PlayHeader() {
@@ -168,11 +169,11 @@ function MobileTabs({ pathname }: { pathname: string }) {
 function FooterColumn({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {
   return (
     <div>
-      <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-rvp-muted">{title}</h2>
-      <ul className="mt-3 space-y-1">
+      <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-rvp-muted">{title}</h2>
+      <ul className="mt-2">
         {links.map((l) => (
           <li key={l.href + l.label}>
-            <Link href={l.href} className="block w-fit py-1.5 text-sm text-rvp-soft transition-colors hover:text-rvp-accent">{l.label}</Link>
+            <Link href={l.href} className="block w-fit py-1 text-sm text-rvp-soft transition-colors hover:text-rvp-accent">{l.label}</Link>
           </li>
         ))}
       </ul>
@@ -186,22 +187,23 @@ function PlayFooter() {
   const year = new Date().getFullYear();
   const homeHref = country?.id ? marketHomePath(country.id) : "/";
   return (
-    // Bas réservé sur téléphone : le bandeau de l'application s'y pose.
-    <footer className="mt-8 border-t border-white/5 bg-rvp-panel pb-24 md:pb-0">
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-2 gap-x-6 gap-y-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:px-10">
-        <div className="col-span-2 lg:col-span-1">
+    // Pied de page discret (affiné le 2026-10-22) : il accompagne le catalogue
+    // sans le dominer. Le bandeau de l'application réserve lui-même sa place.
+    <footer className="mt-6 border-t border-white/5 bg-rvp-panel">
+      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-2 gap-x-6 gap-y-6 px-4 py-8 sm:grid-cols-3 sm:px-6 lg:grid-cols-[1.4fr_repeat(3,1fr)] lg:gap-x-10 lg:px-10">
+        <div className="col-span-2 sm:col-span-3 lg:col-span-1">
           <div className="flex items-center gap-3">
-            <Wordmark className="h-7" />
-            <span aria-hidden className="h-6 w-px bg-white/15" />
-            <span className="flex items-center gap-1.5 text-[13px] font-extrabold uppercase tracking-[0.28em] text-rvp-accent">
+            <Wordmark className="h-6" />
+            <span aria-hidden className="h-5 w-px bg-white/15" />
+            <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.28em] text-rvp-accent">
               Play <Play className="h-3 w-3 fill-current" aria-hidden />
             </span>
           </div>
-          <p className="mt-4 max-w-sm text-sm leading-6 text-rvp-muted">
-            Films, séries et clips d’artistes, sur le site et dans l’application Rivendy, avec le même compte : la lecture reprend où vous l’avez laissée.
+          <p className="mt-3 max-w-sm text-sm leading-6 text-rvp-muted">
+            Films, séries et clips, sur le site et dans l’application Rivendy, avec le même compte.
           </p>
           <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
-            className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg border border-white/15 px-4 text-sm font-semibold text-rvp-text transition-colors hover:border-rvp-accent hover:text-rvp-accent">
+            className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg border border-white/15 px-3.5 text-sm font-semibold text-rvp-text transition-colors hover:border-rvp-accent hover:text-rvp-accent">
             <Download className="h-4 w-4" aria-hidden /> Application Android
           </a>
         </div>
@@ -225,7 +227,7 @@ function PlayFooter() {
         ]} />
       </div>
       <div className="border-t border-white/5">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-rvp-muted sm:flex-row sm:px-6 lg:px-10">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col items-center justify-between gap-1 px-4 py-3 text-xs text-rvp-muted sm:flex-row sm:px-6 lg:px-10">
           <p>© {year} Rivendy — Rivendy Play</p>
           <div className="flex items-center gap-4">
             <Link href="/legal?tab=cgu" className="py-1 transition-colors hover:text-rvp-text">Conditions</Link>

@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X, Smartphone, Download } from "lucide-react";
+import { isPlayPath } from "@/components/layout/hide-in-play";
 import { HAS_APP_LINKS, storeUrlForUA } from "@/lib/config/app-links";
 import { useMusicPlayerOptional } from "@/features/music/player/music-player-provider";
 
@@ -19,6 +21,7 @@ const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 export function AppDownloadBanner() {
   // Le mini-lecteur Rivendy Music occupe le bas de l'écran : le bandeau s'efface.
   const musicPlaying = !!useMusicPlayerOptional()?.current;
+  const playPage = isPlayPath(usePathname());
   const [platform, setPlatform] = useState<"mobile" | "desktop" | null>(null);
   const [storeUrl, setStoreUrl] = useState("/");
 
@@ -58,6 +61,11 @@ export function AppDownloadBanner() {
   // ── Mobile : smart-banner fixe en bas ──────────────────────────
   if (platform === "mobile") {
     return (
+      <>
+      {/* Rivendy Play : place réservée en bas de page seulement quand le
+          bandeau est là (son pied de page n'a plus de marge fixe, 2026-10-22).
+          Le pied de page de la marketplace garde la sienne. */}
+      {playPage ? <div aria-hidden className="h-[72px] md:hidden" /> : null}
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] md:hidden">
         <div className="flex items-center gap-3">
           {AppIcon}
@@ -85,6 +93,7 @@ export function AppDownloadBanner() {
           </button>
         </div>
       </div>
+      </>
     );
   }
 

@@ -115,13 +115,19 @@ export function inTerritory(countries: Array<{ country_id: string }> | null | un
   return !!market && rows.some((c) => c.country_id === market);
 }
 
-export function ageLabel(a: string | null | undefined): string {
+/**
+ * Classification telle qu'ENREGISTRÉE pour le titre (`age_rating` : 'tous',
+ * '10', '12', '16' ou '18', choisie au dashboard). Une valeur absente ou
+ * inconnue ne s'affiche pas — on n'invente jamais « Tout public ».
+ */
+export function ageLabel(a: string | null | undefined): string | null {
   switch (a) {
+    case "tous": return "Tout public";
     case "10": return "-10";
     case "12": return "-12";
     case "16": return "-16";
     case "18": return "-18";
-    default: return "Tout public";
+    default: return null;
   }
 }
 

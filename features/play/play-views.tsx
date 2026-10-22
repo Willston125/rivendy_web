@@ -13,7 +13,7 @@ import {
   clearTitleHistory, fetchCatalog, fetchEpisodesByIds, fetchProgress, fetchTitleHistory, fetchTitlesByIds, fetchTopWeek,
   forgetProgress,
 } from "./play-api";
-import { HeroSkeleton, Kicker, MetaLine, MobileWideArt, PlayHero, PosterFrame, PrimaryAction, TitleBackdrop } from "./play-hero";
+import { HERO_HEIGHT, HeroSkeleton, Kicker, MetaLine, MobileWideArt, PlayHero, PosterFrame, PrimaryAction, TitleBackdrop } from "./play-hero";
 import { appIntentUrl } from "./play-link-page";
 import { usePlayList } from "./play-list";
 import {
@@ -118,6 +118,8 @@ export function PlayHomeView() {
     } else notify("Action impossible pour l’instant.", "error");
   };
 
+  // La première rangée suit la bannière de près : elle se voit dès le premier écran.
+  const firstTight = "mt-6 lg:mt-8";
   const loginNote = <LoginNote text="Connectez-vous pour regarder, reprendre vos films là où vous les avez laissés et retrouver Ma liste — sur le site comme dans l’application." />;
 
   return (
@@ -135,11 +137,11 @@ export function PlayHomeView() {
               <div className="pt-8"><PageHeading title="Rivendy Play" intro="Films, séries et clips, sur le site et dans l’application, avec le même compte." /></div>
             ) : null}
             {resumeShown.length > 0 ? (
-              <Section id="row-resume" title="Continuer à regarder" count={resumeShown.length}>
-                <Rail label="Continuer à regarder" layout="landscape">
+              <Section id="row-resume" title="Continuer à regarder" count={resumeShown.length} className={firstTight}>
+                <Rail label="Continuer à regarder" layout="landscape" count={resumeShown.length}>
                   {resumeShown.map((r) => (
                     <RailItem key={r.title.id}>
-                      <LandscapeCard title={r.title} href={resumeHref(r.entry)}
+                      <LandscapeCard title={r.title} watch={resumeHref(r.entry)}
                         kicker={r.episode ? `Saison ${r.episode.season} · Épisode ${r.episode.episode_number}` : kindLabel(r.title.kind)}
                         caption={remainingLabel(r.entry.position_seconds, r.entry.duration_seconds)}
                         progress={r.entry.duration_seconds > 0 ? r.entry.position_seconds / r.entry.duration_seconds : null}
@@ -151,13 +153,13 @@ export function PlayHomeView() {
             ) : null}
             {rows.map((row, i) => (
               <Fragment key={row.id}>
-                <HomeRowSection row={row} progress={progress} />
+                <HomeRowSection row={row} progress={progress} className={i === 0 && resumeShown.length === 0 ? firstTight : undefined} />
                 {i === 0 ? loginNote : null}
               </Fragment>
             ))}
             {current.clips.length > 0 ? (
               <Section id="row-clips" title="Clips" count={current.clips.length} href="/play/clips">
-                <Rail label="Clips" layout="landscape">
+                <Rail label="Clips" layout="landscape" count={Math.min(20, current.clips.length)}>
                   {current.clips.slice(0, 20).map((t) => <RailItem key={t.id}><LandscapeCard title={t} /></RailItem>)}
                 </Rail>
               </Section>
@@ -174,11 +176,11 @@ export function PlayHomeView() {
   );
 }
 
-function HomeRowSection({ row, progress }: { row: HomeRow; progress: WatchProgress[] }) {
+function HomeRowSection({ row, progress, className }: { row: HomeRow; progress: WatchProgress[]; className?: string }) {
   const id = `row-${foldText(row.id).replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <Section id={id} title={row.title} count={row.titles.length} href={row.href} total={row.total}>
-      <Rail label={row.title} layout={row.layout === "landscape" ? "landscape" : "poster"}>
+    <Section id={id} title={row.title} count={row.titles.length} href={row.href} total={row.total} className={className}>
+      <Rail label={row.title} layout={row.layout === "landscape" ? "landscape" : "poster"} count={row.titles.length}>
         {row.titles.map((t, i) => (
           <RailItem key={t.id}>
             {row.layout === "landscape" ? (
@@ -291,13 +293,14 @@ function SecondaryActions({ title }: { title: PlayTitle }) {
   );
 }
 
-/** En-tête d'une fiche : les vraies images du titre, comme la bannière d'accueil. */
+/** En-tête d'une fiche : la même scène que la bannière d'accueil (vraies images du titre). */
 function DetailHero({ title, kicker, heading, children }: { title: PlayTitle; kicker: string; heading?: ReactNode; children: ReactNode }) {
   const wide = !!landscapeArt(title);
   return (
-    <section className="relative isolate overflow-hidden border-b border-white/5">
+    // Hauteur minimale de la bannière ; un long résumé peut l'allonger, l'affiche garde sa taille.
+    <section className={cn("relative isolate overflow-hidden lg:min-h-[var(--rvp-hero)]", HERO_HEIGHT)}>
       <TitleBackdrop title={title} priority />
-      <div className="relative mx-auto grid w-full max-w-[1600px] items-center gap-6 px-4 pb-10 pt-6 sm:px-6 lg:min-h-[clamp(440px,60vh,620px)] lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-16 lg:px-10 lg:py-14">
+      <div className="relative mx-auto grid w-full max-w-[1600px] items-center gap-6 px-4 pb-10 pt-6 sm:px-6 lg:min-h-[var(--rvp-hero)] lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12 lg:px-10 lg:py-10">
         <div className="flex justify-center lg:hidden">
           <PosterFrame title={title} priority place="mobile" />
           <MobileWideArt title={title} priority />
@@ -305,7 +308,7 @@ function DetailHero({ title, kicker, heading, children }: { title: PlayTitle; ki
         <div className="min-w-0 text-center lg:max-w-[700px] lg:text-left">
           <Kicker>Rivendy Play <span aria-hidden>·</span> {kicker}</Kicker>
           {heading ?? (
-            <h1 className="mt-4 break-words text-[clamp(2rem,4.6vw,4.25rem)] font-black leading-[1] tracking-tight text-rvp-text lg:mt-5">{title.title}</h1>
+            <h1 className="mt-4 break-words text-[clamp(2rem,4.4vw,4.25rem)] font-black leading-[1] tracking-tight text-rvp-text">{title.title}</h1>
           )}
           {children}
         </div>
@@ -634,7 +637,7 @@ export function HistoryView() {
                   const entry = resumeEntries(current.progress).find((x) => x.title_id === t.id);
                   return (
                     <li key={t.id}>
-                      <LandscapeCard title={t} href={entry ? resumeHref(entry) : titlePath(t)}
+                      <LandscapeCard title={t} watch={entry ? resumeHref(entry) : undefined}
                         caption={entry ? remainingLabel(entry.position_seconds, entry.duration_seconds) : undefined}
                         progress={entry && entry.duration_seconds > 0 ? entry.position_seconds / entry.duration_seconds : null}
                         removeLabel={`Retirer « ${t.title} » de En cours`}

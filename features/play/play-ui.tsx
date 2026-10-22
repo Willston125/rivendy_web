@@ -8,7 +8,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { cn } from "@/lib/utils/cn";
 import {
-  countLabel, kindLabel, kindOf, landscapeArt, metaParts, playImage, playSrcSet, posterArt, titlePath,
+  countLabel, durationLabel, kindLabel, kindOf, landscapeArt, metaParts, playImage, playSrcSet, posterArt, titlePath, watchHref,
   type PlayTitle, type WatchProgress,
 } from "./play-logic";
 import { usePlayList } from "./play-list";
@@ -33,7 +33,7 @@ export const btnGhost =
 
 /** Conteneur des pages Play : toute la largeur, marges régulières. */
 export function PlayPage({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("mx-auto w-full max-w-[1600px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-10", className)}>{children}</div>;
+  return <div className={cn("mx-auto w-full max-w-[1600px] px-4 pb-12 pt-6 sm:px-6 lg:px-10 lg:pt-10", className)}>{children}</div>;
 }
 
 export function PageHeading({ title, intro, count, unit = "titre" }: { title: string; intro?: string; count?: number | null; unit?: string }) {
@@ -233,69 +233,60 @@ export function PosterCard({ title, rank, progress, sizes = "(min-width: 1536px)
 }
 
 /**
- * Carte paysage 16:9 (découverte, clips, « Continuer à regarder »). Avec un
- * vrai fond paysage : l'image, le titre dessus. Avec l'affiche seulement :
- * l'affiche ENTIÈRE à gauche sur son ambiance floutée, le texte à droite —
- * jamais une affiche recadrée en bandeau.
+ * Carte paysage 16:9 (découverte, clips, « Continuer à regarder ») : l'image
+ * REMPLIT la miniature, le titre et les métadonnées sont dessous. Image : le
+ * vrai visuel paysage (fond du dashboard, vignette d'un clip) ; à défaut,
+ * l'affiche, cadrée sur son tiers haut (où sont les visages), jamais étirée.
+ * Lecture et « Ma liste » sont des commandes à part, posées sur l'image, hors
+ * du lien de la carte.
  */
-export function LandscapeCard({ title, href, kicker, caption, progress, onRemove, removeLabel, sizes = "(min-width: 1536px) 24vw, (min-width: 1024px) 31vw, (min-width: 640px) 45vw, 82vw", eager }: {
-  title: PlayTitle; href?: string; kicker?: string; caption?: string; progress?: number | null;
+export function LandscapeCard({ title, href, watch, kicker, caption, progress, onRemove, removeLabel, sizes = "(min-width: 1536px) 24vw, (min-width: 1024px) 31vw, (min-width: 640px) 45vw, 82vw", eager }: {
+  title: PlayTitle; href?: string;
+  /** Lecture directe (reprise d'une position) ; par défaut, le film ou le clip, les épisodes d'une série. */
+  watch?: string; kicker?: string; caption?: string; progress?: number | null;
   onRemove?: () => void; removeLabel?: string; sizes?: string; eager?: boolean;
 }) {
   const wide = landscapeArt(title);
-  const poster = posterArt(title);
-  const top = kicker ?? [kindLabel(title.kind), title.genre?.trim()].filter(Boolean).join(" · ");
-  const meta = kindOf(title.kind) === "clip" && title.artist
-    ? title.artist
-    : metaParts(title).filter((p) => p !== kindLabel(title.kind) && p !== title.genre?.trim()).join(" · ");
+  const art = wide ?? posterArt(title);
+  const k = kindOf(title.kind);
+  const meta = k === "clip" && title.artist
+    ? [title.artist, durationLabel(title.duration_seconds)].filter(Boolean).join(" · ")
+    : metaParts(title).join(" · ");
+  const play = watch ?? watchHref(title) ?? `${titlePath(title)}#episodes`;
+  const playLabel = watch || k !== "serie" ? `Regarder « ${title.title} »` : `Voir les épisodes de « ${title.title} »`;
   return (
     <article className="rvp-card group relative">
       <Link href={href ?? titlePath(title)} className="block rounded-xl">
         <div className="relative aspect-video overflow-hidden rounded-xl bg-rvp-surface ring-1 ring-white/5 transition duration-300 group-hover:ring-rvp-accent/70">
-          {wide ? (
-            <>
-              <PlayImg src={wide} widths={[480, 720, 1080]} sizes={sizes} eager={eager}
-                className="absolute inset-0 h-full w-full object-cover transition duration-500 motion-safe:group-hover:scale-[1.03]" />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" aria-hidden />
-              <span className="absolute inset-x-4 bottom-3.5 block pr-12">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-rvp-accent">{top}</span>
-                <span className="mt-1 line-clamp-2 block text-lg font-extrabold leading-tight text-rvp-text sm:text-xl">{title.title}</span>
-              </span>
-            </>
-          ) : poster ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={playImage(poster, 160) ?? poster} alt="" aria-hidden loading="lazy" decoding="async"
-                className="absolute inset-0 h-full w-full scale-125 object-cover opacity-50 blur-2xl saturate-150" />
-              <span className="absolute inset-0 bg-gradient-to-r from-rvp-ground/85 via-rvp-ground/55 to-rvp-ground/25" aria-hidden />
-              <span className="relative flex h-full items-stretch gap-3 p-3 sm:gap-4 sm:p-4">
-                <PlayImg src={poster} widths={[160, 320, 480]} sizes="(min-width: 1024px) 170px, 130px" eager={eager}
-                  className="aspect-[2/3] h-full w-auto shrink-0 rounded-lg object-cover shadow-[0_12px_30px_-10px_rgba(0,0,0,0.9)] ring-1 ring-white/10 transition duration-500 motion-safe:group-hover:scale-[1.03]" />
-                <span className="flex min-w-0 flex-1 flex-col justify-end pb-0.5 pr-11">
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-rvp-accent">{top}</span>
-                  <span className="mt-1 line-clamp-3 block text-lg font-extrabold leading-tight text-rvp-text sm:text-xl">{title.title}</span>
-                  {meta ? <span className="mt-1 line-clamp-1 block text-xs text-rvp-soft">{meta}</span> : null}
-                </span>
-              </span>
-            </>
-          ) : (
-            <ArtFallback title={title.title} wide />
-          )}
-          <span aria-hidden className="absolute bottom-3.5 right-3.5 flex h-10 w-10 items-center justify-center rounded-full border border-white/50 bg-black/35 text-white backdrop-blur-sm transition-colors group-hover:border-rvp-accent group-hover:bg-rvp-accent group-hover:text-rvp-on-accent">
-            <Play className="h-4 w-4 translate-x-px fill-current" />
-          </span>
+          <PlayImg src={art} widths={[320, 480, 720, 1080]} sizes={sizes} eager={eager}
+            className={cn("absolute inset-0 h-full w-full object-cover transition duration-500 motion-safe:group-hover:scale-[1.04]",
+              wide ? "object-[50%_35%]" : "object-[50%_30%]")}
+            fallback={<ArtFallback title={title.title} wide />} />
+          <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" aria-hidden />
+          {title.is_premium && k !== "clip" ? <span className="absolute left-2 top-2"><PremiumBadge solid /></span> : null}
           {progress != null && progress > 0 ? <ProgressBar ratio={progress} className="right-16" /> : null}
         </div>
-        {caption ? <p className="mt-2 line-clamp-1 text-xs text-rvp-muted">{caption}</p> : null}
+        <span className="mt-3 block min-w-0">
+          {kicker ? <span className="block truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-rvp-accent">{kicker}</span> : null}
+          <span className="block truncate text-base font-bold text-rvp-text transition-colors group-hover:text-rvp-accent">{title.title}</span>
+          {caption || meta ? <span className="mt-0.5 block truncate text-sm text-rvp-muted">{caption ?? meta}</span> : null}
+        </span>
       </Link>
-      {onRemove ? (
-        <button type="button" onClick={onRemove} aria-label={removeLabel ?? `Retirer « ${title.title} »`} title={removeLabel}
-          className="rvp-reveal absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-black/55 text-white backdrop-blur-md transition-colors hover:border-white hover:bg-black/75">
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-      ) : (
-        <ListToggle titleId={title.id} label={title.title} className="absolute right-2 top-2 z-10" />
-      )}
+      {/* Commandes posées sur l'image (même boîte 16:9), hors du lien de la carte. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 aspect-video">
+        <Link href={play} aria-label={playLabel} title={playLabel}
+          className="pointer-events-auto absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-rvp-accent text-rvp-on-accent shadow-[0_8px_20px_-6px_rgba(0,0,0,0.8)] transition-colors hover:bg-rvp-accent-hover">
+          <Play className="h-[18px] w-[18px] translate-x-px fill-current" aria-hidden />
+        </Link>
+        {onRemove ? (
+          <button type="button" onClick={onRemove} aria-label={removeLabel ?? `Retirer « ${title.title} »`} title={removeLabel}
+            className="rvp-reveal pointer-events-auto absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-black/55 text-white backdrop-blur-md transition-colors hover:border-white hover:bg-black/75">
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        ) : (
+          <ListToggle titleId={title.id} label={title.title} className="pointer-events-auto absolute right-2 top-2" />
+        )}
+      </div>
     </article>
   );
 }
@@ -310,11 +301,23 @@ const RAIL_COLS: Record<RailLayout, string> = {
 };
 
 /**
+ * Colonnes d'une rangée paysage d'après le nombre RÉEL de titres : peu de
+ * titres = des miniatures plus grandes qui occupent la largeur, jamais de
+ * titre répété pour remplir. (Classes écrites en entier : Tailwind les lit.)
+ */
+function landscapeCols(count: number): string {
+  if (count <= 1) return "auto-cols-[100%] gap-3 sm:auto-cols-[calc((100%_-_1rem)/2)] sm:gap-4 lg:auto-cols-[calc((100%_-_1.25rem)/2)] lg:gap-5";
+  if (count === 2) return "auto-cols-[82%] gap-3 sm:auto-cols-[calc((100%_-_1rem)/2)] sm:gap-4 lg:auto-cols-[calc((100%_-_1.25rem)/2)] lg:gap-5";
+  if (count === 3) return "auto-cols-[82%] gap-3 sm:auto-cols-[calc((100%_-_1rem)/2.15)] sm:gap-4 lg:auto-cols-[calc((100%_-_2.5rem)/3)] lg:gap-5";
+  return RAIL_COLS.landscape;
+}
+
+/**
  * Rangée horizontale : glissement au doigt (accroché à chaque carte), flèches
  * sur ordinateur, défilement au clavier par la tabulation. Ne déborde jamais
  * de la page : seul le rail défile.
  */
-export function Rail({ label, layout, children }: { label: string; layout: RailLayout; children: ReactNode }) {
+export function Rail({ label, layout, count, children }: { label: string; layout: RailLayout; count?: number; children: ReactNode }) {
   const ref = useRef<HTMLUListElement>(null);
   const [edges, setEdges] = useState({ start: true, end: true });
 
@@ -351,7 +354,7 @@ export function Rail({ label, layout, children }: { label: string; layout: RailL
       <ul ref={ref} aria-label={label}
         className={cn(
           "no-scrollbar -mx-4 grid snap-x snap-mandatory grid-flow-col overflow-x-auto overscroll-x-contain scroll-px-4 px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:-mx-10 lg:scroll-px-10 lg:px-10",
-          RAIL_COLS[layout],
+          layout === "landscape" && count != null ? landscapeCols(count) : RAIL_COLS[layout],
         )}>
         {children}
       </ul>
