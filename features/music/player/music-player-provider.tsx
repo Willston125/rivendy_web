@@ -30,6 +30,10 @@ import { loginHref, savePending } from "../music-pending";
 
 export type QueueItem = { track: MusicTrack; release: MusicRelease };
 
+/** D'où vient la file (panneau « En cours de lecture ») : « Titres likés », un album, le Hit… */
+export type PlaySource = { label: string; href?: string | null };
+export type PlayOptions = { source?: PlaySource | null; shuffle?: boolean };
+
 type PlayerContext = {
   queue: QueueItem[];
   index: number;
@@ -44,7 +48,9 @@ type PlayerContext = {
   muted: boolean;
   expanded: boolean;
   error: string | null;
-  playQueue: (items: QueueItem[], start?: number) => void;
+  /** Sélection d'où vient la file en cours (null : inconnue). */
+  source: PlaySource | null;
+  playQueue: (items: QueueItem[], start?: number, options?: PlayOptions) => void;
   /** Joue l'élément i de la file en cours (file d'attente, « À suivre »). */
   playAt: (i: number) => void;
   toggle: () => void;
@@ -58,6 +64,8 @@ type PlayerContext = {
   playNext: (item: QueueItem) => void;
   addToQueue: (item: QueueItem) => void;
   removeAt: (i: number) => void;
+  /** Vide « À suivre » (le titre en cours continue). */
+  clearUpcoming: () => void;
   close: () => void;
   setExpanded: (open: boolean) => void;
   pause: () => void;
@@ -104,6 +112,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const [muted, setMuted] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<PlaySource | null>(null);
 
   // État de l'écoute en cours (lu dans les gestionnaires, jamais au rendu).
   const listen = useRef({ trackId: "", listened: 0, lastPos: 0, counted: false, sessionId: null as string | null });
@@ -227,17 +236,29 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => { loadAtRef.current = loadAt; }, [loadAt]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const playQueue = useCallback((items: QueueItem[], start = 0) => {
+  const playQueue = useCallback((items: QueueItem[], start = 0, options?: PlayOptions) => {
     const playable = items.filter((x) => isPlayable(x.track));
     if (playable.length === 0) { dialogs.notify("Aucun titre disponible pour l’instant.", "info"); return; }
     const startId = items[start]?.track.id;
-    const i = Math.max(0, playable.findIndex((x) => x.track.id === startId));
+    // Lecture aléatoire d'une liste : un premier titre au hasard, le reste mélangé.
+    const i = options?.shuffle
+      ? Math.floor(Math.random() * playable.length)
+      : Math.max(0, playable.findIndex((x) => x.track.id === startId));
     if (!user) {
       // Écouter exige un compte : la file est gardée, la page d'origine
       // propose de la reprendre après la connexion (un geste reste requis).
       const first = playable[i];
       savePending({ kind: "play", id: first.track.id, path: pathname || "/music", label: first.track.title }, playable.slice(i));
       router.push(loginHref(pathname || "/music"));
+      return;
+    }
+    setSource(options?.source ?? null);
+    if (options?.shuffle) {
+      const mixed = shuffleKeepingCurrent(playable, i);
+      originalOrder.current = playable;
+      setShuffled(true);
+      setQueue(mixed);
+      void loadAt(mixed, 0);
       return;
     }
     originalOrder.current = null;
@@ -362,6 +383,11 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     if (i < indexRef.current) setIndex((x) => x - 1);
   }, []);
 
+  const clearUpcoming = useCallback(() => {
+    setQueue((q) => q.slice(0, indexRef.current + 1));
+    originalOrder.current = null;
+  }, []);
+
   const close = useCallback(() => {
     const audio = audioRef.current;
     finishListen();
@@ -375,6 +401,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     setPlaying(false);
     setExpanded(false);
     setPreview(false);
+    setSource(null);
     try { localStorage.removeItem(STORE_KEY); } catch { /* rien */ }
   }, [finishListen]);
 
@@ -507,9 +534,10 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (!raw) return;
-      const saved = JSON.parse(raw) as { u?: string; q?: QueueItem[]; i?: number };
+      const saved = JSON.parse(raw) as { u?: string; q?: QueueItem[]; i?: number; s?: PlaySource | null };
       if (saved.u !== user.id || !Array.isArray(saved.q) || saved.q.length === 0) return;
       setQueue(saved.q.slice(0, 50));
+      if (saved.s && typeof saved.s.label === "string") setSource({ label: saved.s.label.slice(0, 120), href: typeof saved.s.href === "string" && saved.s.href.startsWith("/") ? saved.s.href : null });
       setIndex(Math.min(Math.max(0, saved.i ?? 0), saved.q.length - 1));
     } catch { /* stockage indisponible */ }
   }, [user]);
@@ -518,9 +546,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     if (!user || queue.length === 0) return;
     try {
       const start = Math.max(0, index - 10);
-      localStorage.setItem(STORE_KEY, JSON.stringify({ u: user.id, q: queue.slice(start, start + 50), i: index - start }));
+      localStorage.setItem(STORE_KEY, JSON.stringify({ u: user.id, q: queue.slice(start, start + 50), i: index - start, s: source }));
     } catch { /* stockage indisponible */ }
-  }, [user, queue, index]);
+  }, [user, queue, index, source]);
 
   // ── Commandes de l'écran verrouillé et des touches multimédia ────────────
   const current = queue[index] ?? null;
@@ -541,12 +569,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   }, [current, next, previous, seek, toggle]);
 
   const value = useMemo<PlayerContext>(() => ({
-    queue, index, current, playing, loading, duration, preview, repeat, shuffled, volume, muted, expanded, error,
+    queue, index, current, playing, loading, duration, preview, repeat, shuffled, volume, muted, expanded, error, source,
     playQueue, playAt, toggle, next, previous, seek, setVolume, toggleMute, cycleRepeat, toggleShuffle, playNext, addToQueue,
-    removeAt, close, setExpanded, pause,
+    removeAt, clearUpcoming, close, setExpanded, pause,
   }), [queue, index, current, playing, loading, duration, preview, repeat, shuffled, volume, muted, expanded, error,
     playQueue, playAt, toggle, next, previous, seek, setVolume, toggleMute, cycleRepeat, toggleShuffle, playNext, addToQueue,
-    removeAt, close, pause]);
+    removeAt, clearUpcoming, close, pause, source]);
   const progress = useMemo(() => ({ position, duration, ready }), [position, duration, ready]);
 
   return (

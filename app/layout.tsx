@@ -85,20 +85,24 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSONLD) }}
         />
         <Providers>
-          {/* Rivendy Play a son en-tête et son pied de page sombres (refonte du 2026-10-22). */}
+          {/* Rivendy Play a son en-tête et son pied de page sombres (refonte du 2026-10-22) ;
+              la Musique est une application plein écran avec sa propre barre (même jour). */}
           <Suspense fallback={null}>
             <HideInPlay>
-              <AppHeader />
+              <HideInMusic>
+                <AppHeader />
+              </HideInMusic>
             </HideInPlay>
           </Suspense>
           <main className="min-h-screen">{children}</main>
-          {/* Play et Musique ont leur fin de page sombre. */}
           <HideInPlay>
             <HideInMusic>
               <SiteFooter />
             </HideInMusic>
           </HideInPlay>
-          <AppDownloadBanner />
+          <HideInMusic>
+            <AppDownloadBanner />
+          </HideInMusic>
         </Providers>
       </body>
     </html>

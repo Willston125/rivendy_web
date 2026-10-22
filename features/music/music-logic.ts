@@ -48,6 +48,8 @@ export interface MusicTrack {
   is_free?: boolean | null;
   explicit?: boolean | null;
   music_releases?: MusicRelease | null;
+  /** Côté compte, jamais en base du titre : ajouté en favori ou à la playlist, ou dernière écoute (ISO). */
+  added_at?: string | null;
 }
 
 /** Nom affiché : l'artiste du compte, sinon le nom saisi, sinon « Rivendy ». */
@@ -378,4 +380,126 @@ export function heroHitBadge(top: { rank: number; releaseId: string | null } | n
   | { kind: "none" } | { kind: "same" } | { kind: "other" } {
   if (!top || top.rank !== 1 || !top.releaseId) return { kind: "none" };
   return top.releaseId === spotlightId ? { kind: "same" } : { kind: "other" };
+}
+
+// ── Mise en page « application » du 2026-10-22 (bibliothèque, panneaux) ────
+
+export type LibraryKind = "liked" | "playlist" | "album" | "artist";
+
+/** Une entrée de « Ma bibliothèque » : uniquement des données du compte. */
+export type LibraryEntry = {
+  key: string;
+  kind: LibraryKind;
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  cover: string | null;
+  /** Pochettes d'une playlist (mosaïque), dans l'ordre des titres. */
+  covers?: string[];
+  /** Ajouté (enregistré, suivi, créé) — ISO. */
+  addedAt: string | null;
+  /** Dernière utilisation connue (écoute, modification) — ISO. */
+  usedAt: string | null;
+  /** « Titres likés » reste en tête, comme une playlist épinglée. */
+  pinned?: boolean;
+};
+
+export type LibrarySort = "recent" | "added" | "alpha";
+
+const time = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
+
+/** La plus récente de plusieurs dates ISO (null si aucune). */
+export function latestIso(...isos: Array<string | null | undefined>): string | null {
+  let best: string | null = null;
+  for (const d of isos) if (d && (!best || time(d) > time(best))) best = d;
+  return best;
+}
+
+/** Tri de la bibliothèque : l'entrée épinglée d'abord, puis le critère choisi. */
+export function sortLibrary(entries: LibraryEntry[], sort: LibrarySort): LibraryEntry[] {
+  const by = (a: LibraryEntry, b: LibraryEntry) => {
+    if (sort === "alpha") return a.title.localeCompare(b.title, "fr", { sensitivity: "base" });
+    if (sort === "added") return time(b.addedAt) - time(a.addedAt) || a.title.localeCompare(b.title, "fr");
+    return time(latestIso(b.usedAt, b.addedAt)) - time(latestIso(a.usedAt, a.addedAt)) || a.title.localeCompare(b.title, "fr");
+  };
+  return [...entries].sort((a, b) => (!!a.pinned === !!b.pinned ? by(a, b) : a.pinned ? -1 : 1));
+}
+
+/** Filtre (type + texte, sans accents). Le filtre « Playlists » garde « Titres likés ». */
+export function filterLibrary(entries: LibraryEntry[], kind: LibraryKind | null, query: string): LibraryEntry[] {
+  const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+  const q = fold(query);
+  return entries.filter((e) => {
+    if (kind && !(e.kind === kind || (kind === "playlist" && e.kind === "liked"))) return false;
+    return !q || fold(e.title).includes(q) || fold(e.subtitle).includes(q);
+  });
+}
+
+/** Filtres proposés : seulement les types présents dans la bibliothèque. */
+export function libraryKinds(entries: LibraryEntry[]): Array<"playlist" | "album" | "artist"> {
+  const has = (k: LibraryKind) => entries.some((e) => e.kind === k);
+  const out: Array<"playlist" | "album" | "artist"> = [];
+  if (has("playlist") || has("liked")) out.push("playlist");
+  if (has("album")) out.push("album");
+  if (has("artist")) out.push("artist");
+  return out;
+}
+
+/** Durée totale d'une liste : « 3 min 29 s », « 2 h 05 min », « plus de 24 h ». */
+export function totalDurationLabel(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s >= 24 * 3600) return "plus de 24 h";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h} h ${String(m).padStart(2, "0")} min`;
+  if (m > 0) return r > 0 ? `${m} min ${String(r).padStart(2, "0")} s` : `${m} min`;
+  return `${r} s`;
+}
+
+const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+/** Date d'ajout : « aujourd’hui », « hier », « il y a 5 jours », puis « 14 févr. 2026 ». */
+export function addedAtLabel(iso: string | null | undefined, now: number): string {
+  const t = time(iso);
+  if (!t) return "";
+  const startOf = (x: number) => { const d = new Date(x); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const days = Math.round((startOf(now) - startOf(t)) / 86_400_000);
+  if (days <= 0) return "aujourd’hui";
+  if (days === 1) return "hier";
+  if (days < 7) return `il y a ${days} jours`;
+  const d = new Date(t);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** Largeur d'un panneau gardée dans ses bornes (bibliothèque, panneau de lecture). */
+export function clampPanel(width: number, min: number, max: number): number {
+  if (!Number.isFinite(width)) return min;
+  return Math.min(max, Math.max(min, Math.round(width)));
+}
+
+/**
+ * Largeurs réellement affichées : le panneau central garde au moins
+ * `centerMin` ; on réduit d'abord le panneau de droite, puis la bibliothèque.
+ */
+export function fitPanels(p: { available: number; left: number; right: number; leftMin: number; rightMin: number; centerMin: number }):
+  { left: number; right: number } {
+  let { left, right } = p;
+  let over = left + right + p.centerMin - p.available;
+  if (over > 0) { const r = Math.max(0, Math.min(over, right - p.rightMin)); right -= r; over -= r; }
+  if (over > 0) { const l = Math.max(0, Math.min(over, left - p.leftMin)); left -= l; }
+  return { left, right };
+}
+
+/**
+ * Teinte d'en-tête tirée d'une pochette : assombrie jusqu'à ce que le texte
+ * blanc reste lisible (contraste 4,5:1 au moins). Entrée et sortie en [r, g, b].
+ */
+export function headerTint(rgb: [number, number, number]): [number, number, number] {
+  const f = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const lum = (c: number[]) => 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+  let c = rgb.map((x) => Math.max(0, Math.min(255, Math.round(x)))) as [number, number, number];
+  for (let k = 0; k < 20 && 1.05 / (lum(c) + 0.05) < 4.5; k++) c = c.map((x) => Math.round(x * 0.85)) as [number, number, number];
+  return c;
 }

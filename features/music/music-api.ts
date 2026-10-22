@@ -230,8 +230,9 @@ export async function fetchLikedTracks(): Promise<MusicTrack[]> {
   if (!u) return [];
   const data = must(await supabase.from("music_likes").select(`created_at, music_tracks(${TRACK_WITH_RELEASE})`)
     .eq("user_id", u).order("created_at", { ascending: false }).limit(500));
-  return ((data ?? []) as unknown as Array<{ music_tracks: MusicTrack | null }>)
-    .map((r) => r.music_tracks).filter((t): t is MusicTrack => !!t && !!t.music_releases);
+  return ((data ?? []) as unknown as Array<{ created_at: string; music_tracks: MusicTrack | null }>)
+    .filter((r) => !!r.music_tracks && !!r.music_tracks.music_releases)
+    .map((r) => ({ ...(r.music_tracks as MusicTrack), added_at: r.created_at }));
 }
 
 export async function isReleaseSaved(releaseId: string): Promise<boolean> {
@@ -270,13 +271,14 @@ export async function fetchMyPlaylists(): Promise<Playlist[]> {
 export async function fetchPlaylist(id: string): Promise<{ playlist: Playlist | null; tracks: MusicTrack[] }> {
   const [r1, r2] = await Promise.all([
     supabase.from("music_playlists").select(PLAYLIST_COLUMNS).eq("id", id).maybeSingle(),
-    supabase.from("music_playlist_items").select(`position, music_tracks(${TRACK_WITH_RELEASE})`)
+    supabase.from("music_playlist_items").select(`position, added_at, music_tracks(${TRACK_WITH_RELEASE})`)
       .eq("playlist_id", id).order("position").limit(1000),
   ]);
   const playlist = must(r1);
   const items = must(r2);
-  const tracks = ((items ?? []) as unknown as Array<{ music_tracks: MusicTrack | null }>)
-    .map((r) => r.music_tracks).filter((t): t is MusicTrack => !!t && !!t.music_releases);
+  const tracks = ((items ?? []) as unknown as Array<{ added_at: string | null; music_tracks: MusicTrack | null }>)
+    .filter((r) => !!r.music_tracks && !!r.music_tracks.music_releases)
+    .map((r) => ({ ...(r.music_tracks as MusicTrack), added_at: r.added_at }));
   return { playlist: (playlist as Playlist | null) ?? null, tracks };
 }
 
@@ -360,4 +362,86 @@ export async function setFollowing(personId: string, on: boolean): Promise<strin
   if (error) return "network";
   const res = data as { success?: boolean; error?: string } | null;
   return res?.success ? null : res?.error ?? "unknown";
+}
+
+// ── « Ma bibliothèque » (mise en page application, 2026-10-22) ─────────────
+
+export type LibraryOverview = {
+  likeCount: number;
+  likedAt: string | null;
+  playlists: Array<Playlist & { covers: string[] }>;
+  albums: Array<{ release: MusicRelease; savedAt: string }>;
+  artists: Array<{ artist: MusicArtist; followedAt: string }>;
+  /** Dernière écoute connue par sortie et par artiste (music_play_history). */
+  lastPlayedByRelease: Record<string, string>;
+  lastPlayedByArtist: Record<string, string>;
+};
+
+/**
+ * Toute la bibliothèque du compte en une passe : favoris (nombre et dernier
+ * ajout), playlists (et leurs 4 premières pochettes), albums enregistrés,
+ * artistes suivis, et les dates des dernières écoutes pour le tri
+ * « Récents ». Les mêmes lignes que l'app ; rien d'inventé.
+ */
+export async function fetchLibraryOverview(): Promise<LibraryOverview | null> {
+  const u = await uid();
+  if (!u) return null;
+  const [likes, lists, saved, follows, history] = await Promise.all([
+    supabase.from("music_likes").select("created_at", { count: "exact" }).eq("user_id", u)
+      .order("created_at", { ascending: false }).limit(1),
+    supabase.from("music_playlists").select(PLAYLIST_COLUMNS).eq("owner_id", u)
+      .order("updated_at", { ascending: false }).limit(200),
+    supabase.from("music_saved_releases").select(`created_at, music_releases(${RELEASE_WITH_TERRITORY})`)
+      .eq("user_id", u).order("created_at", { ascending: false }).limit(300),
+    supabase.from("play_follows").select("followed_id, created_at").eq("follower_id", u).limit(1000),
+    supabase.from("music_play_history").select("last_played_at, music_tracks(release_id, music_releases(artist_id))")
+      .eq("user_id", u).order("last_played_at", { ascending: false }).limit(300),
+  ]);
+  if (likes.error) throw new Error(likes.error.message);
+  const playlists = (must(lists) ?? []) as Playlist[];
+  const savedRows = (must(saved) ?? []) as unknown as Array<{ created_at: string; music_releases: MusicRelease | null }>;
+  const followRows = (must(follows) ?? []) as Array<{ followed_id: string; created_at: string }>;
+  const historyRows = (must(history) ?? []) as unknown as Array<{
+    last_played_at: string; music_tracks: { release_id: string; music_releases: { artist_id: string | null } | null } | null;
+  }>;
+
+  // Pochettes des playlists : les 4 premières différentes, dans l'ordre des titres.
+  const covers: Record<string, string[]> = {};
+  if (playlists.length > 0) {
+    const items = must(await supabase.from("music_playlist_items")
+      .select("playlist_id, position, music_tracks(music_releases(cover_url))")
+      .in("playlist_id", playlists.map((p) => p.id)).order("position").limit(800));
+    for (const row of (items ?? []) as unknown as Array<{ playlist_id: string; music_tracks: { music_releases: { cover_url: string | null } | null } | null }>) {
+      const url = row.music_tracks?.music_releases?.cover_url;
+      const list = (covers[row.playlist_id] ??= []);
+      if (url && list.length < 4 && !list.includes(url)) list.push(url);
+    }
+  }
+
+  // Artistes suivis : seulement ceux qui ont un profil d'artiste (on suit une personne).
+  let artists: LibraryOverview["artists"] = [];
+  if (followRows.length > 0) {
+    const data = must(await supabase.from("play_artists").select(ARTIST_COLUMNS).in("user_id", followRows.map((f) => f.followed_id)));
+    const at = new Map(followRows.map((f) => [f.followed_id, f.created_at]));
+    artists = ((data ?? []) as MusicArtist[]).map((a) => ({ artist: a, followedAt: at.get(a.user_id ?? "") ?? "" }));
+  }
+
+  const lastPlayedByRelease: Record<string, string> = {};
+  const lastPlayedByArtist: Record<string, string> = {};
+  for (const h of historyRows) {
+    const rel = h.music_tracks?.release_id;
+    const art = h.music_tracks?.music_releases?.artist_id;
+    if (rel && !lastPlayedByRelease[rel]) lastPlayedByRelease[rel] = h.last_played_at;
+    if (art && !lastPlayedByArtist[art]) lastPlayedByArtist[art] = h.last_played_at;
+  }
+
+  return {
+    likeCount: likes.count ?? 0,
+    likedAt: ((likes.data ?? []) as Array<{ created_at: string }>)[0]?.created_at ?? null,
+    playlists: playlists.map((p) => ({ ...p, covers: covers[p.id] ?? [] })),
+    albums: savedRows.filter((r) => !!r.music_releases).map((r) => ({ release: r.music_releases as MusicRelease, savedAt: r.created_at })),
+    artists,
+    lastPlayedByRelease,
+    lastPlayedByArtist,
+  };
 }

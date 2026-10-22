@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { RequireAuth } from "@/features/auth/require-auth";
 import { LibraryView } from "@/features/music/music-views";
 
 export const metadata: Metadata = {
@@ -8,9 +7,6 @@ export const metadata: Metadata = {
 };
 
 export default function MusicLibraryPage() {
-  return (
-    <RequireAuth>
-      <LibraryView />
-    </RequireAuth>
-  );
+  // Sans compte, la bibliothèque invite à se connecter, dans le thème de la Musique.
+  return <LibraryView />;
 }

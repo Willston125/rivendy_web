@@ -9,10 +9,13 @@ import { DialogShell } from "@/components/ui/dialog-shell";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useDialogs } from "@/features/ui/dialogs";
 import {
-  addToPlaylist, createPlaylist, fetchLikeCount, fetchMyPlaylists, likedTrackIds, setFollowing, setLiked,
-  setReleaseSaved, type Playlist,
+  addToPlaylist, createPlaylist, fetchLibraryOverview, likedTrackIds, setFollowing, setLiked,
+  setReleaseSaved, type LibraryOverview, type Playlist,
 } from "./music-api";
-import { isValidPlaylistName, musicSharePath, samePath, type PendingMusicAction } from "./music-logic";
+import {
+  artistName, isValidPlaylistName, latestIso, musicSharePath, releaseKindLabel, samePath,
+  type LibraryEntry, type PendingMusicAction,
+} from "./music-logic";
 import { loginHref, peekPendingPath, savePending, takePending } from "./music-pending";
 import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
 
@@ -34,10 +37,19 @@ type LibraryContext = {
   /** Nombre de titres aimés (null tant qu'il n'est pas connu). */
   likeCount: number | null;
   isLiked: (trackId: string) => boolean;
+  /** true / false si on le sait, null tant que ce titre n'a pas été vérifié. */
+  likeState: (trackId: string) => boolean | null;
   /** Vérifie, une fois, si ces titres sont aimés. */
   ensureLikes: (trackIds: string[]) => void;
   toggleLike: (track: { id: string; title: string }) => Promise<void>;
   playlists: Playlist[] | null;
+  /** Toute la bibliothèque du compte (null sans compte ou pendant le chargement). */
+  overview: LibraryOverview | null;
+  /** Entrées de « Ma bibliothèque » (null sans compte ou pendant le chargement). */
+  entries: LibraryEntry[] | null;
+  libraryError: boolean;
+  refreshLibrary: () => void;
+  /** Ancien nom de refreshLibrary. */
   refreshPlaylists: () => void;
   newPlaylist: (thenAdd?: QueueItem) => Promise<Playlist | null>;
   pickPlaylist: (item: QueueItem) => void;
@@ -58,41 +70,53 @@ const PLAYLIST_ERRORS: Record<string, string> = {
 };
 export const playlistMessage = (code: string) => PLAYLIST_ERRORS[code] ?? "Action impossible pour l’instant.";
 
-function emit(detail: LibraryEventDetail) {
+/** Album enregistré, artiste suivi : les pages et « Ma bibliothèque » se mettent à jour. */
+export function emitLibraryChange(detail: LibraryEventDetail) {
   window.dispatchEvent(new CustomEvent<LibraryEventDetail>(MUSIC_LIBRARY_EVENT, { detail }));
 }
+const emit = emitLibraryChange;
 
 export function MusicLibraryProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const dialogs = useDialogs();
   const router = useRouter();
   const pathname = usePathname();
   const player = useMusicPlayer();
 
   const [likes, setLikes] = useState<Map<string, boolean>>(() => new Map());
-  const [likeCount, setLikeCount] = useState<number | null>(null);
-  const [playlists, setPlaylists] = useState<Playlist[] | null>(null);
+  const [overview, setOverview] = useState<LibraryOverview | null>(null);
+  const [libraryError, setLibraryError] = useState(false);
+  const likeCount = overview?.likeCount ?? null;
+  const playlists = useMemo(() => (userId ? overview?.playlists ?? null : null), [overview, userId]);
   const [picker, setPicker] = useState<QueueItem | null>(null);
   const [resume, setResume] = useState<{ label: string; items: QueueItem[] } | null>(null);
   const asked = useRef(new Set<string>());
-  const userId = user?.id ?? null;
 
   // ── Compte : tout repart de zéro ─────────────────────────────────────────
-  const refreshPlaylists = useCallback(() => {
-    if (!userId) { setPlaylists(null); return; }
-    void fetchMyPlaylists().then(setPlaylists).catch(() => setPlaylists((p) => p ?? []));
+  const loadSeq = useRef(0);
+  const refreshLibrary = useCallback(() => {
+    const seq = ++loadSeq.current;
+    if (!userId) { setOverview(null); setLibraryError(false); return; }
+    void fetchLibraryOverview()
+      .then((o) => { if (seq === loadSeq.current) { setOverview(o); setLibraryError(false); } })
+      .catch(() => { if (seq === loadSeq.current) setLibraryError(true); });
   }, [userId]);
 
   useEffect(() => {
     asked.current = new Set();
     setLikes(new Map());
     setPicker(null);
-    if (!userId) { setLikeCount(null); setPlaylists(null); return; }
-    let alive = true;
-    void fetchLikeCount().then((n) => { if (alive) setLikeCount(n); }).catch(() => {});
-    void fetchMyPlaylists().then((p) => { if (alive) setPlaylists(p); }).catch(() => { if (alive) setPlaylists([]); });
-    return () => { alive = false; };
-  }, [userId]);
+    setOverview(null);
+    refreshLibrary();
+  }, [refreshLibrary]);
+
+  // Album enregistré ou artiste suivi ailleurs (page, panneau, reprise) : on relit.
+  useEffect(() => {
+    const on = () => refreshLibrary();
+    window.addEventListener(MUSIC_LIBRARY_EVENT, on);
+    return () => window.removeEventListener(MUSIC_LIBRARY_EVENT, on);
+  }, [refreshLibrary]);
 
   const ensureLikes = useCallback((trackIds: string[]) => {
     if (!userId) return;
@@ -109,6 +133,7 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
   }, [userId]);
 
   const isLiked = useCallback((trackId: string) => likes.get(trackId) === true, [likes]);
+  const likeState = useCallback((trackId: string) => (likes.has(trackId) ? likes.get(trackId) === true : null), [likes]);
 
   const requireLogin = useCallback((action: Omit<PendingMusicAction, "at" | "path">, items?: QueueItem[]) => {
     const path = `${window.location.pathname}${window.location.search}`;
@@ -124,7 +149,7 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
       setLikes((m) => new Map(m).set(trackId, !on));
       return false;
     }
-    setLikeCount((c) => (c === null ? c : Math.max(0, c + (on ? 1 : -1))));
+    setOverview((o) => (o ? { ...o, likeCount: Math.max(0, o.likeCount + (on ? 1 : -1)), likedAt: on ? new Date().toISOString() : o.likedAt } : o));
     return true;
   }, []);
 
@@ -140,11 +165,9 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
     const err = await addToPlaylist(p.id, item.track.id);
     if (err) { dialogs.notify(playlistMessage(err), "error"); return false; }
     dialogs.notify(`Ajouté à « ${p.name} »`, "success");
-    setPlaylists((list) => list?.map((x) => x.id === p.id
-      ? { ...x, music_playlist_items: [{ count: (x.music_playlist_items?.[0]?.count ?? 0) + 1 }] }
-      : x) ?? list);
+    refreshLibrary();
     return true;
-  }, [dialogs]);
+  }, [dialogs, refreshLibrary]);
 
   const newPlaylist = useCallback(async (thenAdd?: QueueItem): Promise<Playlist | null> => {
     if (!userId) { router.push(loginHref(`${window.location.pathname}${window.location.search}`)); return null; }
@@ -154,11 +177,10 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
     const res = await createPlaylist(name);
     if (res.error || !res.playlist) { dialogs.notify(playlistMessage(res.error ?? ""), "error"); return null; }
     const created = res.playlist;
-    setPlaylists((list) => [created, ...(list ?? [])]);
     if (thenAdd) await addTo(created, thenAdd);
-    else dialogs.notify(`Playlist « ${created.name} » créée`, "success");
+    else { dialogs.notify(`Playlist « ${created.name} » créée`, "success"); refreshLibrary(); }
     return created;
-  }, [addTo, dialogs, router, userId]);
+  }, [addTo, dialogs, refreshLibrary, router, userId]);
 
   const pickPlaylist = useCallback((item: QueueItem) => {
     if (!userId) { requireLogin({ kind: "playlist", id: item.track.id, label: item.track.title }, [item]); return; }
@@ -218,9 +240,13 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
     })();
   }, [applyLike, dialogs, pathname, userId]);
 
+  const entries = useMemo(() => (userId && overview ? libraryEntries(overview) : null), [overview, userId]);
+
   const value = useMemo<LibraryContext>(() => ({
-    likeCount, isLiked, ensureLikes, toggleLike, playlists, refreshPlaylists, newPlaylist, pickPlaylist, requireLogin, share,
-  }), [likeCount, isLiked, ensureLikes, toggleLike, playlists, refreshPlaylists, newPlaylist, pickPlaylist, requireLogin, share]);
+    likeCount, isLiked, likeState, ensureLikes, toggleLike, playlists, overview, entries, libraryError, refreshLibrary,
+    refreshPlaylists: refreshLibrary, newPlaylist, pickPlaylist, requireLogin, share,
+  }), [likeCount, isLiked, likeState, ensureLikes, toggleLike, playlists, overview, entries, libraryError, refreshLibrary, newPlaylist,
+    pickPlaylist, requireLogin, share]);
 
   return (
     <Ctx.Provider value={value}>
@@ -247,6 +273,37 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
       ) : null}
     </Ctx.Provider>
   );
+}
+
+/**
+ * Entrées de « Ma bibliothèque » à partir des données du compte : « Titres
+ * likés » (épinglé), playlists, albums enregistrés, artistes suivis. La
+ * dernière utilisation = dernière écoute connue ou dernière modification.
+ */
+function libraryEntries(o: LibraryOverview): LibraryEntry[] {
+  const n = (k: number) => `${k} titre${k > 1 ? "s" : ""}`;
+  return [
+    {
+      key: "liked", kind: "liked", id: "liked", title: "Titres likés", subtitle: `Playlist • ${n(o.likeCount)}`,
+      href: "/music/favorites", cover: null, addedAt: o.likedAt, usedAt: o.likedAt, pinned: true,
+    },
+    ...o.playlists.map((p): LibraryEntry => ({
+      key: `playlist:${p.id}`, kind: "playlist", id: p.id, title: p.name,
+      subtitle: `Playlist • ${n(p.music_playlist_items?.[0]?.count ?? 0)}`,
+      href: `/music/playlist/${p.id}`, cover: p.covers[0] ?? null, covers: p.covers,
+      addedAt: p.updated_at, usedAt: p.updated_at,
+    })),
+    ...o.albums.map(({ release: r, savedAt }): LibraryEntry => ({
+      key: `album:${r.id}`, kind: "album", id: r.id, title: r.title,
+      subtitle: `${releaseKindLabel(r.kind)} • ${artistName(r)}`, href: `/music/album/${r.id}`, cover: r.cover_url ?? null,
+      addedAt: savedAt, usedAt: latestIso(savedAt, o.lastPlayedByRelease[r.id]),
+    })),
+    ...o.artists.map(({ artist: a, followedAt }): LibraryEntry => ({
+      key: `artist:${a.id}`, kind: "artist", id: a.id, title: a.name, subtitle: "Artiste",
+      href: `/artist/${a.id}`, cover: a.avatar_url ?? null,
+      addedAt: followedAt || null, usedAt: latestIso(followedAt, o.lastPlayedByArtist[a.id]),
+    })),
+  ];
 }
 
 export function useMusicLibrary(): LibraryContext {

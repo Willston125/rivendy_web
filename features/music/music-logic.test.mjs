@@ -197,3 +197,70 @@ test("bannière : « N° 1 du Rivendy Hit » seulement s'il est vraiment premier
   assert.deepEqual(heroHitBadge({ rank: 1, releaseId: "r2" }, "r1"), { kind: "other" });
   assert.deepEqual(heroHitBadge({ rank: 1, releaseId: null }, "r1"), { kind: "none" });
 });
+
+// ── Mise en page « application » ───────────────────────────────────────────
+import {
+  latestIso, sortLibrary, filterLibrary, libraryKinds, totalDurationLabel, addedAtLabel, clampPanel, fitPanels, headerTint,
+} from "./music-logic.ts";
+
+const E = (o) => ({ key: o.kind + o.id, href: "/", cover: null, subtitle: "", addedAt: null, usedAt: null, ...o });
+
+test("bibliothèque : « Titres likés » en tête, puis récents, ajoutés, ou alphabétique", () => {
+  const items = [
+    E({ kind: "album", id: "a", title: "Zouk love", addedAt: "2026-10-01T10:00:00Z", usedAt: "2026-10-20T10:00:00Z" }),
+    E({ kind: "playlist", id: "p", title: "Éclats", addedAt: "2026-10-10T10:00:00Z", usedAt: "2026-10-10T10:00:00Z" }),
+    E({ kind: "liked", id: "liked", title: "Titres likés", pinned: true, addedAt: "2026-09-01T10:00:00Z" }),
+    E({ kind: "artist", id: "r", title: "Ali", addedAt: "2026-10-15T10:00:00Z" }),
+  ];
+  assert.deepEqual(sortLibrary(items, "recent").map((e) => e.id), ["liked", "a", "r", "p"]);
+  assert.deepEqual(sortLibrary(items, "added").map((e) => e.id), ["liked", "r", "p", "a"]);
+  assert.deepEqual(sortLibrary(items, "alpha").map((e) => e.id), ["liked", "r", "p", "a"]);
+  assert.equal(latestIso(null, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"), "2026-02-01T00:00:00Z");
+  assert.equal(latestIso(null, undefined), null);
+});
+
+test("bibliothèque : filtres présents seulement, recherche sans accents", () => {
+  const items = [
+    E({ kind: "liked", id: "liked", title: "Titres likés", pinned: true }),
+    E({ kind: "album", id: "a", title: "Mélodie", subtitle: "Album • Waza" }),
+  ];
+  assert.deepEqual(libraryKinds(items), ["playlist", "album"]);
+  assert.deepEqual(libraryKinds([]), []);
+  assert.deepEqual(filterLibrary(items, "playlist", "").map((e) => e.id), ["liked"]);
+  assert.deepEqual(filterLibrary(items, null, "melo").map((e) => e.id), ["a"]);
+  assert.deepEqual(filterLibrary(items, null, "waza").map((e) => e.id), ["a"]);
+});
+
+test("durée totale et date d'ajout", () => {
+  assert.equal(totalDurationLabel(209), "3 min 29 s");
+  assert.equal(totalDurationLabel(1873), "31 min 13 s");
+  assert.equal(totalDurationLabel(3600 * 2 + 300), "2 h 05 min");
+  assert.equal(totalDurationLabel(90_000), "plus de 24 h");
+  assert.equal(totalDurationLabel(45), "45 s");
+  const now = Date.parse("2026-10-22T15:00:00");
+  assert.equal(addedAtLabel("2026-10-22T08:00:00", now), "aujourd’hui");
+  assert.equal(addedAtLabel("2026-10-21T23:00:00", now), "hier");
+  assert.equal(addedAtLabel("2026-10-17T12:00:00", now), "il y a 5 jours");
+  assert.equal(addedAtLabel("2026-02-14T12:00:00", now), "14 févr. 2026");
+  assert.equal(addedAtLabel(null, now), "");
+});
+
+test("panneaux : bornes, et le centre garde sa largeur minimale", () => {
+  assert.equal(clampPanel(500, 240, 440), 440);
+  assert.equal(clampPanel(100, 240, 440), 240);
+  assert.equal(clampPanel(NaN, 240, 440), 240);
+  // 1280 px utiles : 440 + 440 + 480 > 1280 → la droite cède d'abord, puis la gauche.
+  assert.deepEqual(fitPanels({ available: 1280, left: 440, right: 440, leftMin: 240, rightMin: 280, centerMin: 480 }), { left: 440, right: 360 });
+  assert.deepEqual(fitPanels({ available: 1000, left: 440, right: 440, leftMin: 240, rightMin: 280, centerMin: 480 }), { left: 240, right: 280 });
+  assert.deepEqual(fitPanels({ available: 1600, left: 300, right: 340, leftMin: 240, rightMin: 280, centerMin: 480 }), { left: 300, right: 340 });
+});
+
+test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
+  const f = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const lum = (c) => 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+  for (const c of [[250, 240, 200], [0, 191, 165], [30, 30, 60]]) {
+    const t = headerTint(c);
+    assert.ok(1.05 / (lum(t) + 0.05) >= 4.5, `${c} → ${t}`);
+  }
+  assert.deepEqual(headerTint([30, 30, 60]), [30, 30, 60]);
+});

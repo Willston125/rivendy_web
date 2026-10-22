@@ -8,19 +8,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  BookmarkCheck, ChevronLeft, ChevronRight, Disc3, Ellipsis, Heart, ListEnd, ListPlus, ListStart, LoaderCircle, Lock,
-  Music2, Pause, Play, Plus, Share2, UserRound, WifiOff, type LucideIcon,
+  BookmarkCheck, ChevronLeft, ChevronRight, CircleCheck, CirclePlus, Clock3, Disc3, Ellipsis, Heart, ListEnd, ListPlus,
+  ListStart, LoaderCircle, Lock, Music2, Pause, Play, Plus, Share2, Shuffle, UserCheck, UserPlus, UserRound, WifiOff, X,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useDialogs } from "@/features/ui/dialogs";
 import { cn } from "@/lib/utils/cn";
-import { fetchRelease, isReleaseSaved, setReleaseSaved, type MusicArtist } from "./music-api";
-import { MUSIC_LIBRARY_EVENT, useMusicLibrary, type LibraryEventDetail } from "./music-library";
+import { fetchRelease, isFollowing, isReleaseSaved, setFollowing, setReleaseSaved, type MusicArtist } from "./music-api";
+import { MUSIC_LIBRARY_EVENT, emitLibraryChange, useMusicLibrary, type LibraryEventDetail } from "./music-library";
 import {
-  artistName, formatDuration, isPlayable, releaseKindLabel, thumbUrl, trackSubtitle,
+  addedAtLabel, artistName, formatDuration, isPlayable, releaseKindLabel, thumbUrl, trackSubtitle,
   type MusicRelease, type MusicTrack,
 } from "./music-logic";
-import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
+import { useMusicPlayer, type PlaySource, type QueueItem } from "./player/music-player-provider";
 
 /**
  * Briques visuelles de Rivendy Musique (refonte du 2026-10-22, d'après la
@@ -59,6 +60,32 @@ export function useLoad<T>(key: string | null, load: () => Promise<T>) {
     loading: key !== null && !fresh,
     reload: () => setNonce((n) => n + 1),
   };
+}
+
+/**
+ * Champ de recherche relié à l'adresse (?q=) : ce qui est tapé part dans
+ * l'adresse après une courte pause (`commit`) ; si l'adresse change
+ * ailleurs (retour arrière, autre lien), le champ suit. L'aller-retour
+ * avec le routeur ne fait ni clignoter le champ ni perdre de caractères.
+ */
+export function useSearchDraft(urlQ: string, commit: (v: string) => void, delay = 350) {
+  const [q, setQ] = useState(urlQ);
+  const [prev, setPrev] = useState(urlQ);
+  const [sent, setSent] = useState<string | null>(null);
+  if (urlQ !== prev) {
+    setPrev(urlQ);
+    // Notre propre envoi qui arrive : on garde ce qui a été tapé depuis.
+    if (urlQ !== sent) setQ(urlQ);
+  }
+  const commitRef = useRef(commit);
+  useEffect(() => { commitRef.current = commit; });
+  useEffect(() => {
+    const v = q.trim();
+    if (v === urlQ.trim()) return;
+    const t = window.setTimeout(() => { setSent(v); commitRef.current(v); }, delay);
+    return () => window.clearTimeout(t);
+  }, [delay, q, urlQ]);
+  return [q, setQ] as const;
 }
 
 /** Lectures du navigateur : réduire les animations ? */
@@ -179,7 +206,7 @@ export function CardRow({ label, children }: { label: string; children: ReactNod
   return (
     <div className="group/row relative">
       <div ref={ref} onScroll={update} role="list" aria-label={label}
-        className="no-scrollbar -mx-1 grid snap-x snap-mandatory auto-cols-[44%] grid-flow-col gap-4 overflow-x-auto px-1 pb-2 sm:auto-cols-[30%] md:auto-cols-[23%] xl:auto-cols-[18.4%] 2xl:auto-cols-[15.3%]">
+        className="no-scrollbar -mx-1 grid snap-x snap-mandatory auto-cols-[44%] grid-flow-col gap-4 overflow-x-auto px-1 pb-2 @lg:auto-cols-[31%] @3xl:auto-cols-[23.2%] @5xl:auto-cols-[18.4%] @7xl:auto-cols-[15.3%]">
         {children.map((child, i) => <div key={i} role="listitem" className="min-w-0 snap-start">{child}</div>)}
       </div>
       {!edges.start ? (
@@ -198,7 +225,7 @@ export function CardRow({ label, children }: { label: string; children: ReactNod
 
 export function CardRowSkeleton({ count = 6, round = false }: { count?: number; round?: boolean }) {
   return (
-    <div aria-hidden className="grid auto-cols-[44%] grid-flow-col gap-4 overflow-hidden sm:auto-cols-[30%] md:auto-cols-[23%] xl:auto-cols-[18.4%] 2xl:auto-cols-[15.3%]">
+    <div aria-hidden className="grid auto-cols-[44%] grid-flow-col gap-4 overflow-hidden @lg:auto-cols-[31%] @3xl:auto-cols-[23.2%] @5xl:auto-cols-[18.4%] @7xl:auto-cols-[15.3%]">
       {Array.from({ length: count }, (_, i) => (
         <div key={i}>
           <div className={cn("aspect-square bg-rvm-raised motion-safe:animate-pulse", round ? "rounded-full" : "rounded-xl")} />
@@ -267,17 +294,45 @@ export const iconButton =
  * « Écouter » d'une page (sortie, playlist, favoris…) : si cette liste joue
  * déjà, le même bouton met en pause et reprend.
  */
-export function PlayAllButton({ items, label = "Écouter", className }: { items: QueueItem[]; label?: string; className?: string }) {
+export function PlayAllButton({ items, label = "Écouter", className, source, variant = "pill" }: {
+  items: QueueItem[]; label?: string; className?: string;
+  /** Nom de la sélection (panneau « En cours de lecture »). */
+  source?: PlaySource;
+  /** « round » : gros bouton rond vert sous l'en-tête d'une liste. */
+  variant?: "pill" | "round";
+}) {
   const player = useMusicPlayer();
   const playable = items.filter((x) => isPlayable(x.track));
   const curId = player.current?.track.id;
   const isThis = !!curId && items.some((x) => x.track.id === curId);
+  const onClick = () => (isThis ? player.toggle() : player.playQueue(items, 0, { source }));
+  if (variant === "round") {
+    return (
+      <button type="button" disabled={playable.length === 0} onClick={onClick}
+        aria-label={isThis && player.playing ? "Pause" : isThis ? "Reprendre la lecture" : `${label}${source ? ` : ${source.label}` : ""}`}
+        className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-black/40 transition hover:scale-105 hover:bg-rvm-accent-hover active:scale-95 active:bg-rvm-accent-pressed disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100", className)}>
+        {isThis && player.playing ? <Pause className="h-6 w-6 fill-current" aria-hidden /> : <Play className="ml-0.5 h-6 w-6 fill-current" aria-hidden />}
+      </button>
+    );
+  }
   return (
     <button type="button" disabled={playable.length === 0}
-      onClick={() => (isThis ? player.toggle() : player.playQueue(items, 0))}
+      onClick={onClick}
       className={cn(primaryButton, className)}>
       {isThis && player.playing ? <Pause className="h-4 w-4 fill-current" aria-hidden /> : <Play className="h-4 w-4 fill-current" aria-hidden />}
       {isThis ? (player.playing ? "Pause" : "Reprendre") : label}
+    </button>
+  );
+}
+
+/** Lecture aléatoire d'une liste (sous l'en-tête des sorties, playlists, favoris). */
+export function ShuffleButton({ items, source }: { items: QueueItem[]; source?: PlaySource }) {
+  const player = useMusicPlayer();
+  const playable = items.some((x) => isPlayable(x.track));
+  return (
+    <button type="button" disabled={!playable} onClick={() => player.playQueue(items, 0, { source, shuffle: true })}
+      aria-label="Lecture aléatoire" title="Lecture aléatoire" className={cn(iconButton, "h-12 w-12 text-rvm-soft")}>
+      <Shuffle className="h-6 w-6" aria-hidden />
     </button>
   );
 }
@@ -292,7 +347,7 @@ function useReleasePlay(release: MusicRelease) {
     setBusy(true);
     try {
       const { release: r, tracks } = await fetchRelease(release.id);
-      player.playQueue(toQueue(tracks, r ?? release), 0);
+      player.playQueue(toQueue(tracks, r ?? release), 0, { source: { label: release.title, href: `/music/album/${release.id}` } });
     } catch {
       // Panne réseau : le lecteur dit « aucun titre disponible ».
       player.playQueue([], 0);
@@ -316,7 +371,7 @@ export function PlayReleaseLabelButton({ release, label = "Écouter" }: { releas
 }
 
 /** « Enregistrer » une sortie dans la bibliothèque du compte (site et app). */
-export function SaveReleaseButton({ release, className }: { release: MusicRelease; className?: string }) {
+export function SaveReleaseButton({ release, className, variant = "pill" }: { release: MusicRelease; className?: string; variant?: "pill" | "icon" }) {
   const { user } = useAuth();
   const library = useMusicLibrary();
   const dialogs = useDialogs();
@@ -342,7 +397,19 @@ export function SaveReleaseButton({ release, className }: { release: MusicReleas
     setSaved(next);
     const ok = await setReleaseSaved(release.id, next);
     if (!ok) { setSaved(!next); dialogs.notify("Action impossible pour l’instant. Réessayez.", "error"); return; }
+    emitLibraryChange({ kind: "save", id: release.id, on: next });
     dialogs.notify(next ? "Enregistré dans votre bibliothèque" : "Retiré de votre bibliothèque", next ? "success" : "info");
+  }
+
+  if (variant === "icon") {
+    return (
+      <button type="button" onClick={toggle} aria-pressed={saved}
+        aria-label={saved ? `Retirer « ${release.title} » de votre bibliothèque` : `Enregistrer « ${release.title} » dans votre bibliothèque`}
+        title={saved ? "Retirer de votre bibliothèque" : "Enregistrer dans votre bibliothèque"}
+        className={cn(iconButton, "h-12 w-12", saved ? "text-rvm-accent hover:text-rvm-accent" : "text-rvm-soft", className)}>
+        {saved ? <CircleCheck className="h-7 w-7 fill-rvm-accent text-rvm-surface" aria-hidden /> : <CirclePlus className="h-7 w-7" aria-hidden />}
+      </button>
+    );
   }
 
   return (
@@ -443,7 +510,7 @@ export function ReleaseShelf({ releases, label }: { releases: MusicRelease[]; la
   if (releases.length <= 3) {
     return (
       <div role="list" aria-label={label}
-        className={cn("grid gap-3", releases.length === 1 ? "max-w-2xl" : releases.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3")}>
+        className={cn("grid gap-3", releases.length === 1 ? "max-w-2xl" : releases.length === 2 ? "@xl:grid-cols-2" : "@xl:grid-cols-2 @5xl:grid-cols-3")}>
         {releases.map((r) => <div key={r.id} role="listitem" className="min-w-0"><ReleaseTile release={r} /></div>)}
       </div>
     );
@@ -480,7 +547,7 @@ export function ArtistList({ artists }: { artists: MusicArtist[] }) {
 export function ReleaseGrid({ releases, empty = "Rien pour l’instant." }: { releases: MusicRelease[]; empty?: string }) {
   if (releases.length === 0) return <p className="text-sm text-rvm-muted">{empty}</p>;
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-6 @lg:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @7xl:grid-cols-6">
       {releases.map((r) => <ReleaseCard key={r.id} release={r} />)}
     </div>
   );
@@ -519,9 +586,14 @@ export function toQueue(tracks: MusicTrack[], release?: MusicRelease | null): Qu
 /**
  * Liste jouable : sortie, playlist, favoris, historique, Hit, recherche.
  * Toucher le titre (ou double-cliquer la ligne) lance la liste à partir de
- * lui ; le titre en cours est en vert, avec l'égaliseur.
+ * lui ; le titre en cours est en vert, avec l'égaliseur. Les colonnes
+ * (album, date, durée) suivent la largeur du PANNEAU central (requêtes de
+ * conteneur), pas celle de la fenêtre.
  */
-export function TrackList({ items, showAlbum = true, showCover = true, numbered = false, ranks, menuExtra, hideRelease = false, label = "Titres", highlight = null }: {
+export function TrackList({
+  items, showAlbum = true, showCover = true, numbered = false, ranks, menuExtra, hideRelease = false, label = "Titres",
+  highlight = null, source, dateLabel, stickyHeader = false,
+}: {
   items: QueueItem[];
   /** Titre ouvert par un lien partagé : mis en évidence. */
   highlight?: string | null;
@@ -535,20 +607,29 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
   /** Page de la sortie : pas de lien « Aller à l'album ». */
   hideRelease?: boolean;
   label?: string;
+  /** Sélection d'où part la lecture (panneau « En cours de lecture »). */
+  source?: PlaySource;
+  /** Colonne de date (« Date d'ajout », « Écouté ») lue dans `track.added_at`. */
+  dateLabel?: string;
+  /** En-tête des colonnes collé sous la barre compacte de la page. */
+  stickyHeader?: boolean;
 }) {
   const player = useMusicPlayer();
   const library = useMusicLibrary();
   const { ensureLikes } = library;
   const ids = items.map((x) => x.track.id).join(",");
   useEffect(() => { if (ids) ensureLikes(ids.split(",")); }, [ensureLikes, ids]);
+  const [now] = useState(() => Date.now());
 
   return (
     <div>
-      <div aria-hidden className="mb-1 hidden items-center gap-3 border-b border-rvm-line px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-rvm-soft md:flex">
+      <div aria-hidden className={cn("mb-1 hidden items-center gap-3 border-b border-rvm-line px-2 py-2 text-xs font-semibold uppercase tracking-wider text-rvm-soft @md:flex",
+        stickyHeader && "sticky top-16 z-10 bg-rvm-surface")}>
         <span className="w-8 text-center">#</span>
         <span className="min-w-0 flex-1">Titre</span>
-        {showAlbum ? <span className="hidden w-[26%] lg:block">Album</span> : null}
-        <span className="w-12 text-right">Durée</span>
+        {showAlbum ? <span className="hidden w-[24%] @3xl:block">Album</span> : null}
+        {dateLabel ? <span className="hidden w-32 @4xl:block">{dateLabel}</span> : null}
+        <span className="flex w-12 justify-end"><Clock3 className="h-4 w-4" aria-label="Durée" /></span>
         <span className="w-[5.25rem]" />
       </div>
       <ol aria-label={label}>
@@ -558,10 +639,10 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
           const isCurrent = player.current?.track.id === t.id;
           const locked = !!r.is_premium && !t.is_free;
           const rank = ranks?.get(t.id);
-          const play = () => { if (!playable) return; if (isCurrent) player.toggle(); else player.playQueue(items, i); };
+          const play = () => { if (!playable) return; if (isCurrent) player.toggle(); else player.playQueue(items, i, { source }); };
           return (
             <li key={`${t.id}-${i}`} id={`t-${t.id}`} onDoubleClick={play}
-              className={cn("group flex scroll-mt-32 items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/5",
+              className={cn("group flex scroll-mt-32 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.07]",
                 isCurrent && "bg-rvm-accent/10 hover:bg-rvm-accent/15", highlight === t.id && "ring-1 ring-rvm-accent/70",
                 !playable && "opacity-60")}>
               <div className="relative flex h-10 w-8 shrink-0 flex-col items-center justify-center">
@@ -572,7 +653,7 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
                       <span className="mt-0.5 text-[10px] text-rvm-muted">{rank.move}</span>
                     </span>
                   ) : (
-                    <span className="text-sm tabular-nums text-rvm-muted group-hover:invisible group-focus-within:invisible">{numbered ? t.position : i + 1}</span>
+                    <span className="text-[15px] tabular-nums text-rvm-soft group-hover:invisible group-focus-within:invisible">{numbered ? t.position : i + 1}</span>
                   )}
                 <button type="button" onClick={play} disabled={!playable}
                   aria-label={isCurrent && player.playing ? `Mettre en pause ${t.title}` : `Écouter ${t.title}`}
@@ -580,7 +661,7 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
                   {isCurrent && player.playing ? <Pause className="h-4 w-4 fill-current" aria-hidden /> : <Play className="h-4 w-4 fill-current" aria-hidden />}
                 </button>
               </div>
-              {showCover ? <Cover url={r.cover_url} size={160} alt="" className="h-10 w-10 shrink-0" rounded="rounded-md" /> : null}
+              {showCover ? <Cover url={r.cover_url} size={160} alt="" className="h-10 w-10 shrink-0" rounded="rounded" /> : null}
               <div className="min-w-0 flex-1">
                 <button type="button" onClick={play} disabled={!playable} tabIndex={-1}
                   className={cn("block max-w-full truncate text-left text-[15px] font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>
@@ -591,23 +672,140 @@ export function TrackList({ items, showAlbum = true, showCover = true, numbered 
                 </span>
               </div>
               {showAlbum ? (
-                <span className="hidden w-[26%] min-w-0 truncate text-sm text-rvm-soft lg:block">
+                <span className="hidden w-[24%] min-w-0 truncate text-sm text-rvm-soft @3xl:block">
                   {hideRelease ? r.title : <Link href={`/music/album/${r.id}`} className="hover:text-rvm-text hover:underline">{r.title}</Link>}
                 </span>
               ) : null}
+              {dateLabel ? <span className="hidden w-32 truncate text-sm text-rvm-soft @4xl:block">{addedAtLabel(t.added_at, now)}</span> : null}
               <span className="flex shrink-0 items-center gap-1.5">
                 {!playable ? <span className="text-xs text-rvm-muted">Bientôt</span>
                   : locked ? <Lock className="h-3.5 w-3.5 text-rvm-premium" aria-label="Premium" />
                   : r.is_premium && t.is_free ? <span className="text-xs font-semibold text-rvm-premium">Offert</span> : null}
-                <span className="hidden w-12 text-right text-[13px] tabular-nums text-rvm-soft sm:block">{formatDuration(t.duration_seconds)}</span>
+                <span className="hidden w-12 text-right text-[13px] tabular-nums text-rvm-soft @md:block">{formatDuration(t.duration_seconds)}</span>
               </span>
-              <LikeButton track={t} size="h-[18px] w-[18px]" className="hidden sm:inline-flex" />
+              <LikeButton track={t} size="h-[18px] w-[18px]" className="hidden @md:inline-flex" />
               <TrackMenuButton item={item} extra={menuExtra?.(item, i)} hideRelease={hideRelease} />
             </li>
           );
         })}
       </ol>
     </div>
+  );
+}
+
+// ── File d'attente (panneau « En cours de lecture », lecteur agrandi) ──────
+
+/** Ligne de la file : toucher la joue ; la croix la retire (sauf le titre en cours). */
+function QueueRow({ item, i, current }: { item: QueueItem; i: number; current: boolean }) {
+  const p = useMusicPlayer();
+  return (
+    <li className={cn("group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-white/[0.07]", current && "bg-rvm-accent/10")}>
+      <button type="button" onClick={() => (current ? p.toggle() : p.playAt(i))} className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        aria-label={current ? (p.playing ? `Mettre en pause ${item.track.title}` : `Reprendre ${item.track.title}`) : `Écouter ${item.track.title}`}>
+        <Cover url={item.release.cover_url} size={160} alt="" className="h-11 w-11 shrink-0" rounded="rounded" />
+        <span className="min-w-0 flex-1">
+          <span className={cn("flex items-center gap-2 truncate text-[15px] font-semibold", current ? "text-rvm-accent" : "text-rvm-text")}>
+            {current ? <Equalizer paused={!p.playing} /> : null}<span className="truncate">{item.track.title}</span>
+          </span>
+          <span className="block truncate text-[13px] text-rvm-soft">{artistName(item.release)}</span>
+        </span>
+      </button>
+      {!current ? (
+        <button type="button" onClick={() => p.removeAt(i)} aria-label={`Retirer « ${item.track.title} » de la file`}
+          className={cn(iconButton, "h-9 w-9 opacity-100 @sm:opacity-0 @sm:group-hover:opacity-100 @sm:focus-visible:opacity-100")}>
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
+/** « En cours », puis « À suivre » (au plus `limit` titres affichés). */
+export function QueueList({ limit = 100 }: { limit?: number }) {
+  const p = useMusicPlayer();
+  const cur = p.current;
+  const upcoming = p.queue.slice(p.index + 1, p.index + 1 + limit);
+  const left = p.queue.length - p.index - 1;
+  return (
+    <div className="@container">
+      {cur ? (
+        <>
+          <h3 className="px-2 text-sm font-bold text-rvm-text">En cours de lecture</h3>
+          <ul className="mt-1"><QueueRow item={cur} i={p.index} current /></ul>
+        </>
+      ) : null}
+      <div className="mt-5 flex items-center justify-between gap-2 px-2">
+        <h3 className="text-sm font-bold text-rvm-text">
+          À suivre{p.source ? <span className="font-normal text-rvm-soft"> · {p.source.label}</span> : null}
+        </h3>
+        {left > 0 ? (
+          <button type="button" onClick={p.clearUpcoming} className="rounded-full px-2 py-1 text-[13px] font-semibold text-rvm-soft hover:text-rvm-text">
+            Effacer la file
+          </button>
+        ) : null}
+      </div>
+      {upcoming.length === 0 ? (
+        <p className="px-2 pt-2 text-sm text-rvm-soft">La file d’attente est vide. Ajoutez des titres avec le menu « … ».</p>
+      ) : (
+        <ul className="mt-1">
+          {upcoming.map((item, k) => <QueueRow key={`${item.track.id}-${p.index + 1 + k}`} item={item} i={p.index + 1 + k} current={false} />)}
+        </ul>
+      )}
+      {left > upcoming.length ? <p className="px-2 pt-2 text-[13px] text-rvm-soft">Et {left - upcoming.length} autres titres.</p> : null}
+    </div>
+  );
+}
+
+// ── Suivre un artiste (page d'artiste, panneau « En cours de lecture ») ────
+
+export function FollowArtistButton({ artist, className, compact = false }: {
+  artist: Pick<MusicArtist, "id" | "user_id" | "name">; className?: string; compact?: boolean;
+}) {
+  const { user } = useAuth();
+  const dialogs = useDialogs();
+  const library = useMusicLibrary();
+  const [following, setFollowingState] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const personId = artist.user_id;
+
+  useEffect(() => {
+    if (!user || !personId) { setFollowingState(false); return; }
+    let alive = true;
+    void isFollowing(personId).then((v) => { if (alive) setFollowingState(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, [user, personId]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<LibraryEventDetail>).detail;
+      if (d?.kind === "follow" && d.id === personId) setFollowingState(d.on);
+    };
+    window.addEventListener(MUSIC_LIBRARY_EVENT, on);
+    return () => window.removeEventListener(MUSIC_LIBRARY_EVENT, on);
+  }, [personId]);
+
+  if (!personId) return null;
+
+  async function toggle() {
+    if (!personId) return;
+    if (!user) { library.requireLogin({ kind: "follow", id: personId, label: artist.name }); return; }
+    setBusy(true);
+    const err = await setFollowing(personId, !following);
+    setBusy(false);
+    if (err) { dialogs.notify(err === "blocked" ? "Action impossible avec ce compte." : "Action impossible pour l’instant.", "error"); return; }
+    setFollowingState(!following);
+    emitLibraryChange({ kind: "follow", id: personId, on: !following });
+  }
+
+  return (
+    <button type="button" onClick={toggle} disabled={busy} aria-pressed={following}
+      aria-label={following ? `Ne plus suivre ${artist.name}` : `Suivre ${artist.name}`}
+      className={cn(compact
+        ? "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors"
+        : secondaryButton,
+        following ? "border-rvm-accent text-rvm-accent" : "border-white/30 text-rvm-text hover:border-white", className)}>
+      {following ? <UserCheck className="h-4 w-4" aria-hidden /> : <UserPlus className="h-4 w-4" aria-hidden />}
+      {following ? "Abonné" : "Suivre"}
+    </button>
   );
 }
 
