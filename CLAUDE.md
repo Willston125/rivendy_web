@@ -97,6 +97,16 @@ pour un aperçu protégé : `vercel curl`). Si cela se reproduit : nouveau nom d
 fichier, ou variable `VERCEL_FORCE_NO_BUILD_CACHE=1` sur le projet Vercel
 (réglage du propriétaire).
 
+## 8. Vignettes Supabase : `resize=contain`, sinon l'image est RECADRÉE
+
+`/storage/v1/render/image/…?width=480` seul, en mode par défaut (`cover`),
+garde la HAUTEUR d'origine et recadre : une affiche 1365×2048 revenait en
+480×2048, une pochette carrée de 1329 px en 320×1329 — affichées zoomées sur
+leur centre (constaté en production le 2026-10-22, Musique comprise). Toute
+adresse de vignette porte donc `resize=contain` (`thumbUrl` de la Musique,
+`playImage` de Play). Vérifier une vignette = ouvrir son adresse et lire ses
+dimensions, jamais supposer.
+
 ## Vérifications avant de livrer
 
 `npx tsc --noEmit` → **0 erreur** (obligatoire)

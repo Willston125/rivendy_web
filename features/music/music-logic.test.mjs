@@ -36,7 +36,8 @@ test("libellés et durées", () => {
 
 test("vignettes : seulement music-images et play-images, en https", () => {
   const u = "https://x.supabase.co/storage/v1/object/public/music-images/artists/a/1.jpg";
-  assert.equal(thumbUrl(u, 320), "https://x.supabase.co/storage/v1/render/image/public/music-images/artists/a/1.jpg?width=320&quality=70");
+  // resize=contain : proportions gardées (sans lui, Supabase recadre à la hauteur d'origine).
+  assert.equal(thumbUrl(u, 320), "https://x.supabase.co/storage/v1/render/image/public/music-images/artists/a/1.jpg?width=320&resize=contain&quality=70");
   const other = "https://x.supabase.co/storage/v1/object/public/products/1.jpg";
   assert.equal(thumbUrl(other, 320), other);
   assert.equal(thumbUrl("http://x/a.jpg", 160), "http://x/a.jpg");

@@ -48,6 +48,25 @@
   --rvm-accent-pressed: var(--rv-primary);
   --rvm-on-accent:      #03201C;  /* texte et icônes posés sur le vert  */
   --rvm-premium:        #F5B83D;  /* marque « Premium » seulement       */
+
+  /* Rivendy Play — salle de cinéma VERTE (refonte du 2026-10-22). Fonds vert
+     profond, blanc cassé pour le texte, le vert de la marque pour l'accent.
+     Contrastes sur --rvp-ground : texte 17:1, --rvp-soft 12:1, --rvp-muted
+     7:1, accent 8:1 ; --rvp-on-accent sur l'accent 7:1. Mêmes valeurs dans
+     l'app (PlayColors). L'or reste réservé à Rivendy+ (comme la Musique). */
+  --rvp-ground:         #061110;  /* fond des pages                     */
+  --rvp-panel:          #081513;  /* en-tête, pied de page              */
+  --rvp-surface:        #0C1A18;  /* cartes, encadrés                   */
+  --rvp-raised:         #12231F;  /* survol, champs, puces              */
+  --rvp-line:           #1C2F2B;  /* séparateurs, bordures              */
+  --rvp-text:           #F3F5F2;  /* blanc cassé                        */
+  --rvp-soft:           #C9D3D0;
+  --rvp-muted:          #95A6A1;
+  --rvp-accent:         var(--rv-primary-light);
+  --rvp-accent-hover:   #2CCFB8;
+  --rvp-accent-pressed: var(--rv-primary);
+  --rvp-on-accent:      #03201C;
+  --rvp-premium:        #F5B83D;
 }
 
 /* Jetons Tailwind de la Musique (bg-rvm-accent, text-rvm-muted…) : le SEUL
@@ -67,6 +86,21 @@
   --color-rvm-on-accent: var(--rvm-on-accent);
   --color-rvm-brand: var(--rv-primary);
   --color-rvm-premium: var(--rvm-premium);
+
+  /* Rivendy Play (bg-rvp-ground, text-rvp-accent…) */
+  --color-rvp-ground: var(--rvp-ground);
+  --color-rvp-panel: var(--rvp-panel);
+  --color-rvp-surface: var(--rvp-surface);
+  --color-rvp-raised: var(--rvp-raised);
+  --color-rvp-line: var(--rvp-line);
+  --color-rvp-text: var(--rvp-text);
+  --color-rvp-soft: var(--rvp-soft);
+  --color-rvp-muted: var(--rvp-muted);
+  --color-rvp-accent: var(--rvp-accent);
+  --color-rvp-accent-hover: var(--rvp-accent-hover);
+  --color-rvp-accent-pressed: var(--rvp-accent-pressed);
+  --color-rvp-on-accent: var(--rvp-on-accent);
+  --color-rvp-premium: var(--rvp-premium);
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -169,4 +203,46 @@ button, input, select, textarea {
     .rvm-eq > span { animation: none; transform: scaleY(0.7); }
     .rvm-range::-webkit-slider-thumb { transition: none; }
   }
+
+  /* ── Rivendy Play ──────────────────────────────────────────────────────── */
+  /* Focus clavier visible et vert sur tout l'espace Play (cartes, bannière,
+     lecteur) : les boutons à icône n'ont pas d'autre repère. */
+  .rvp-scope :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--rvp-accent);
+    outline-offset: 2px;
+  }
+
+  /* Entrée d'une diapositive de la bannière : fondu court, immobile si l'on
+     réduit les animations. */
+  @keyframes rvp-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes rvp-rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* Sans « both » ni délai : si l'animation ne tourne pas (onglet en
+     arrière-plan, impression, robot), le contenu reste VISIBLE. */
+  .rvp-fade-in { animation: rvp-fade-in 650ms ease-out; }
+  .rvp-rise-in { animation: rvp-rise-in 520ms ease-out; }
+  @media (prefers-reduced-motion: reduce) {
+    .rvp-fade-in, .rvp-rise-in { animation: none; }
+  }
+
+  /* Bouton posé sur une carte (« Ma liste », retirer) : discret sur
+     ordinateur (visible au survol ou au clavier), toujours visible au toucher. */
+  @media (hover: hover) {
+    .rvp-card .rvp-reveal { opacity: 0; transition: opacity 150ms ease-out; }
+    .rvp-card:hover .rvp-reveal,
+    .rvp-card:focus-within .rvp-reveal,
+    .rvp-card .rvp-reveal[aria-pressed="true"] { opacity: 1; }
+  }
+}
+
+/* Fond de la page entière pendant Rivendy Play : le rebond du défilement et
+   le bas des pages courtes restaient blancs. Posé par PlayShell. */
+html[data-world="play"],
+html[data-world="play"] body {
+  background: var(--rvp-ground);
 }

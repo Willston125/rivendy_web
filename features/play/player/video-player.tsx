@@ -226,40 +226,40 @@ export function VideoPlayer({
         </video>
         {skipIntro ? (
           <button type="button" onClick={() => { const v = videoRef.current; if (v && intro?.end) v.currentTime = intro.end; }}
-            className="absolute bottom-16 right-4 rounded-lg border border-white/40 bg-black/70 px-4 py-2 text-sm font-bold text-white hover:bg-black/90">
+            className="absolute bottom-16 right-4 h-11 rounded-lg border border-white/40 bg-black/70 px-4 text-sm font-bold text-white hover:bg-black/90">
             Passer l’intro
           </button>
         ) : null}
         {showNext && upNext ? (
           <button type="button" onClick={upNext.onGo}
-            className="absolute bottom-16 right-4 flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-[#071719] hover:bg-[#5EEAD4]">
+            className="absolute bottom-16 right-4 flex h-11 items-center gap-2 rounded-lg bg-rvp-accent px-4 text-sm font-bold text-rvp-on-accent hover:bg-rvp-accent-hover">
             <SkipForward className="h-4 w-4" /> {upNext.label}
           </button>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2 bg-[#0B1F21] px-3 py-2 text-xs text-white/80">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-rvp-surface px-3 py-2 text-xs text-rvp-soft">
         <label className="flex items-center gap-1">
           Qualité
           <select value={quality} onChange={(e) => void chooseQuality(e.target.value as QualityId)}
-            className="rounded bg-white/10 px-1.5 py-1 text-white">
-            {QUALITIES.map((q) => <option key={q.id} value={q.id} className="bg-[#0B1F21]">{q.label}</option>)}
+            className="h-9 rounded-md bg-rvp-raised px-2 text-rvp-text">
+            {QUALITIES.map((q) => <option key={q.id} value={q.id} className="bg-rvp-surface">{q.label}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-1">
           Vitesse
           <select value={speed} onChange={(e) => { const r = Number(e.target.value); setSpeed(r); if (videoRef.current) videoRef.current.playbackRate = r; }}
-            className="rounded bg-white/10 px-1.5 py-1 text-white">
-            {SPEEDS.map((s) => <option key={s} value={s} className="bg-[#0B1F21]">{s === 1 ? "Normale" : `${String(s).replace(".", ",")}×`}</option>)}
+            className="h-9 rounded-md bg-rvp-raised px-2 text-rvp-text">
+            {SPEEDS.map((s) => <option key={s} value={s} className="bg-rvp-surface">{s === 1 ? "Normale" : `${String(s).replace(".", ",")}×`}</option>)}
           </select>
         </label>
-        {subtitles.length > 0 ? <span className="text-white/55">Sous-titres : menu du lecteur</span> : null}
+        {subtitles.length > 0 ? <span className="text-rvp-muted">Sous-titres : menu du lecteur</span> : null}
         <span className="flex-1" />
         {pipOk ? (
-          <button type="button" onClick={togglePip} className="rounded p-1.5 hover:bg-white/10" aria-label="Image dans l’image">
+          <button type="button" onClick={togglePip} className="flex h-10 w-10 items-center justify-center rounded-lg text-rvp-text hover:bg-white/10" aria-label="Image dans l’image">
             <PictureInPicture2 className="h-4 w-4" />
           </button>
         ) : null}
-        <button type="button" onClick={toggleFullscreen} className="rounded p-1.5 hover:bg-white/10" aria-label={fullscreen ? "Quitter le plein écran" : "Plein écran"}>
+        <button type="button" onClick={toggleFullscreen} className="flex h-10 w-10 items-center justify-center rounded-lg text-rvp-text hover:bg-white/10" aria-label={fullscreen ? "Quitter le plein écran" : "Plein écran"}>
           {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
         </button>
       </div>

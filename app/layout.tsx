@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import "./site.css";
 import { Providers } from "@/app/providers";
 import { AppHeader } from "@/components/layout/app-header";
+import { HideInPlay } from "@/components/layout/hide-in-play";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { AppDownloadBanner } from "@/features/app-banner/app-download-banner";
 import { PLAY_LISTING_URL, SITE_URL } from "@/lib/seo";
@@ -83,11 +84,16 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSONLD) }}
         />
         <Providers>
+          {/* Rivendy Play a son en-tête et son pied de page sombres (refonte du 2026-10-22). */}
           <Suspense fallback={null}>
-            <AppHeader />
+            <HideInPlay>
+              <AppHeader />
+            </HideInPlay>
           </Suspense>
           <main className="min-h-screen">{children}</main>
-          <SiteFooter />
+          <HideInPlay>
+            <SiteFooter />
+          </HideInPlay>
           <AppDownloadBanner />
         </Providers>
       </body>

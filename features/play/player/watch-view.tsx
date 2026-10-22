@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Loader2, Lock, Smartphone } from "lucide-react";
+import { ChevronLeft, Lock, Smartphone } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { MEDIA_PLAY_EVENT, deviceId } from "@/features/media/device-id";
 import { appIntentUrl } from "../play-link-page";
@@ -16,7 +16,7 @@ import {
   isArtistClip, kindOf, nextEpisode, playbackErrorMessage, resumeAt, titlePath, upNextAt, wideImage,
   type PlayEpisode, type PlayTitle,
 } from "../play-logic";
-import { PlayPage } from "../play-ui";
+import { EmptyState, PlayPage, Spinner, btnPrimary, btnSecondary } from "../play-ui";
 import { VideoPlayer, type FatalReason } from "./video-player";
 
 /**
@@ -280,30 +280,31 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
   const here = `/play/watch/${kind}/${id}`;
   if (loaded === null) {
     return (
-      <PlayPage>
-        <p className="py-16 text-center text-white/70">Ce titre n’est plus disponible.</p>
-        <p className="text-center"><Link href="/play" className="font-bold text-[#5EEAD4] hover:underline">Retour à Rivendy Play</Link></p>
+      <PlayPage className="max-w-[1320px]">
+        <EmptyState title="Ce titre n’est plus disponible" text="Il a peut-être été retiré du catalogue.">
+          <Link href="/play" className={btnSecondary}>Retour à Rivendy Play</Link>
+        </EmptyState>
       </PlayPage>
     );
   }
   if (loaded === undefined || authLoading) {
-    return <PlayPage><div className="py-24 text-center text-white/60"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div></PlayPage>;
+    return <PlayPage className="max-w-[1320px]"><Spinner label="Préparation de la lecture…" /></PlayPage>;
   }
 
   const { title, episode } = loaded;
   const heading = episode ? `${title.title} · S${episode.season} É${episode.episode_number} — ${episode.title}` : title.title;
   const back = (
-    <Link href={episode ? `/play/series/${title.id}` : titlePath(title)} className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5EEAD4] hover:underline">
+    <Link href={episode ? `/play/series/${title.id}` : titlePath(title)} className="mb-3 inline-flex h-10 items-center gap-1 rounded-lg text-sm font-semibold text-rvp-soft transition-colors hover:text-rvp-accent">
       <ChevronLeft className="h-4 w-4" /> {title.title}
     </Link>
   );
 
   if (!user) {
     return (
-      <PlayPage>
+      <PlayPage className="max-w-[1320px]">
         {back}
         <Notice title="Connectez-vous pour regarder" text="Votre compte Rivendy est le même sur le site et dans l’application : la lecture reprend où vous l’avez laissée.">
-          <Link href={`/auth/login?next=${encodeURIComponent(here)}`} className="rounded-full bg-[#00BFA5] px-6 py-3 text-sm font-black text-[#071719] hover:bg-[#5EEAD4]">Se connecter</Link>
+          <Link href={`/auth/login?next=${encodeURIComponent(here)}`} className={btnPrimary}>Se connecter</Link>
         </Notice>
       </PlayPage>
     );
@@ -311,24 +312,24 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
   if (error) {
     return (
-      <PlayPage>
+      <PlayPage className="max-w-[1320px]">
         {back}
         <Notice title={heading} text={playbackErrorMessage(error)}>
           {error === "pass_required" ? (
-            <Link href="/plus" className="rounded-full bg-[#00BFA5] px-6 py-3 text-sm font-black text-[#071719] hover:bg-[#5EEAD4]">Découvrir Rivendy+</Link>
+            <Link href="/plus" className={btnPrimary}>Découvrir Rivendy+</Link>
           ) : null}
           {error === "too_many_streams" ? (
             <button type="button" onClick={() => { setTakeOver(true); setAttempt((n) => n + 1); }}
-              className="rounded-full bg-[#00BFA5] px-6 py-3 text-sm font-black text-[#071719] hover:bg-[#5EEAD4]">Regarder ici (arrête l’autre écran)</button>
+              className={btnPrimary}>Regarder ici (arrête l’autre écran)</button>
           ) : null}
           {error === "personal_token_required" ? (
-            <a href={appIntentUrl(`/play/title/${title.id}`)} className="flex items-center gap-2 rounded-full bg-[#00BFA5] px-6 py-3 text-sm font-black text-[#071719] hover:bg-[#5EEAD4]">
+            <a href={appIntentUrl(`/play/title/${title.id}`)} className={btnPrimary}>
               <Smartphone className="h-4 w-4" /> Ouvrir dans l’application
             </a>
           ) : null}
           {["network", "media", "bad_response", "too_many_requests", "internal", "signing_unavailable"].includes(error) ? (
             <button type="button" onClick={() => { refreshes.current = 0; setAttempt((n) => n + 1); }}
-              className="rounded-full border border-white/25 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">Réessayer</button>
+              className={btnSecondary}>Réessayer</button>
           ) : null}
         </Notice>
       </PlayPage>
@@ -336,23 +337,23 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
   }
 
   if (!grant) {
-    return <PlayPage>{back}<div className="py-24 text-center text-white/60"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div></PlayPage>;
+    return <PlayPage className="max-w-[1320px]">{back}<Spinner label="Préparation de la lecture…" /></PlayPage>;
   }
 
   const markers = episode ?? title;
   const duration = Number(episode?.duration_seconds ?? title.duration_seconds ?? 0);
 
   return (
-    <PlayPage>
+    <PlayPage className="max-w-[1320px]">
       {back}
-      <h1 className="mb-3 text-xl font-black text-white sm:text-2xl">{heading}</h1>
+      <h1 className="mb-4 text-2xl font-black tracking-tight text-rvp-text sm:text-3xl">{heading}</h1>
       {grant.preview ? (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl bg-[#00BFA5]/10 px-4 py-3 text-sm text-[#CCFBF1]">
-          <Lock className="h-4 w-4" />
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-rvp-premium/30 bg-rvp-premium/10 px-4 py-3 text-sm text-rvp-soft">
+          <Lock className="h-4 w-4 shrink-0 text-rvp-premium" aria-hidden />
           <span className="flex-1">
             Aperçu gratuit{grant.preview_seconds ? ` : les ${Math.max(1, Math.round(grant.preview_seconds / 60))} premières minutes` : ""}. La suite avec Rivendy+.
           </span>
-          <Link href="/plus" className="font-bold text-[#5EEAD4] underline">Découvrir Rivendy+</Link>
+          <Link href="/plus" className="font-bold text-rvp-premium underline underline-offset-4">Découvrir Rivendy+</Link>
         </div>
       ) : null}
       {stopped ? (
@@ -377,16 +378,16 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
       />
       {ended && grant.preview ? (
         <Notice title="Fin de l’aperçu" text="Regardez la suite avec Rivendy+, sur le site et dans l’application, avec le même compte.">
-          <Link href="/plus" className="rounded-full bg-[#00BFA5] px-6 py-3 text-sm font-black text-[#071719] hover:bg-[#5EEAD4]">Découvrir Rivendy+</Link>
+          <Link href="/plus" className={btnPrimary}>Découvrir Rivendy+</Link>
         </Notice>
       ) : null}
       {isArtistClip(title) && title.artist ? (
-        <p className="mt-4 text-sm text-white/70">
-          Clip de <Link href={`/artist/${title.artist_id}`} className="font-bold text-[#5EEAD4] hover:underline">{title.artist}</Link>
+        <p className="mt-4 text-sm text-rvp-soft">
+          Clip de <Link href={`/artist/${title.artist_id}`} className="font-bold text-rvp-accent underline-offset-4 hover:underline">{title.artist}</Link>
         </p>
       ) : null}
       {(episode?.synopsis || title.synopsis) ? (
-        <p className="mt-4 max-w-3xl whitespace-pre-line text-sm leading-6 text-white/70">{episode?.synopsis || title.synopsis}</p>
+        <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-7 text-rvp-soft">{episode?.synopsis || title.synopsis}</p>
       ) : null}
     </PlayPage>
   );
@@ -394,9 +395,9 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
 function Notice({ title, text, children }: { title: string; text: string; children?: React.ReactNode }) {
   return (
-    <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-white/10 bg-[#0B1F21] px-6 py-8 text-center">
-      <h2 className="text-lg font-black text-white">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-white/70">{text}</p>
+    <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-rvp-line bg-rvp-surface px-6 py-8 text-center">
+      <h2 className="text-lg font-black text-rvp-text">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-rvp-soft">{text}</p>
       {children ? <div className="mt-5 flex flex-wrap justify-center gap-3">{children}</div> : null}
     </div>
   );

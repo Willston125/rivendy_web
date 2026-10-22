@@ -268,3 +268,264 @@ export function isDocumentary(genre: string | null | undefined): boolean {
   const g = (genre ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   return g.includes("documentaire") || g.includes("documentary");
 }
+
+// ── Refonte « salle de cinéma » (2026-10-22) ───────────────────────────────
+
+const https = (u: string | null | undefined): string | null => (u && u.startsWith("https://") ? u : null);
+const PLAY_IMAGE = /^(https:\/\/[^/]+)\/storage\/v1\/object\/public\/play-images\/([^?#]+)$/;
+
+/**
+ * Image du catalogue (bucket play-images) redimensionnée par Supabase, aux
+ * proportions d'origine. `resize=contain` est INDISPENSABLE : avec un seul
+ * côté et le mode par défaut (cover), Supabase garde la hauteur d'origine et
+ * RECADRE — 480 de large donnait 480×2048 pour une affiche de 1365×2048
+ * (constaté le 2026-10-22). Toute autre adresse est rendue telle quelle.
+ */
+export function playImage(url: string | null | undefined, width: number): string | null {
+  const u = https(url);
+  if (!u) return null;
+  const m = PLAY_IMAGE.exec(u);
+  if (!m) return u;
+  return `${m[1]}/storage/v1/render/image/public/play-images/${m[2]}?width=${Math.round(width)}&resize=contain&quality=70`;
+}
+
+/** `srcset` d'une image du catalogue ; undefined si l'adresse ne se redimensionne pas. */
+export function playSrcSet(url: string | null | undefined, widths: readonly number[]): string | undefined {
+  const u = https(url);
+  if (!u || !PLAY_IMAGE.test(u)) return undefined;
+  return widths.map((w) => `${playImage(u, w)} ${w}w`).join(", ");
+}
+
+/**
+ * Image paysage RÉELLE : le fond 16:9 posé au dashboard ; pour un clip, sa
+ * vignette publique. Jamais une affiche recadrée, jamais la vignette d'un
+ * film ou d'un épisode (vidéo signée : l'image demande un jeton).
+ */
+export function landscapeArt(t: Pick<PlayTitle, "kind" | "backdrop_url" | "thumbnail_url">): string | null {
+  return https(t.backdrop_url) ?? (kindOf(t.kind) === "clip" ? https(t.thumbnail_url) : null);
+}
+
+/** Affiche portrait 2:3. */
+export const posterArt = (t: Pick<PlayTitle, "poster_url">): string | null => https(t.poster_url);
+
+const newestFirst = (a: Pick<PlayTitle, "published_at">, b: Pick<PlayTitle, "published_at">) =>
+  (b.published_at ?? "").localeCompare(a.published_at ?? "");
+const featuredRank = (t: Pick<PlayTitle, "featured_rank">) =>
+  t.featured_rank == null ? Number.POSITIVE_INFINITY : Number(t.featured_rank);
+
+/** Mis à la une au dashboard d'abord (rang), puis du plus récent au plus ancien. */
+export function byFeaturedThenNewest(a: PlayTitle, b: PlayTitle): number {
+  const fa = featuredRank(a);
+  const fb = featuredRank(b);
+  if (fa !== fb) return fa < fb ? -1 : 1;
+  return newestFirst(a, b);
+}
+
+/** Publié depuis moins de `days` jours. */
+export function isRecent(t: Pick<PlayTitle, "published_at">, now: Date, days = 60): boolean {
+  if (!t.published_at) return false;
+  const at = Date.parse(t.published_at);
+  return Number.isFinite(at) && now.getTime() - at <= days * 86_400_000;
+}
+
+/**
+ * Bannière d'accueil : films et séries regardables qui ont une VRAIE image
+ * (fond ou affiche) — jamais un titre sans visuel. Une seule diapositive tant
+ * qu'un seul titre s'y prête : la sélection n'apparaît qu'à partir de deux.
+ */
+export function heroTitles(catalog: PlayTitle[], max = 5): PlayTitle[] {
+  return catalog
+    .filter((t) => isListable(t) && kindOf(t.kind) !== "clip" && !!(landscapeArt(t) || posterArt(t)))
+    .sort(byFeaturedThenNewest)
+    .slice(0, max);
+}
+
+/** Bandeau au-dessus du titre de la bannière : la raison de sa présence, rien d'inventé. */
+export function heroKicker(t: PlayTitle, now: Date): string {
+  const k = kindOf(t.kind);
+  if (t.featured_rank != null) return k === "serie" ? "La série à la une" : k === "clip" ? "Le clip à la une" : "Le film à la une";
+  if (isRecent(t, now)) return k === "serie" ? "Nouvelle série" : k === "clip" ? "Nouveau clip" : "Nouveau film";
+  return kindLabel(k);
+}
+
+/** « 2023 · Film · Action · 14 min » : seulement ce qui est renseigné. */
+export function metaParts(t: PlayTitle, episodes?: number): string[] {
+  const k = kindOf(t.kind);
+  const parts: string[] = [];
+  if (t.release_year) parts.push(String(t.release_year));
+  parts.push(kindLabel(k));
+  if (t.genre?.trim()) parts.push(t.genre.trim());
+  if (k === "serie") {
+    if (episodes) parts.push(`${episodes} épisode${episodes > 1 ? "s" : ""}`);
+  } else {
+    const d = durationLabel(t.duration_seconds);
+    if (d) parts.push(d);
+  }
+  return parts;
+}
+
+/** Lecture directe d'un film ou d'un clip (une série passe par un épisode). */
+export function watchHref(t: Pick<PlayTitle, "id" | "kind">): string | null {
+  const k = kindOf(t.kind);
+  if (k === "film") return `/play/watch/movie/${t.id}`;
+  if (k === "clip") return `/play/watch/clip/${t.id}`;
+  return null;
+}
+
+/** Reprise d'une position enregistrée : l'épisode, sinon le film. */
+export function resumeHref(p: Pick<WatchProgress, "title_id" | "episode_id">): string {
+  return p.episode_id ? `/play/watch/episode/${p.episode_id}` : `/play/watch/movie/${p.title_id}`;
+}
+
+/**
+ * « Continuer à regarder » : une VRAIE progression seulement (au moins 30 s,
+ * pas finie), une entrée par titre, la plus récente d'abord.
+ */
+export function resumeEntries(progress: WatchProgress[]): WatchProgress[] {
+  const seen = new Set<string>();
+  return [...progress]
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .filter((p) => {
+      if (seen.has(p.title_id)) return false;
+      seen.add(p.title_id);
+      return p.position_seconds >= 30 && !isFinished(p.position_seconds, p.duration_seconds);
+    });
+}
+
+/** « Reste 12 min ». */
+export function remainingLabel(position: number, duration: number): string {
+  const left = durationLabel(Math.max(0, duration - position));
+  return left ? `Reste ${left}` : "Presque fini";
+}
+
+/** Compteur d'une rangée : « 03 », « 12 ». */
+export const countLabel = (n: number) => String(Math.max(0, n)).padStart(2, "0");
+
+export type HomeRowLayout = "landscape" | "poster" | "ranked";
+export interface HomeRow {
+  id: string;
+  title: string;
+  titles: PlayTitle[];
+  layout: HomeRowLayout;
+  /** Page complète de la rubrique. */
+  href?: string;
+  /** Nombre de titres de la rubrique entière, quand la rangée n'en montre qu'une partie. */
+  total?: number;
+}
+
+/** En dessous : une seule rangée « À l'affiche », jamais les mêmes titres répétés. */
+export const SMALL_CATALOG = 8;
+
+/**
+ * Rangées de découverte de l'accueil (films et séries ; les clips ont leur
+ * rangée à part). Chaque titre n'apparaît qu'UNE fois : avant le 2026-10-22,
+ * les trois mêmes titres revenaient sous « Top 10 », « Nouveautés »,
+ * « Films » et « Séries ». Rangée vide = absente.
+ */
+export function homeRows(catalog: PlayTitle[], topIds: string[], now: Date): HomeRow[] {
+  const list = catalog.filter((t) => isListable(t) && kindOf(t.kind) !== "clip");
+  if (list.length === 0) return [];
+  const topRank = new Map(topIds.map((id, i) => [id, i]));
+  if (list.length <= SMALL_CATALOG) {
+    // À la une d'abord, puis les plus regardés de la semaine, puis les plus récents.
+    const ordered = [...list].sort((a, b) => {
+      const fa = featuredRank(a);
+      const fb = featuredRank(b);
+      if (fa !== fb) return fa < fb ? -1 : 1;
+      return (topRank.get(a.id) ?? 99) - (topRank.get(b.id) ?? 99) || newestFirst(a, b);
+    });
+    return [{ id: "affiche", title: "À l’affiche", titles: ordered, layout: "landscape" }];
+  }
+
+  const used = new Set<string>();
+  const rows: HomeRow[] = [];
+  const free = (ts: PlayTitle[]) => ts.filter((t) => !used.has(t.id));
+  const push = (row: HomeRow) => {
+    rows.push(row);
+    row.titles.forEach((t) => used.add(t.id));
+  };
+
+  const byId = new Map(list.map((t) => [t.id, t]));
+  const top = topIds.map((id) => byId.get(id)).filter((t): t is PlayTitle => !!t).slice(0, 10);
+  if (top.length >= 3) push({ id: "top", title: "Les plus regardés cette semaine", titles: top, layout: "ranked" });
+
+  const recent = free([...list].sort(newestFirst)).filter((t) => isRecent(t, now)).slice(0, 20);
+  if (recent.length >= 3) push({ id: "new", title: "Nouveautés", titles: recent, layout: "landscape" });
+
+  const byGenre = new Map<string, PlayTitle[]>();
+  for (const t of free(list)) {
+    const g = t.genre?.trim();
+    if (!g || isDocumentary(g)) continue;
+    byGenre.set(g, [...(byGenre.get(g) ?? []), t]);
+  }
+  [...byGenre.entries()]
+    .filter(([, ts]) => ts.length >= 4)
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "fr"))
+    .slice(0, 3)
+    .forEach(([g, ts]) => push({ id: `genre:${g}`, title: g, titles: [...ts].sort(newestFirst).slice(0, 20), layout: "landscape" }));
+
+  const docs = free(list).filter((t) => isDocumentary(t.genre)).sort(newestFirst);
+  if (docs.length >= 3) push({ id: "docs", title: "Documentaires", titles: docs.slice(0, 20), layout: "landscape" });
+
+  for (const [kind, title, href] of [["film", "Films", "/play/movies"], ["serie", "Séries", "/play/series"]] as const) {
+    const all = list.filter((t) => kindOf(t.kind) === kind);
+    const rest = free(all).sort(newestFirst).slice(0, 20);
+    if (rest.length) push({ id: kind, title, titles: rest, layout: "poster", href, total: all.length });
+  }
+  return rows;
+}
+
+/** Texte comparable : minuscules, sans accents (œ → oe, æ → ae). Miroir de `_fold` de l'app. */
+export function foldText(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/œ/g, "oe")
+    .replace(/æ/g, "ae")
+    .replace(/[’‘`]/g, "'")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Recherche Play, miroir de `searchTitles` de l'app : titre, genre ou
+ * artiste, avec ou sans accents ni majuscules ; titres regardables seulement.
+ * Requête vide : tout, du plus récent au plus ancien.
+ */
+export function searchTitles(titles: PlayTitle[], query: string): PlayTitle[] {
+  const q = foldText(query.trim());
+  const listable = titles.filter(isListable).sort(newestFirst);
+  if (!q) return listable;
+  return listable.filter((t) => foldText(t.title).includes(q) || foldText(t.genre ?? "").includes(q) || foldText(t.artist ?? "").includes(q));
+}
+
+/** Genres présents dans une liste, dans l'ordre alphabétique (puces de filtre). */
+export function genresOf(titles: Array<Pick<PlayTitle, "genre">>): string[] {
+  const seen = new Map<string, string>();
+  for (const t of titles) {
+    const g = t.genre?.trim();
+    if (g && !seen.has(foldText(g))) seen.set(foldText(g), g);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+// ── « Ma liste » demandée sans compte ──────────────────────────────────────
+
+export interface PendingListAdd { titleId: string; label: string; at: number }
+
+/** Durée de validité d'un ajout demandé avant la connexion. */
+export const PENDING_TTL_MS = 30 * 60 * 1000;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Ajout à « Ma liste » gardé le temps de la connexion : valide 30 min, un identifiant de titre et un libellé, rien d'autre. */
+export function parsePendingListAdd(raw: string | null | undefined, now: number): PendingListAdd | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { titleId?: unknown; label?: unknown; at?: unknown };
+    if (typeof v.titleId !== "string" || !UUID.test(v.titleId) || typeof v.at !== "number") return null;
+    if (now - v.at > PENDING_TTL_MS || v.at - now > 60_000) return null;
+    return { titleId: v.titleId.toLowerCase(), label: typeof v.label === "string" ? v.label.slice(0, 120) : "", at: v.at };
+  } catch {
+    return null;
+  }
+}

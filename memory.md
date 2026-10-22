@@ -185,4 +185,49 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 - Dev local avec une copie dont `node_modules` est une jonction : Turbopack
   refuse (« points out of the filesystem root ») → `next dev --webpack`.
 
-*Dernière mise à jour : 22 octobre 2026 (refonte Musique)*
+## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
+
+- **Couleurs** : jetons `--rvp-*` dans `app/site.css` (`:root` + `@theme inline`
+  → `bg-rvp-ground`, `text-rvp-accent`…). Fonds vert profond (#061110), blanc
+  cassé (#F3F5F2), accent = vert de la marque (`--rv-primary-light`). L'or
+  (`rvp-premium`) est RÉSERVÉ à Rivendy+, comme dans la Musique. Mêmes valeurs
+  dans l'app (`PlayColors`). Jamais de code couleur écrit dans un composant Play.
+- **Coque** : `app/play/layout.tsx` → `PlayShell` (en-tête sombre : logo →
+  marketplace, « PLAY » → accueil Play, Accueil · Films · Séries · Clips ·
+  Ma liste, recherche, notifications, compte ; onglets défilants sous 1024 px ;
+  pied de page Play). L'en-tête et le pied de page BLANCS de la marketplace
+  sont masqués sur /play par `HideInPlay` (`components/layout/hide-in-play.tsx`,
+  posé dans `app/layout.tsx`). Aucun prix ni lien d'achat dans la coque : les
+  pages `/play/short/…` sont ouvertes depuis l'app Android (règle Google Play).
+- **Images** : seulement les VRAIES images du titre. `playImage()` /
+  `playSrcSet()` (play-logic) redimensionnent par Supabase avec
+  `resize=contain` — voir CLAUDE.md §8. Fond paysage (« Image de fond 16:9 »
+  du dashboard, `backdrop_url`) → bannière plein cadre ; sinon l'affiche
+  ENTIÈRE, nette, sur son ambiance floutée (jamais recadrée en bandeau : la
+  bannière montrait le nez de « Mbayé Trambwé »). La vignette vidéo d'un film
+  ou d'un épisode n'est jamais prise pour un fond (vidéo signée = jeton).
+  `<picture>` + pixel vide : chaque format ne télécharge que son image.
+- **Accueil** : `homeRows()` — chaque titre UNE seule fois (les trois mêmes
+  titres revenaient sous Top 10, Nouveautés, Films et Séries) ; jusqu'à
+  8 titres, une seule rangée « À l'affiche » ; rangée vide = absente ;
+  « Continuer à regarder » seulement avec une vraie position (≥ 30 s, pas
+  finie), lien direct vers la reprise, bouton « retirer ». Bannière :
+  `heroTitles()` (à la une, puis les plus récents, toujours avec une image),
+  sélection MANUELLE (indicateurs, flèches, ← →), aucun défilement automatique.
+- **Ma liste** : `PlayListProvider` (`play-list.tsx`) lit `play_list` UNE fois
+  pour toutes les cartes ; sans compte, l'ajout est gardé 30 min
+  (sessionStorage, identifiant + libellé) et fait au retour de la connexion.
+  Le bouton « + » d'une carte est À CÔTÉ du lien (jamais dedans) : il ne lance
+  ni la fiche ni la lecture.
+- **Recherche** : dans le navigateur, sur le catalogue du marché
+  (`searchTitles`, miroir de l'app) : titre, genre, artiste, avec ou sans
+  accents. L'adresse suit la saisie (`history.replaceState`, sans recharger).
+- **Pannes** : `fetchCatalog` et `fetchMyList` LÈVENT une erreur → « Chargement
+  impossible » + « Réessayer », jamais un catalogue vide.
+- **Animations** : fondus `.rvp-fade-in` / `.rvp-rise-in` SANS `both` ni
+  délai — si l'animation ne tourne pas (onglet en arrière-plan, impression,
+  robot), le contenu reste visible. Coupées si l'on réduit les animations.
+- Non vérifié (pas de compte de test) : ajout réel à Ma liste, reprise après
+  connexion, « Continuer à regarder », lecture.
+
+*Dernière mise à jour : 22 octobre 2026 (refonte cinéma de Play)*

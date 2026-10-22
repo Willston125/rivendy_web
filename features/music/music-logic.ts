@@ -108,13 +108,17 @@ const THUMB_BUCKETS = new Set(["music-images", "play-images"]);
 /**
  * Vignette Supabase Storage (même règle que l'app) : seulement pour les
  * buckets music-images et play-images, en https. Sinon l'URL d'origine.
+ * `resize=contain` : avec la seule largeur et le mode par défaut (cover),
+ * Supabase garde la hauteur d'origine et RECADRE — une pochette carrée de
+ * 1329 px revenait en 320×1329 et s'affichait zoomée sur son centre
+ * (constaté en production le 2026-10-22).
  */
 export function thumbUrl(url: string | null | undefined, width: 160 | 320 | 480 | 720): string | null {
   if (!url || !url.startsWith("https://")) return url ?? null;
   const m = url.match(/^(https:\/\/[^/]+)\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
   if (!m || !THUMB_BUCKETS.has(m[2])) return url;
   const path = m[3].split("?")[0];
-  return `${m[1]}/storage/v1/render/image/public/${m[2]}/${path}?width=${width}&quality=70`;
+  return `${m[1]}/storage/v1/render/image/public/${m[2]}/${path}?width=${width}&resize=contain&quality=70`;
 }
 
 /** Mouvement dans le Rivendy Hit : « Nouveau », « ▲ 3 », « ▼ 2 », « = ». */

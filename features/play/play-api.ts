@@ -7,14 +7,24 @@ import { EPISODE_COLUMNS, TITLE_COLUMNS, type PlayEpisode, type PlayTitle, type 
  * enregistrée sur le site reprend dans l'app, et inversement.
  */
 
-/** Catalogue d'un marché (jointure sur play_title_countries, comme l'app). */
+/**
+ * Lecture qui LÈVE une erreur en cas de panne (refonte du 2026-10-22) : un
+ * catalogue injoignable s'affiche « Impossible de charger » avec
+ * « Réessayer », jamais comme un catalogue vide.
+ */
+function must<T>(res: { data: T | null; error: { message: string } | null }, empty: T): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data ?? empty;
+}
+
+/** Catalogue d'un marché (jointure sur play_title_countries, comme l'app). Lève en cas de panne. */
 export async function fetchCatalog(market: string | null, kind?: "film" | "serie" | "clip", limit = 300): Promise<PlayTitle[]> {
   if (!market) return [];
   let q = supabase.from("play_titles").select(`${TITLE_COLUMNS}, play_title_countries!inner(country_id)`)
     .eq("status", "published").eq("play_title_countries.country_id", market);
   q = kind ? q.eq("kind", kind) : q.neq("kind", "clip").neq("kind", "short");
-  const { data } = await q.order("published_at", { ascending: false }).limit(limit);
-  return (data ?? []) as unknown as PlayTitle[];
+  const res = await q.order("published_at", { ascending: false }).limit(limit);
+  return must(res, []) as unknown as PlayTitle[];
 }
 
 export async function fetchTitlesByIds(ids: string[]): Promise<PlayTitle[]> {
@@ -49,14 +59,16 @@ export async function fetchSubtitles(titleId: string, episodeId: string | null):
   return ((data ?? []) as Array<{ lang: string; url: string }>).filter((s) => s.url.startsWith("https://"));
 }
 
-export async function searchTitles(market: string | null, query: string): Promise<PlayTitle[]> {
-  const q = query.trim().replace(/[%,()*\\]/g, " ").slice(0, 60);
-  if (!market || q.length < 2) return [];
-  const { data } = await supabase.from("play_titles").select(`${TITLE_COLUMNS}, play_title_countries!inner(country_id)`)
-    .eq("status", "published").eq("play_title_countries.country_id", market).neq("kind", "short")
-    .or(`title.ilike.%${q}%,genre.ilike.%${q}%,artist.ilike.%${q}%`).order("published_at", { ascending: false }).limit(60);
-  return (data ?? []) as unknown as PlayTitle[];
+/** Saison et numéro des épisodes en cours (« Continuer à regarder »). */
+export async function fetchEpisodesByIds(ids: string[]): Promise<PlayEpisode[]> {
+  if (ids.length === 0) return [];
+  const { data } = await supabase.from("play_episodes").select(EPISODE_COLUMNS).eq("status", "published").in("id", ids);
+  return (data ?? []) as unknown as PlayEpisode[];
 }
+
+// La recherche se fait dans le navigateur, sur le catalogue du marché
+// (`searchTitles` de play-logic, comme l'app) : `ilike` ne retrouvait pas
+// « Mbayé » en tapant « mbaye ».
 
 // ── Compte : progression, Ma liste, historique ─────────────────────────────
 
@@ -87,10 +99,11 @@ export async function forgetProgress(titleId: string): Promise<boolean> {
   return !error;
 }
 
+/** « Ma liste » du compte, la plus récente d'abord. Lève en cas de panne. */
 export async function fetchMyList(): Promise<string[]> {
   if (!(await uid())) return [];
-  const { data } = await supabase.from("play_list").select("title_id").order("created_at", { ascending: false });
-  return ((data ?? []) as Array<{ title_id: string }>).map((r) => r.title_id);
+  const res = await supabase.from("play_list").select("title_id").order("created_at", { ascending: false });
+  return (must(res, []) as Array<{ title_id: string }>).map((r) => r.title_id);
 }
 
 export async function setInMyList(titleId: string, on: boolean): Promise<boolean> {

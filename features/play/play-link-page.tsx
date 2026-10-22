@@ -39,10 +39,10 @@ export type PlayLinkContent = {
 
 export function PlayLinkPage({ path, content }: { path: string; content: PlayLinkContent | null }) {
   return (
-    <div className="min-h-[80vh] bg-[#071719] px-4 py-10 text-slate-100">
+    <div className="min-h-[70vh] px-4 py-10 text-rvp-text sm:px-6 lg:py-16">
       <div className="mx-auto flex max-w-3xl flex-col items-center gap-8 md:flex-row md:items-start">
         <div
-          className={`relative w-full shrink-0 overflow-hidden rounded-2xl bg-black ${
+          className={`relative w-full shrink-0 overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${
             content?.vertical ? "aspect-[9/16] max-w-[300px]" : "aspect-[2/3] max-w-[280px]"
           }`}
         >
@@ -55,23 +55,23 @@ export function PlayLinkPage({ path, content }: { path: string; content: PlayLin
             <img src={content.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <Clapperboard className="h-14 w-14 text-[#5EEAD4]" />
+              <Clapperboard className="h-14 w-14 text-rvp-accent" aria-hidden />
             </div>
           )}
         </div>
 
         <div className="flex w-full flex-col items-center text-center md:items-start md:text-left">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#5EEAD4]">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-rvp-accent">
             {content ? content.kicker : "Rivendy Play"}
           </p>
-          <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">
+          <h1 className="mt-2 text-3xl font-black leading-tight text-rvp-text md:text-4xl">
             {content ? content.title : "Cette vidéo n’est plus disponible"}
           </h1>
-          {content?.subtitle ? <p className="mt-2 text-sm font-semibold text-slate-300">{content.subtitle}</p> : null}
+          {content?.subtitle ? <p className="mt-2 text-sm font-semibold text-rvp-soft">{content.subtitle}</p> : null}
           {content?.description ? (
-            <p className="mt-4 line-clamp-6 whitespace-pre-line text-sm leading-6 text-slate-300">{content.description}</p>
+            <p className="mt-4 line-clamp-6 whitespace-pre-line text-sm leading-6 text-rvp-soft">{content.description}</p>
           ) : null}
-          <p className="mt-6 text-sm text-slate-400">
+          <p className="mt-6 text-sm text-rvp-muted">
             {content
               ? "Regardez-la en entier, commentez et suivez ses créateurs dans l’application Rivendy."
               : "Découvrez les films, séries, clips et Shorts de Rivendy Play dans l’application Rivendy."}
@@ -80,23 +80,23 @@ export function PlayLinkPage({ path, content }: { path: string; content: PlayLin
           <div className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <a
               href={PLAY_STORE_URL}
-              className="flex h-12 items-center justify-center gap-2 rounded-full bg-[#00BFA5] px-6 text-sm font-black text-[#071719] transition hover:bg-[#5EEAD4]"
+              className="flex h-12 items-center justify-center gap-2 rounded-lg bg-rvp-accent px-6 text-sm font-bold text-rvp-on-accent transition-colors hover:bg-rvp-accent-hover"
             >
               <Download className="h-4 w-4" />
               Télécharger Rivendy
             </a>
             <a
               href={appIntentUrl(path)}
-              className="flex h-12 items-center justify-center gap-2 rounded-full border border-white/20 px-6 text-sm font-bold text-white transition hover:bg-white/10"
+              className="flex h-12 items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 text-sm font-semibold text-rvp-text transition-colors hover:bg-white/15"
             >
               <Smartphone className="h-4 w-4" />
               J’ai déjà l’application
             </a>
           </div>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-rvp-muted">
             Application Android gratuite. Déjà installée ? Mettez-la à jour pour ouvrir ce lien directement.
           </p>
-          <Link href="/" className="mt-8 text-sm font-semibold text-[#5EEAD4] underline-offset-4 hover:underline">
+          <Link href="/" className="mt-8 text-sm font-semibold text-rvp-accent underline-offset-4 hover:underline">
             Voir la marketplace Rivendy
           </Link>
         </div>
