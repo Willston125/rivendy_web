@@ -163,10 +163,8 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   sur fond sombre), appuyé = `--rv-primary` (#009688). L'or (`rvm-premium`) est
   RÉSERVÉ à la marque Premium. Jamais de code couleur écrit dans un composant
   Musique. Mêmes valeurs dans l'app (`MusiqueColors`).
-- **Coque** : `app/music/layout.tsx` et `app/artist/layout.tsx` → `MusicShell`
-  (barre latérale sous l'en-tête global, onglets défilants sous 1024 px). La
-  hauteur de l'en-tête global est MESURÉE (`--rvm-top`) : il fait 64 px en une
-  ligne, 114 px en deux lignes, et il apparaît après coup (Suspense).
+- **Coque** : remplacée le même jour par la mise en page « application »
+  (section suivante) ; l'ancienne barre latérale et `--rvm-top` n'existent plus.
 - **Lecteur** : toujours UN `<audio>` (`music-player-provider.tsx`). La position
   vit dans un contexte à part (`useMusicProgress`) : les listes ne se
   redessinent plus 4 fois par seconde. `playAt`, `toggleMute`, volume gardé
@@ -194,7 +192,40 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   sorties, « N° 1 du Rivendy Hit » seulement s'il l'est (`heroHitBadge`).
   Fin de page Musique sombre et compacte (`MusicFooter` ; le grand pied de
   page est masqué par `HideInMusic`). Hauteur du lecteur publiée dans
-  `--rvm-player-h` (barre latérale, file d'attente).
+  `--rvm-player-h` (lecteur flottant des autres pages, file d'attente).
+- **Mise en page « application » (même jour, branche `feat/musique-app`)**,
+  d'après une vidéo de référence du propriétaire :
+  - **Une seule coque** : route group `app/(musique)/layout.tsx` → `MusicShell`
+    pour `/music/*` ET `/artist/*` (URL inchangées). Deux layouts séparés
+    remontaient toute la coque à chaque passage artiste ↔ musique.
+  - **Plein écran** : la page ne défile pas (`html` en `overflow:hidden`) ;
+    barre du haut (logo → marketplace, accueil, recherche qui pilote
+    `/music/explore?q=`), bibliothèque à gauche (`music-library-panel.tsx`),
+    panneau central `#rvm-center` (`@container` : les pages se règlent sur SA
+    largeur, pas sur la fenêtre), « En cours de lecture » à droite
+    (`music-now-playing.tsx`), lecteur en bas (`MusicPlayerBar`). L'en-tête,
+    le pied de page et la bannière de la marketplace sont masqués (`HideInMusic`).
+  - **Disposition** (`music-layout.tsx`, localStorage `rivendy_music_layout_v1`) :
+    largeurs bornées, le centre garde 420 px (`fitPanels`) ; ≥ 1280 px panneau
+    droit dans la page, en dessous en tiroir ; < 768 px bibliothèque dans la
+    navigation du bas, mini-lecteur au-dessus. PIÈGE : n'enregistrer que sur un
+    geste (`patch`) — un effet d'enregistrement au montage réécrivait les
+    valeurs par défaut (effets doublés en dev) et rouvrait le panneau droit.
+  - **Bibliothèque** : `fetchLibraryOverview` (une passe : favoris, playlists et
+    leurs pochettes, albums, artistes suivis, dernières écoutes) → entrées
+    (`libraryEntries`) ; tri/filtre/recherche purs dans `music-logic.ts`.
+  - **Collections** (`music-collection.tsx`) : en-tête teinté par la pochette
+    (`useCoverTint`, vignette lue en canevas — le stockage répond
+    `Access-Control-Allow-Origin: *`), sinon vert dérivé de Rivendy ; barre
+    compacte au défilement par écouteur `scroll` (un IntersectionObserver rate
+    les sauts d'un coup).
+  - **Lecteur** : `source` (sélection d'où part la lecture, gardée avec la
+    file), aléatoire au lancement, `clearUpcoming` ; une pause pendant un
+    chargement arrête la roue.
+  - Vérifié avec un banc d'essai LOCAL (sons WAV, bibliothèque simulée,
+    retirés avant commit) : vidéo et captures dans
+    `rivendy-docs/docs/musique-refonte/mise-en-page-app/`. Avec un vrai compte :
+    à essayer par le propriétaire.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 
