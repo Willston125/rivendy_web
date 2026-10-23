@@ -64,9 +64,12 @@ export function AppDownloadBanner() {
       <>
       {/* Rivendy Play : place réservée en bas de page seulement quand le
           bandeau est là (son pied de page n'a plus de marge fixe, 2026-10-22).
-          Le pied de page de la marketplace garde la sienne. */}
+          Le pied de page de la marketplace garde la sienne. Depuis le
+          2026-10-23, Play a une navigation basse : le bandeau se pose
+          au-dessus d'elle, sans la cacher. */}
       {playPage ? <div aria-hidden className="h-[72px] md:hidden" /> : null}
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] md:hidden">
+      <div className={`fixed inset-x-0 z-50 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] md:hidden ${
+        playPage ? "bottom-[calc(4rem+env(safe-area-inset-bottom))]" : "bottom-0"}`}>
         <div className="flex items-center gap-3">
           {AppIcon}
           <div className="min-w-0 flex-1">

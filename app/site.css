@@ -67,6 +67,18 @@
   --rvp-accent-pressed: var(--rv-primary);
   --rvp-on-accent:      #03201C;
   --rvp-premium:        #F5B83D;
+
+  /* Coque « application » de Play (2026-10-23, maquette du propriétaire) :
+     une fenêtre vert profond posée sur --rvp-ground, menu latéral, cartes.
+     Teintes relevées sur la maquette ; l'accent reste le vert de la marque.
+     Contrastes : --rvp-muted 7:1 sur --rvp-frame, 6,5:1 sur --rvp-card ;
+     --rvp-sage 6,9:1 sur --rvp-frame. */
+  --rvp-frame:          #0A1B16;  /* fenêtre, panneau central           */
+  --rvp-side:           #0C211A;  /* menu latéral (haut du dégradé)     */
+  --rvp-card:           #0D221B;  /* bannière, panneau droit, vignettes */
+  --rvp-edge:           #17302A;  /* bordures de la fenêtre et des cartes */
+  --rvp-deep:           #05170F;  /* côté texte de la bannière, pied des vignettes */
+  --rvp-sage:           #7FAA95;  /* seconde moitié d'un titre          */
 }
 
 /* Jetons Tailwind de la Musique (bg-rvm-accent, text-rvm-muted…) : le SEUL
@@ -101,6 +113,12 @@
   --color-rvp-accent-pressed: var(--rvp-accent-pressed);
   --color-rvp-on-accent: var(--rvp-on-accent);
   --color-rvp-premium: var(--rvp-premium);
+  --color-rvp-frame: var(--rvp-frame);
+  --color-rvp-side: var(--rvp-side);
+  --color-rvp-card: var(--rvp-card);
+  --color-rvp-edge: var(--rvp-edge);
+  --color-rvp-deep: var(--rvp-deep);
+  --color-rvp-sage: var(--rvp-sage);
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -245,4 +263,31 @@ button, input, select, textarea {
 html[data-world="play"],
 html[data-world="play"] body {
   background: var(--rvp-ground);
+}
+
+/* Coque « application » de Play (2026-10-23) : sur grand écran, la fenêtre
+   ne défile pas, seul le panneau central défile (#rvp-main) ; le menu
+   latéral et la barre du haut restent en place. Téléphone et tablette
+   gardent le défilement de la page (barre d'adresse, geste de retour). */
+@media (min-width: 1024px) {
+  html[data-world="play"] { overflow: hidden; }
+  /* Hauteur de la fenêtre : 100vh d'abord pour un navigateur qui ignore dvh
+     (sinon la coque grandirait avec la page, qui ne défile plus). */
+  html[data-world="play"] .rvp-scope { height: 100vh; height: 100dvh; }
+}
+
+/* Boutons et champs de Play : la règle globale « button { font: inherit } »
+   (ci-dessus, hors couche) l'emportait sur les classes de taille et de
+   graisse (text-[13px], font-semibold…) — un bouton prenait la taille de
+   son parent. Ici, retour aux valeurs des couches Tailwind ; sans classe,
+   la couche de base hérite toujours de la police. */
+.rvp-scope :is(button, input, select, textarea) {
+  font: revert-layer;
+}
+
+/* Hauteur de la bannière (accueil et fiches) sur grand format : à 1366 × 768,
+   la bannière, le panneau de droite et le haut du catalogue tiennent dans le
+   premier écran. */
+.rvp-scope {
+  --rvp-hero: clamp(320px, calc(100dvh - 430px), 400px);
 }

@@ -8,7 +8,8 @@ import {
   pickRendition, withBandwidthHint, playbackErrorMessage, isDocumentary, cover, wideImage, hasTrailer, isArtistClip,
   playImage, playSrcSet, landscapeArt, posterArt, heroTitles, heroKicker, metaParts, watchHref, resumeHref,
   resumeEntries, remainingLabel, countLabel, homeRows, SMALL_CATALOG, foldText, searchTitles, genresOf,
-  parsePendingListAdd, PENDING_TTL_MS, isRecent,
+  parsePendingListAdd, PENDING_TTL_MS, isRecent, sectionLabel, heroBadge, tileKicker, tileMeta, panelMeta,
+  kindFilters, byKindFilter, suggestionsFor, talentsTarget, initialsOf, firstNameOf, searchHref,
 } from "./play-logic.ts";
 
 const ep = (id, season, n, extra = {}) => ({ id, title_id: "s", season, episode_number: n, title: id, video_status: "ready", ...extra });
@@ -245,4 +246,89 @@ test("« Ma liste » demandée sans compte : 30 minutes, un identifiant valide",
   assert.equal(parsePendingListAdd(JSON.stringify({ titleId: "pas-un-uuid", at }), at), null);
   assert.equal(parsePendingListAdd("{", at), null);
   assert.equal(parsePendingListAdd(null, at), null);
+});
+
+// ── Coque « application » (2026-10-23) ─────────────────────────────────────
+
+test("barre du haut : la rubrique d'après l'adresse", () => {
+  assert.equal(sectionLabel("/play"), "Découvrir");
+  assert.equal(sectionLabel(null), "Découvrir");
+  assert.equal(sectionLabel("/play/movies"), "Films");
+  assert.equal(sectionLabel("/play/movie/abc"), "Films");
+  assert.equal(sectionLabel("/play/series"), "Séries");
+  assert.equal(sectionLabel("/play/episode/abc"), "Séries");
+  assert.equal(sectionLabel("/play/clips"), "Clips");
+  assert.equal(sectionLabel("/play/clip/abc"), "Clips");
+  assert.equal(sectionLabel("/play/my-list"), "Ma liste");
+  assert.equal(sectionLabel("/play/history"), "Récents");
+  assert.equal(sectionLabel("/play/search"), "Recherche");
+  assert.equal(sectionLabel("/play/watch/movie/abc"), "Lecture");
+  assert.equal(sectionLabel("/play/autre"), "Rivendy Play");
+});
+
+test("bannière : pastille vraie (à la une, nouveau, sinon le type)", () => {
+  assert.equal(heroBadge(t("a", { featured_rank: 1 }), NOW), "À la une");
+  assert.equal(heroBadge(t("b", { published_at: "2026-10-20T00:00:00Z" }), NOW), "Nouveau film");
+  assert.equal(heroBadge(t("c", { kind: "serie", published_at: "2026-10-20T00:00:00Z" }), NOW), "Nouvelle série");
+  assert.equal(heroBadge(t("d", { published_at: "2025-01-01T00:00:00Z" }), NOW), "Film");
+  assert.equal(heroBadge(t("e", { kind: "serie", published_at: null }), NOW), "Série");
+});
+
+test("vignettes et panneau : seulement ce qui est renseigné", () => {
+  const mbaye = t("m", { genre: "Action", release_year: 2023, duration_seconds: 840 });
+  const code = t("c", { duration_seconds: 480 });
+  const boussole = t("b", { kind: "serie", genre: "Drame", release_year: 2025, duration_seconds: 3000 });
+  const clip = t("k", { kind: "clip", artist: "Nawal", genre: "Twarab", duration_seconds: 200 });
+  assert.equal(tileKicker(mbaye), "Film · Action");
+  assert.equal(tileKicker(code), "Film");
+  assert.equal(tileKicker(boussole), "Série · Drame");
+  assert.equal(tileKicker(clip), "Clip · Nawal");
+  assert.equal(tileMeta(mbaye), "2023 · 14 min");
+  assert.equal(tileMeta(code), "8 min");
+  assert.equal(tileMeta(boussole), "2025");
+  assert.equal(tileMeta(boussole, 7), "2025 · 7 épisodes");
+  assert.equal(tileMeta(t("z")), "");
+  assert.equal(panelMeta(mbaye), "Film · 14 min");
+  assert.equal(panelMeta(code), "Film · 8 min");
+  assert.equal(panelMeta(boussole), "Série · Drame");
+  assert.equal(panelMeta(t("g", { genre: "Comédie" })), "Film · Comédie");
+});
+
+test("filtres Tout / Films / Séries : seulement les types présents", () => {
+  const list = [t("f1"), t("s1", { kind: "serie" }), t("f2")];
+  assert.deepEqual(kindFilters(list), ["all", "film", "serie"]);
+  assert.deepEqual(kindFilters([t("f1"), t("f2")]), []);
+  assert.deepEqual(kindFilters([]), []);
+  assert.deepEqual(byKindFilter(list, "serie").map((x) => x.id), ["s1"]);
+  assert.deepEqual(byKindFilter(list, "film").map((x) => x.id), ["f1", "f2"]);
+  assert.equal(byKindFilter(list, "all").length, 3);
+});
+
+test("panneau de droite : suggestions hors de Ma liste, à la une d'abord", () => {
+  const list = [
+    t("code", { published_at: "2026-10-05T00:00:00Z" }),
+    t("boussole", { kind: "serie", video_status: null, published_at: "2026-10-12T00:00:00Z" }),
+    t("mbaye", { featured_rank: 1, published_at: "2026-10-08T00:00:00Z" }),
+    t("brouillon", { video_status: "processing" }),
+    t("clip", { kind: "clip" }),
+  ];
+  assert.deepEqual(suggestionsFor(list, []).map((x) => x.id), ["mbaye", "boussole", "code"]);
+  assert.deepEqual(suggestionsFor(list, ["mbaye"]).map((x) => x.id), ["boussole", "code"]);
+  assert.deepEqual(suggestionsFor(list, ["mbaye", "code", "boussole"]), []);
+  assert.equal(suggestionsFor(list, [], 2).length, 2);
+});
+
+test("carte des talents, compte et recherche", () => {
+  assert.deepEqual(talentsTarget(2), { href: "/play/clips", label: "Explorer les Clips" });
+  assert.deepEqual(talentsTarget(0), { href: "/music/artists", label: "Découvrir les artistes" });
+  assert.equal(initialsOf("William Ali"), "WA");
+  assert.equal(initialsOf("  élodie  "), "É");
+  assert.equal(initialsOf("Assad Mohamed Ali"), "AM");
+  assert.equal(initialsOf(""), "R");
+  assert.equal(initialsOf(null), "R");
+  assert.equal(firstNameOf("William Ali"), "William");
+  assert.equal(firstNameOf("   "), null);
+  assert.equal(searchHref("  Mbayé "), "/play/search?q=Mbay%C3%A9");
+  assert.equal(searchHref(""), "/play/search");
+  assert.equal(searchHref("x".repeat(80)).length, "/play/search?q=".length + 60);
 });

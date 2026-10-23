@@ -395,7 +395,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
 function Notice({ title, text, children }: { title: string; text: string; children?: React.ReactNode }) {
   return (
-    <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-rvp-line bg-rvp-surface px-6 py-8 text-center">
+    <div className="mx-auto mt-6 max-w-xl rounded-[24px] border border-rvp-edge bg-rvp-card/80 px-6 py-8 text-center">
       <h2 className="text-lg font-black text-rvp-text">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-rvp-soft">{text}</p>
       {children ? <div className="mt-5 flex flex-wrap justify-center gap-3">{children}</div> : null}

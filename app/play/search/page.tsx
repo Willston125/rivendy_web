@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { SearchView } from "@/features/play/play-views";
 
-type Props = { searchParams: Promise<{ q?: string }> };
-
 export const metadata: Metadata = { title: "Recherche — Rivendy Play", robots: { index: false, follow: true } };
 
-export default async function PlaySearchPage({ searchParams }: Props) {
-  const { q } = await searchParams;
-  return <SearchView initial={(q ?? "").slice(0, 60)} />;
+/**
+ * La saisie vit dans la coque (barre du haut et page partagent la même) :
+ * elle est reprise de l'adresse (?q=…) à l'arrivée, puis l'adresse la suit
+ * sans recharger la page.
+ */
+export default function PlaySearchPage() {
+  return <SearchView />;
 }

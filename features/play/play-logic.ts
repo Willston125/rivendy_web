@@ -514,6 +514,110 @@ export function genresOf(titles: Array<Pick<PlayTitle, "genre">>): string[] {
   return [...seen.values()].sort((a, b) => a.localeCompare(b, "fr"));
 }
 
+// ── Coque « application » (2026-10-23) ─────────────────────────────────────
+
+/** Rubrique rappelée dans la barre du haut, d'après l'adresse. */
+export function sectionLabel(pathname: string | null | undefined): string {
+  const p = pathname || "/play";
+  if (p === "/play") return "Découvrir";
+  if (p.startsWith("/play/movie")) return "Films";
+  if (p.startsWith("/play/series") || p.startsWith("/play/episode")) return "Séries";
+  if (p.startsWith("/play/clip")) return "Clips";
+  if (p.startsWith("/play/my-list")) return "Ma liste";
+  if (p.startsWith("/play/history")) return "Récents";
+  if (p.startsWith("/play/search")) return "Recherche";
+  if (p.startsWith("/play/watch")) return "Lecture";
+  if (p.startsWith("/play/short")) return "Short";
+  return "Rivendy Play";
+}
+
+/** Pastille de la bannière : la raison RÉELLE de la présence du titre (mis à la une, nouveau, sinon son type). */
+export function heroBadge(t: PlayTitle, now: Date): string {
+  const k = kindOf(t.kind);
+  if (t.featured_rank != null) return "À la une";
+  if (isRecent(t, now)) return k === "serie" ? "Nouvelle série" : k === "clip" ? "Nouveau clip" : "Nouveau film";
+  return kindLabel(k);
+}
+
+/** Au-dessus du titre d'une vignette : « Film · Action », « Série · Drame », « Clip · l'artiste ». */
+export function tileKicker(t: PlayTitle): string {
+  const k = kindOf(t.kind);
+  const second = k === "clip" ? t.artist?.trim() : t.genre?.trim();
+  return [kindLabel(k), second].filter(Boolean).join(" · ");
+}
+
+/** Sous le titre d'une vignette : « 2023 · 14 min » (film, clip), « 2025 · 7 épisodes » (série) — seulement ce qui est renseigné. */
+export function tileMeta(t: PlayTitle, episodes?: number): string {
+  const k = kindOf(t.kind);
+  const parts: string[] = [];
+  if (t.release_year) parts.push(String(t.release_year));
+  if (k === "serie") {
+    if (episodes) parts.push(`${episodes} épisode${episodes > 1 ? "s" : ""}`);
+  } else {
+    const d = durationLabel(t.duration_seconds);
+    if (d) parts.push(d);
+  }
+  return parts.join(" · ");
+}
+
+/** Panneau de droite : « Film · 14 min », « Série · Drame » (la durée d'un film ou d'un clip, sinon le genre). */
+export function panelMeta(t: PlayTitle): string {
+  const k = kindOf(t.kind);
+  const second = (k !== "serie" ? durationLabel(t.duration_seconds) : "") || t.genre?.trim();
+  return [kindLabel(k), second].filter(Boolean).join(" · ");
+}
+
+export type KindFilter = "all" | "film" | "serie";
+
+/** Filtres utiles d'une sélection : « Tout » et chaque type présent — rien s'il n'y a qu'un type. */
+export function kindFilters(titles: Array<Pick<PlayTitle, "kind">>): KindFilter[] {
+  const present = (["film", "serie"] as const).filter((k) => titles.some((t) => kindOf(t.kind) === k));
+  return present.length > 1 ? ["all", ...present] : [];
+}
+
+export function byKindFilter<T extends Pick<PlayTitle, "kind">>(titles: T[], f: KindFilter): T[] {
+  return f === "all" ? titles : titles.filter((t) => kindOf(t.kind) === f);
+}
+
+/**
+ * Suggestions du panneau de droite (quand le compte n'a encore rien dans Ma
+ * liste, ou pour un visiteur) : des titres regardables du catalogue, jamais
+ * un titre déjà dans la liste — à la une d'abord, puis les plus récents.
+ */
+export function suggestionsFor(catalog: PlayTitle[], listIds: readonly string[], max = 3): PlayTitle[] {
+  const mine = new Set(listIds);
+  return catalog
+    .filter((t) => isListable(t) && kindOf(t.kind) !== "clip" && !mine.has(t.id))
+    .sort(byFeaturedThenNewest)
+    .slice(0, max);
+}
+
+/** Carte « L'espace des talents » : les clips s'il y en a, sinon les artistes de Rivendy Musique (jamais une rubrique vide). */
+export function talentsTarget(clipCount: number): { href: string; label: string } {
+  return clipCount > 0
+    ? { href: "/play/clips", label: "Explorer les Clips" }
+    : { href: "/music/artists", label: "Découvrir les artistes" };
+}
+
+/** Initiales du compte (« William Ali » → « WA ») ; « R » à défaut de nom. */
+export function initialsOf(name: string | null | undefined): string {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  const letters = words.slice(0, 2).map((w) => Array.from(w)[0] ?? "").join("").toLocaleUpperCase("fr");
+  return letters || "R";
+}
+
+/** Prénom affiché dans la barre du haut (le premier mot du nom). */
+export function firstNameOf(name: string | null | undefined): string | null {
+  const w = (name ?? "").trim().split(/\s+/)[0];
+  return w ? Array.from(w).slice(0, 18).join("") : null;
+}
+
+/** Adresse de la recherche Play pour une saisie (60 caractères au plus). */
+export function searchHref(q: string): string {
+  const v = q.trim().slice(0, 60);
+  return v ? `/play/search?q=${encodeURIComponent(v)}` : "/play/search";
+}
+
 // ── « Ma liste » demandée sans compte ──────────────────────────────────────
 
 export interface PendingListAdd { titleId: string; label: string; at: number }

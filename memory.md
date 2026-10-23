@@ -320,4 +320,58 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   démarre. (La durée du mini-lecteur pour une file restaurée est traitée par
   les finitions Musique du même jour, `playerDuration`.)
 
-*Dernière mise à jour : 22 octobre 2026 (affinage de la refonte cinéma de Play)*
+## Mise en page « application » de Play du 2026-10-23 (branche `feat/play-application`)
+
+D'après la maquette du propriétaire (capture `rivendy-play-dashboard-20261023.jpg` ; la
+maquette en ligne demande une connexion ChatGPT) : une fenêtre vert profond avec menu
+latéral, barre du haut, bannière en carte, panneau de droite et catalogue en vignettes.
+
+- **Coque** (`play-shell.tsx`) : menu Découvrir · Films · Séries · Clips, puis Ma liste
+  (nombre de titres du compte) · Récents (/play/history) ; barre du haut : rubrique,
+  recherche (Ctrl K / ⌘ K), notifications, compte « Mon espace » (raccourcis, marketplace,
+  Musique, déconnexion ; Échap referme) ; fenêtre « À propos de Play » (`<dialog>`
+  natif). ≥ 1024 px : la fenêtre ne défile pas (`html[data-world=play]` + hauteur
+  100vh puis 100dvh, site.css), seul `#rvp-main` défile. Menu en icônes de 1024 à
+  1279 px, complet ensuite ; signature « Nos histoires. Votre écran. » seulement si
+  la hauteur d'écran ≥ 861 px. < 1024 px : barre compacte, navigation basse à cinq
+  destinations, défilement normal ; le bandeau d'application du site se pose
+  au-dessus de la navigation basse sur /play.
+- **PIÈGE `#rvp-main` doit rester `relative`** : sinon les éléments positionnés des
+  pages (textes `sr-only` compris) prenaient la fenêtre pour repère et allongeaient
+  le document (≈ 170 px) alors que la page ne défile pas.
+- **PIÈGE `button, input, select, textarea { font: inherit }`** (règle globale HORS
+  couche de site.css) : elle l'emporte sur toute classe Tailwind de taille ou de
+  graisse posée sur un bouton ou un champ (`text-[13px]`, `font-semibold`… : le
+  bouton prenait la police de son parent). Neutralisée dans Play seulement :
+  `.rvp-scope :is(button, input, select, textarea) { font: revert-layer; }`. La
+  marketplace et la Musique gardent l'ancien comportement (à examiner à part).
+- **Recherche** (`play-search.tsx`) : UNE saisie partagée par la barre du haut et la
+  page (téléphone) ; depuis une autre page, la barre ouvre /play/search dès deux
+  lettres en gardant le focus ; l'adresse suit par `history.replaceState` (pas
+  d'aller-retour serveur qui ferait perdre des lettres tapées entre-temps).
+- **Bannière** (`play-hero.tsx`, `SceneCard`, aussi pour les fiches) : carte réglée
+  sur SA largeur (`@container`, texte à côté de l'image dès 576 px). Fond paysage
+  (`backdrop_url`) → plein cadre à droite, le rendu de la maquette ; sans fond (cas
+  des titres actuels) → l'affiche officielle entière sur son ambiance floutée, même
+  adresse d'image (un seul téléchargement). Le visuel paysage de la maquette était
+  une image générée (son README) : jamais repris. Pastille `heroBadge` (À la une,
+  Nouveau film, sinon le type). Flèches, indicateurs, ← →, glissement du doigt.
+- **Panneau de droite** : les favoris du compte (trois premiers de Ma liste) s'il y
+  en a ; sinon « À découvrir — Des suggestions à ajouter à votre liste »
+  (`suggestionsFor` : jamais un titre déjà dans la liste). Sous la bannière quand la
+  place manque.
+- **Catalogue** : vignettes `TitleTile` (11:10, affiche cadrée sur son haut, genre,
+  titre et durée posés dessus) ; « À l'affiche » filtrable Tout / Films / Séries
+  (`kindFilters`, seulement si les deux types existent) ; carte « L'espace des
+  talents » → Clips s'il y en a, sinon les artistes de Rivendy Musique
+  (`talentsTarget`). « Continuer à regarder » inchangé sur le fond : une VRAIE
+  position seulement.
+- Couleurs nouvelles : `--rvp-frame`, `--rvp-side`, `--rvp-card`, `--rvp-edge`,
+  `--rvp-deep`, `--rvp-sage` (relevées sur la maquette) ; l'accent reste le vert de
+  la marque (`--rv-primary-light`), pas le vert menthe de la maquette.
+- Vérifié localement : visiteur de 390 à 1920 px (aucun débordement, aucune erreur
+  console), compte SIMULÉ dans le navigateur (session factice, lectures du compte
+  servies localement, écritures interceptées, rien envoyé au serveur), clavier,
+  pannes simulées. Avec un vrai compte : à essayer par le propriétaire.
+
+*Dernière mise à jour : 23 octobre 2026 (mise en page « application » de Play)*
