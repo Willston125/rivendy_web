@@ -304,7 +304,8 @@ export function PlayAllButton({ items, label = "Écouter", className, source, va
   const player = useMusicPlayer();
   const playable = items.filter((x) => isPlayable(x.track));
   const curId = player.current?.track.id;
-  const isThis = !!curId && items.some((x) => x.track.id === curId);
+  // « Cette liste joue » : la même sélection (une autre qui contient le titre ne compte pas).
+  const isThis = !!curId && (source?.href ? player.source?.href === source.href : items.some((x) => x.track.id === curId));
   const onClick = () => (isThis ? player.toggle() : player.playQueue(items, 0, { source }));
   if (variant === "round") {
     return (

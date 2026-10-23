@@ -83,7 +83,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
 
   return (
     // Page (téléphone) : c'est le panneau central qui défile, pas la liste.
-    <nav aria-label="Ma bibliothèque" className={cn("flex min-h-0 flex-col", !page && "h-full")}>
+    <nav aria-label="Ma bibliothèque" className={cn("@container flex min-h-0 flex-col", !page && "h-full")}>
       <div className={cn("flex shrink-0 items-center gap-2 px-4 pb-2", page ? "pt-5 @2xl:px-6" : "pt-3")}>
         {!page ? (
           <button type="button" onClick={() => layout.setLibMode("collapsed")} aria-label="Replier la bibliothèque" title="Replier la bibliothèque"
@@ -95,8 +95,9 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           ? <h1 className="min-w-0 flex-1 truncate text-2xl font-black">Ma bibliothèque</h1>
           : <h2 className="min-w-0 flex-1 truncate text-base font-bold">Ma bibliothèque</h2>}
         <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist"
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-rvm-raised px-3.5 text-sm font-bold text-rvm-text transition-colors hover:bg-white/15">
-          <Plus className="h-4 w-4" aria-hidden /> Créer
+          title="Créer une playlist"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-rvm-raised text-sm font-bold text-rvm-text transition-colors hover:bg-white/15 @xs:w-auto @xs:px-3.5">
+          <Plus className="h-4 w-4" aria-hidden /> <span className="hidden @xs:inline">Créer</span>
         </button>
         {!page ? (
           <button type="button" onClick={() => layout.setLibMode(mode === "expanded" ? "list" : "expanded")}
@@ -162,7 +163,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
         ) : !library.entries ? <RowsSkeleton /> : shown.length === 0 ? (
           <p className="px-3 py-4 text-sm text-rvm-soft">{query ? `Rien ne correspond à « ${query} ».` : "Rien pour ce filtre."}</p>
         ) : view === "grid" ? (
-          <ul className={cn("grid gap-2", page ? "grid-cols-2 @lg:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6" : "grid-cols-[repeat(auto-fill,minmax(150px,1fr))]")}>
+          <ul className={cn("grid gap-2", page ? "grid-cols-2 @lg:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6" : "grid-cols-[repeat(auto-fill,minmax(118px,1fr))]")}>
             {shown.map((e) => <li key={e.key}><EntryCard entry={e} active={pathname === e.href} /></li>)}
           </ul>
         ) : (
@@ -170,7 +171,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
             {shown.map((e) => <li key={e.key}><EntryRow entry={e} active={pathname === e.href} compact={view === "compact"} /></li>)}
           </ul>
         )}
-        {user && library.entries && all.length <= 2 && !query && !kind ? <Starter /> : null}
+        {user && library.entries && all.length <= 2 && !query && !kind ? <Starter hasPlaylist={all.some((e) => e.kind === "playlist")} /> : null}
         {!page && mode === "list" ? (
           <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
             className="mx-2 mt-4 flex items-center gap-2 rounded-md px-2 py-2 text-[13px] text-rvm-soft hover:text-rvm-text">
@@ -183,7 +184,8 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
 }
 
 /** Pochette d'une entrée : favoris (dégradé vert), playlist (mosaïque), album, artiste (rond). */
-function EntryCover({ entry: e, className, size = 160 }: { entry: LibraryEntry; className?: string; size?: 160 | 320 }) {
+/** Vignette d’une entrée (aussi dans les raccourcis de l’accueil). */
+export function EntryCover({ entry: e, className, size = 160 }: { entry: LibraryEntry; className?: string; size?: 160 | 320 }) {
   if (e.kind === "liked") return <IconTile icon={Heart} className={cn("rounded shadow-none", className)} />;
   if (e.kind === "playlist") return <PlaylistCover covers={e.covers ?? []} size={size} className={cn("rounded shadow-none", className)} />;
   if (e.kind === "artist") {
@@ -290,6 +292,8 @@ function SortMenu() {
   return (
     <>
       <button type="button" onClick={(e) => setAnchor(e.currentTarget)} aria-haspopup="menu" aria-expanded={!!anchor}
+        aria-label={`Trier et afficher : ${SORT_LABEL[layout.libSort]}, vue ${VIEW_LABEL[layout.libView].toLowerCase()}`}
+        title="Trier et afficher"
         className="ml-auto inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rvm-soft hover:text-rvm-text">
         {SORT_LABEL[layout.libSort]} <ViewIcon className="h-4 w-4" aria-hidden />
       </button>
@@ -384,14 +388,23 @@ function SignedOut({ path }: { path: string }) {
 }
 
 /** Bibliothèque presque vide : de quoi la remplir, sans rien inventer. */
-function Starter() {
+function Starter({ hasPlaylist }: { hasPlaylist: boolean }) {
   const library = useMusicLibrary();
+  const button = "mt-4 inline-flex h-9 items-center rounded-full bg-rvm-text px-4 text-sm font-bold text-rvm-ground hover:scale-105 motion-reduce:hover:scale-100";
+  if (hasPlaylist) {
+    return (
+      <div className="mx-2 mt-3 rounded-lg bg-rvm-raised p-4">
+        <p className="font-bold">Retrouvez vos albums et vos artistes</p>
+        <p className="mt-1 text-sm text-rvm-soft">Enregistrez une sortie avec ⊕ ou suivez un artiste : ils apparaîtront ici, comme dans l’application.</p>
+        <Link href="/music/explore" className={button}>Explorer</Link>
+      </div>
+    );
+  }
   return (
     <div className="mx-2 mt-3 rounded-lg bg-rvm-raised p-4">
       <p className="font-bold">Créez votre première playlist</p>
       <p className="mt-1 text-sm text-rvm-soft">Ajoutez-y des titres avec le menu « … » d’un titre. Les albums enregistrés et les artistes suivis apparaissent aussi ici.</p>
-      <button type="button" onClick={() => void library.newPlaylist()}
-        className="mt-4 inline-flex h-9 items-center rounded-full bg-rvm-text px-4 text-sm font-bold text-rvm-ground hover:scale-105 motion-reduce:hover:scale-100">
+      <button type="button" onClick={() => void library.newPlaylist()} className={button}>
         Créer une playlist
       </button>
     </div>

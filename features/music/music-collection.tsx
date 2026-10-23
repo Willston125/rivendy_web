@@ -111,14 +111,26 @@ export function CollectionPage({ tint, kicker, title, cover, meta, description, 
   const [compact, setCompact] = useState(false);
 
   // Barre compacte : dès que les commandes passent sous la barre (64 px) du panneau.
+  // Un écouteur de défilement plutôt qu'un IntersectionObserver : un saut d'un
+  // coup (touche Fin, retour en haut) ne lui échappe pas.
   useEffect(() => {
     const el = actionsRef.current;
     const root = document.getElementById("rvm-center");
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting && e.boundingClientRect.top < (e.rootBounds?.top ?? 0) + 80),
-      { root, rootMargin: "-64px 0px 0px 0px", threshold: 0 });
-    io.observe(el);
-    return () => io.disconnect();
+    if (!el || !root) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setCompact(el.getBoundingClientRect().bottom <= root.getBoundingClientRect().top + 64);
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(update); };
+    schedule();
+    root.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      root.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   const style = { "--hdr": `${r} ${g} ${b}` } as CSSProperties;

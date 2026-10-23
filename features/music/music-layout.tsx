@@ -107,8 +107,19 @@ function load(): Saved {
   }
 }
 
+function persist(s: Saved) {
+  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* stockage indisponible */ }
+}
+
+/**
+ * La première coque s'hydrate avec les valeurs par défaut (comme le serveur)
+ * puis lit la disposition ; une coque remontée ensuite (retour dans la
+ * Musique depuis une autre page du site) la lit tout de suite, sans à-coup.
+ */
+let hydrated = false;
+
 export function MusicLayoutProvider({ children, hasCurrent }: { children: ReactNode; hasCurrent: boolean }) {
-  const [saved, setSaved] = useState<Saved>(DEFAULTS);
+  const [saved, setSaved] = useState<Saved>(() => (hydrated ? load() : DEFAULTS));
   const [libKind, setLibKind] = useState<LibraryKind | null>(null);
   const [rightMode, setRightMode] = useState<RightMode>("now");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -117,12 +128,19 @@ export function MusicLayoutProvider({ children, hasCurrent }: { children: ReactN
   const vw = useViewportWidth();
 
   // Disposition du navigateur retrouvée (après le premier rendu : pas d'écart d'hydratation).
-  useEffect(() => { setSaved(load()); }, []);
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* stockage indisponible */ }
-  }, [saved]);
+    if (hydrated) return;
+    hydrated = true;
+    setSaved(load());
+  }, []);
 
-  const patch = useCallback((p: Partial<Saved>) => setSaved((s) => ({ ...s, ...p })), []);
+  // Enregistrée seulement sur un geste : un montage n'écrase jamais la disposition
+  // (en développement, React joue les effets deux fois).
+  const patch = useCallback((p: Partial<Saved>) => setSaved((s) => {
+    const next = { ...s, ...p };
+    persist(next);
+    return next;
+  }), []);
 
   // Le tiroir se referme en passant en grand écran (le panneau rejoint la page).
   useEffect(() => { if (wide) setDrawerOpen(false); }, [wide]);

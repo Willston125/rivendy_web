@@ -435,7 +435,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       if (Number.isFinite(audio.duration) && audio.duration > 0) { setDuration(audio.duration); setReady(true); }
     };
     const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
+    // Pause pendant un chargement (« waiting ») : « playing » ne viendra pas, la roue s'arrête ici.
+    const onPause = () => { setPlaying(false); setLoading(false); };
     const onWaiting = () => setLoading(true);
     const onPlaying = () => setLoading(false);
     const onEnded = () => {

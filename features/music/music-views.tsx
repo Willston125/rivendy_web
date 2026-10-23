@@ -15,8 +15,9 @@ import {
   fetchHistory, fetchHit, fetchNewReleases, fetchRelease, fetchReleasesByArtist, fetchTracksByIds, searchMusic,
   type MusicArtist, type MusicGenre, type SearchRow,
 } from "./music-api";
-import { CollectionPage, IconTile, MetaLine, PlaylistCover, useCoverTint } from "./music-collection";
+import { CollectionPage, IconTile, MetaLine, useCoverTint } from "./music-collection";
 import { useMusicLibrary } from "./music-library";
+import { EntryCover } from "./music-library-panel";
 import {
   artistName, availableGenres, distinctArtistIds, filterByGenre, hitMovement, homeShelves, recentIsUseful,
   releaseKindLabel, releaseYear, searchable, totalDurationLabel, uniqueReleases,
@@ -96,8 +97,10 @@ export function MusicHomeView() {
 
   // Raccourcis : les rubriques, puis les entrées les plus récentes de la bibliothèque.
   const tile = "h-full rounded-none shadow-none";
-  const recentEntries = (library.entries ?? []).filter((e) => e.kind !== "liked")
+  const latest = (library.entries ?? []).filter((e) => e.kind !== "liked")
     .sort((a, b) => (b.usedAt ?? "").localeCompare(a.usedAt ?? "")).slice(0, 2);
+  // Par paires seulement : les rangées de raccourcis restent pleines.
+  const recentEntries = latest.length === 2 ? latest : [];
   const shortcuts: Array<{ href: string; label: string; tile: ReactNode }> = [
     ...(user ? [{ href: "/music/favorites", label: "Titres likés", tile: <IconTile icon={Heart} className={tile} /> }] : []),
     { href: "/music/hit", label: "Rivendy Hit", tile: <IconTile icon={Trophy} className={tile} /> },
@@ -107,8 +110,7 @@ export function MusicHomeView() {
     { href: "/play/clips", label: "Clips · Rivendy Play", tile: <IconTile icon={Clapperboard} tone="night" className={tile} /> },
     ...recentEntries.map((e) => ({
       href: e.href, label: e.title,
-      tile: e.kind === "playlist" ? <PlaylistCover covers={e.covers ?? []} size={160} className={tile} />
-        : <Cover url={e.cover} size={160} alt="" rounded={e.kind === "artist" ? "rounded-full" : "rounded-none"} className="h-full w-full" />,
+      tile: <EntryCover entry={e} className={cn("h-full w-full", e.kind !== "artist" && "rounded-none")} />,
     })),
   ];
 
@@ -135,12 +137,13 @@ export function MusicHomeView() {
       ) : <div className="h-3" />}
 
       <div className="relative px-4 pb-2 @2xl:px-6">
-        <ul className="grid grid-cols-2 gap-2 @3xl:grid-cols-4" aria-label="Raccourcis">
+        {/* 2 colonnes, puis 3 (6 raccourcis) ou 4 (4 ou 8) : jamais de rangée à moitié vide. */}
+        <ul className={cn("grid grid-cols-2 gap-2", shortcuts.length % 3 === 0 ? "@2xl:grid-cols-3" : "@4xl:grid-cols-4")} aria-label="Raccourcis">
           {shortcuts.map((s) => (
             <li key={s.href} className="min-w-0">
               <Link href={s.href} className="flex h-14 items-center gap-3 overflow-hidden rounded-md bg-white/[0.08] pr-3 transition-colors hover:bg-white/[0.16] @3xl:h-16">
                 <span className="aspect-square h-full shrink-0 overflow-hidden">{s.tile}</span>
-                <span className="min-w-0 truncate text-[14px] font-bold @3xl:text-[15px]">{s.label}</span>
+                <span className="line-clamp-2 min-w-0 break-words text-[13px] font-bold leading-tight @md:text-[14px] @3xl:text-[15px]">{s.label}</span>
               </Link>
             </li>
           ))}
