@@ -107,6 +107,20 @@ adresse de vignette porte donc `resize=contain` (`thumbUrl` de la Musique,
 `playImage` de Play). Vérifier une vignette = ouvrir son adresse et lire ses
 dimensions, jamais supposer.
 
+## 9. `app/site.css` : une règle hors couche passe devant TOUTES les classes
+
+Tailwind v4 range ses styles dans des couches CSS (`base`, `utilities`…). Une
+règle écrite dans `app/site.css` hors de tout `@layer` l'emporte sur toutes les
+classes, quelle que soit leur précision. Jusqu'au 2026-10-23,
+`button, input, select, textarea { font: inherit; }` (hors couche) annulait
+`text-sm`, `font-bold`, `leading-*`… sur tous les boutons et champs : un bouton
+prenait la taille et la graisse de son parent (« Ajouter au panier » en 16 px
+normal au lieu de 11 px gras), alors qu'un lien habillé en bouton suivait sa
+classe. La base de Tailwind fait déjà ce `font: inherit`, dans sa couche : ne
+jamais le réécrire hors couche. Seule règle hors couche voulue pour la police :
+sur écran tactile ou étroit (< 768 px), un champ de saisie jamais sous 16 px
+(sinon Safari sur iPhone agrandit la page au toucher du champ).
+
 ## Vérifications avant de livrer
 
 `npx tsc --noEmit` → **0 erreur** (obligatoire)

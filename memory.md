@@ -155,6 +155,28 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
 - **Connecté sur l'accueil d'un autre marché** : bandeau « Vous consultez la
   Côte d'Ivoire — revenir aux Comores » (`MarketMismatchBanner`, `theMarket()`).
 
+## Police des boutons et champs (2026-10-23, branche `fix/boutons-police`)
+
+- La règle hors couche `button, input, select, textarea { font: inherit; }`
+  de `app/site.css` est retirée (CLAUDE.md §9) : les classes de taille, de
+  graisse et d'interligne des boutons et champs s'appliquent enfin. Le
+  `Button` partagé passe ainsi à 14 px gras (`text-sm font-bold`), comme les
+  liens habillés par `buttonVariants`, qui le suivaient déjà.
+- Garde : sur écran tactile ou étroit (< 768 px), un champ de saisie reste à
+  `max(16px, 1em)` — Safari sur iPhone agrandit la page au toucher d'un champ
+  plus petit, et les formulaires sont écrits en `text-sm`/`text-xs`.
+- Retirée aussi : la règle de Play
+  `.rvp-scope :is(button, input, select, textarea) { font: revert-layer; }`
+  (mise en page « application »), qui contournait le même défaut dans Play
+  seul ; devenue inutile, elle aurait en plus annulé la garde des 16 px dans
+  Play.
+- En développement seulement (mode strict de React) : un rechargement vide le
+  panier, et « Importer plusieurs photos » de la création de boutique n'ajoute
+  rien (compteur hors de la mise à jour d'état). La production n'est pas
+  touchée. Tester ces parcours sans recharger, ou photo par photo.
+- Captures avant/après et liste des écarts :
+  `rivendy-docs/docs/boutons-police/`.
+
 ## Refonte de Rivendy Musique du 2026-10-22 (branche `feat/musique-refonte`)
 
 - **Couleurs** : jetons `--rvm-*` dans `app/site.css` (ex-`globals.css`, renommée : voir CLAUDE.md §7) (`:root` + bloc
@@ -340,11 +362,12 @@ latéral, barre du haut, bannière en carte, panneau de droite et catalogue en v
   pages (textes `sr-only` compris) prenaient la fenêtre pour repère et allongeaient
   le document (≈ 170 px) alors que la page ne défile pas.
 - **PIÈGE `button, input, select, textarea { font: inherit }`** (règle globale HORS
-  couche de site.css) : elle l'emporte sur toute classe Tailwind de taille ou de
+  couche de site.css) : elle l'emportait sur toute classe Tailwind de taille ou de
   graisse posée sur un bouton ou un champ (`text-[13px]`, `font-semibold`… : le
-  bouton prenait la police de son parent). Neutralisée dans Play seulement :
-  `.rvp-scope :is(button, input, select, textarea) { font: revert-layer; }`. La
-  marketplace et la Musique gardent l'ancien comportement (à examiner à part).
+  bouton prenait la police de son parent). D'abord neutralisée dans Play seul
+  (`.rvp-scope … { font: revert-layer; }`), puis corrigée pour tout le site le
+  même jour (section « Police des boutons et champs », CLAUDE.md §9) : la
+  neutralisation propre à Play est retirée.
 - **Recherche** (`play-search.tsx`) : UNE saisie partagée par la barre du haut et la
   page (téléphone) ; depuis une autre page, la barre ouvre /play/search dès deux
   lettres en gardant le focus ; l'adresse suit par `history.replaceState` (pas

@@ -139,8 +139,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-button, input, select, textarea {
-  font: inherit;
+/* Boutons et champs : la base de Tailwind (couche « base ») leur fait déjà
+   hériter la police de leur parent, et leurs classes (text-sm, font-bold,
+   leading-…) s'appliquent par-dessus. Ne pas réécrire `font: inherit` ici :
+   hors couche, la règle passait devant TOUTES ces classes (CLAUDE.md §9). */
+
+/* Écran tactile ou étroit : un champ de saisie jamais sous 16 px, sinon Safari
+   sur iPhone agrandit la page au toucher du champ (les formulaires sont écrits
+   en text-sm). 1em = la taille du parent, comme avant. Hors couche exprès :
+   doit passer devant ces classes ; seule la taille est concernée. */
+@media (pointer: coarse), (max-width: 767px) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 /* ── Scrollbar invisible ─────────────────────────────────────────────────── */
@@ -274,15 +287,6 @@ html[data-world="play"] body {
   /* Hauteur de la fenêtre : 100vh d'abord pour un navigateur qui ignore dvh
      (sinon la coque grandirait avec la page, qui ne défile plus). */
   html[data-world="play"] .rvp-scope { height: 100vh; height: 100dvh; }
-}
-
-/* Boutons et champs de Play : la règle globale « button { font: inherit } »
-   (ci-dessus, hors couche) l'emportait sur les classes de taille et de
-   graisse (text-[13px], font-semibold…) — un bouton prenait la taille de
-   son parent. Ici, retour aux valeurs des couches Tailwind ; sans classe,
-   la couche de base hérite toujours de la police. */
-.rvp-scope :is(button, input, select, textarea) {
-  font: revert-layer;
 }
 
 /* Hauteur de la bannière (accueil et fiches) sur grand format : à 1366 × 768,
