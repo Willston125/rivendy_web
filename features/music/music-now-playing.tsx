@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Disc3, ListMusic, Share2, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { fetchArtist, type MusicArtist } from "./music-api";
+import { lightData } from "./music-collection";
 import { useMusicLibrary } from "./music-library";
 import { useMusicLayout } from "./music-layout";
 import { artistName, releaseKindLabel, releaseYear, thumbUrl } from "./music-logic";
@@ -80,7 +81,7 @@ export function NowPlayingPanel({ className }: { className?: string }) {
         {queueMode ? <QueueList limit={100} /> : (
           <>
             <Link href={`/music/album/${r.id}?t=${t.id}`} aria-label={`Ouvrir ${r.title}`} className="block">
-              <Cover url={r.cover_url} size={720} alt="" className="w-full shadow-xl shadow-black/40" rounded="rounded-lg" />
+              <Cover url={r.cover_url} size={480} alt="" className="w-full shadow-xl shadow-black/40" rounded="rounded-lg" />
             </Link>
             <div className="mt-4 flex items-start gap-2">
               <div className="min-w-0 flex-1">
@@ -98,14 +99,15 @@ export function NowPlayingPanel({ className }: { className?: string }) {
             {p.preview ? (
               <p className="mt-3 rounded-lg border border-rvm-premium/40 bg-rvm-premium/10 px-3 py-2 text-[13px] text-rvm-soft">
                 Extrait de 30 s · titre réservé aux abonnés.{" "}
-                <Link href="/plus" className="font-bold text-rvm-premium underline">Découvrir Rivendy+</Link>
+                <Link href="/plus" prefetch={false} className="font-bold text-rvm-premium underline">Découvrir Rivendy+</Link>
               </p>
             ) : null}
 
             {artist ? (
               <section aria-label="À propos de l’artiste" className="mt-5 overflow-hidden rounded-lg bg-rvm-raised">
                 <div className="relative aspect-[16/10] bg-gradient-to-br from-rvm-brand/45 to-rvm-raised">
-                  {(artist.banner_url || artist.avatar_url) && (thumbUrl(artist.banner_url || artist.avatar_url, 480) ?? "").startsWith("https://") ? (
+                  {/* Bannière décorative : épargnée en économie de données ou en 2G. */}
+                  {(artist.banner_url || artist.avatar_url) && !lightData() && (thumbUrl(artist.banner_url || artist.avatar_url, 480) ?? "").startsWith("https://") ? (
                     <Image src={thumbUrl(artist.banner_url || artist.avatar_url, 480) as string} alt="" fill unoptimized sizes="400px"
                       className="object-cover object-[50%_30%]" />
                   ) : null}

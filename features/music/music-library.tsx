@@ -3,7 +3,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ListMusic, Play, Plus, X } from "lucide-react";
 import { DialogShell } from "@/components/ui/dialog-shell";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -16,7 +16,8 @@ import {
   artistName, isValidPlaylistName, latestIso, musicSharePath, releaseKindLabel, samePath,
   type LibraryEntry, type PendingMusicAction,
 } from "./music-logic";
-import { loginHref, peekPendingPath, savePending, takePending } from "./music-pending";
+import { LoginInviteHost, inviteLogin } from "./music-login-invite";
+import { peekPendingPath, takePending } from "./music-pending";
 import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
 
 /**
@@ -53,7 +54,7 @@ type LibraryContext = {
   refreshPlaylists: () => void;
   newPlaylist: (thenAdd?: QueueItem) => Promise<Playlist | null>;
   pickPlaylist: (item: QueueItem) => void;
-  /** Action réservée aux comptes : on la garde, on va se connecter, on revient. */
+  /** Action réservée aux comptes : une invitation l'explique ; « Se connecter » la garde, on revient. */
   requireLogin: (action: Omit<PendingMusicAction, "at" | "path">, items?: QueueItem[]) => void;
   share: (kind: ShareKind, id: string, title: string) => Promise<void>;
 };
@@ -80,7 +81,6 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const dialogs = useDialogs();
-  const router = useRouter();
   const pathname = usePathname();
   const player = useMusicPlayer();
 
@@ -136,10 +136,8 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
   const likeState = useCallback((trackId: string) => (likes.has(trackId) ? likes.get(trackId) === true : null), [likes]);
 
   const requireLogin = useCallback((action: Omit<PendingMusicAction, "at" | "path">, items?: QueueItem[]) => {
-    const path = `${window.location.pathname}${window.location.search}`;
-    savePending({ ...action, path }, items);
-    router.push(loginHref(path));
-  }, [router]);
+    inviteLogin({ kind: action.kind, label: action.label, action, items });
+  }, []);
 
   const applyLike = useCallback(async (trackId: string, on: boolean): Promise<boolean> => {
     setLikes((m) => new Map(m).set(trackId, on));
@@ -170,7 +168,7 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
   }, [dialogs, refreshLibrary]);
 
   const newPlaylist = useCallback(async (thenAdd?: QueueItem): Promise<Playlist | null> => {
-    if (!userId) { router.push(loginHref(`${window.location.pathname}${window.location.search}`)); return null; }
+    if (!userId) { inviteLogin({ kind: "create" }); return null; }
     const name = await dialogs.ask({ title: "Nouvelle playlist", placeholder: "Nom de la playlist", confirmLabel: "Créer", maxLength: 60 });
     if (name === null) return null;
     if (!isValidPlaylistName(name)) { dialogs.notify("Donnez un nom de 1 à 60 caractères.", "error"); return null; }
@@ -180,7 +178,7 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
     if (thenAdd) await addTo(created, thenAdd);
     else { dialogs.notify(`Playlist « ${created.name} » créée`, "success"); refreshLibrary(); }
     return created;
-  }, [addTo, dialogs, refreshLibrary, router, userId]);
+  }, [addTo, dialogs, refreshLibrary, userId]);
 
   const pickPlaylist = useCallback((item: QueueItem) => {
     if (!userId) { requireLogin({ kind: "playlist", id: item.track.id, label: item.track.title }, [item]); return; }
@@ -251,6 +249,7 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
+      <LoginInviteHost />
       {picker ? (
         <PlaylistPicker item={picker} playlists={playlists} onClose={() => setPicker(null)}
           onPick={async (p) => { if (await addTo(p, picker)) setPicker(null); }}

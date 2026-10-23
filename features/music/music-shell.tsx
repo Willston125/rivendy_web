@@ -14,7 +14,7 @@ import { marketHomePath } from "@/lib/seo";
 import { LibraryPanel } from "./music-library-panel";
 import { useSearchDraft } from "./music-ui";
 import {
-  LIB_MAX, LIB_MIN, MusicLayoutProvider, RIGHT_MAX, RIGHT_MIN, useMusicLayout,
+  LIB_COLLAPSED, LIB_MAX, LIB_MIN, MusicLayoutProvider, RIGHT_MAX, RIGHT_MIN, useMusicLayout,
 } from "./music-layout";
 import { NowPlayingPanel } from "./music-now-playing";
 import { MobileMiniPlayer, MusicPlayerBar } from "./player/mini-player";
@@ -43,9 +43,13 @@ export function MusicShell({ children }: { children: ReactNode }) {
 function ShellFrame({ children }: { children: ReactNode }) {
   const layout = useMusicLayout();
   const player = useMusicPlayer();
+  const { user } = useAuth();
   const pathname = usePathname() || "/music";
   const center = useRef<HTMLDivElement>(null);
-  const expanded = layout.libMode === "expanded";
+  // Visiteur (ou session pas encore lue) : la bibliothèque n'est qu'un rail,
+  // l'espace va au contenu (lot « Musique web », 2026-10-23).
+  const rail = !user;
+  const expanded = layout.libMode === "expanded" && !rail;
 
   // La page ne défile pas : seuls les panneaux défilent (fond de la Musique au rebond).
   useEffect(() => {
@@ -65,10 +69,10 @@ function ShellFrame({ children }: { children: ReactNode }) {
       <MusicTopBar />
       <div className="relative flex min-h-0 flex-1 md:gap-2 md:px-2">
         <aside aria-label="Bibliothèque"
-          style={{ width: expanded ? undefined : layout.shownLib }}
+          style={{ width: rail ? LIB_COLLAPSED : expanded ? undefined : layout.shownLib }}
           className={cn("relative hidden min-h-0 shrink-0 overflow-hidden rounded-lg bg-rvm-surface md:block", expanded && "md:flex-1")}>
           <LibraryPanel />
-          {layout.libMode === "list" ? (
+          {layout.libMode === "list" && !rail ? (
             <ResizeHandle label="Redimensionner la bibliothèque" side="right" value={layout.libWidth} min={LIB_MIN} max={LIB_MAX}
               onChange={layout.setLibWidth} />
           ) : null}
@@ -173,7 +177,8 @@ function MusicTopBar() {
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 px-3 md:px-4">
       <div className="flex shrink-0 items-center gap-3">
-        <Link href={homeHref} aria-label="Rivendy, retour à la marketplace" className="rounded-md">
+        {/* Liens secondaires sans téléchargement anticipé : la connexion est souvent lente et payante. */}
+        <Link href={homeHref} prefetch={false} aria-label="Rivendy, retour à la marketplace" className="rounded-md">
           <Wordmark className="h-7" />
         </Link>
         <span aria-hidden className="hidden h-6 w-px bg-white/15 sm:block" />
@@ -203,7 +208,7 @@ function MusicTopBar() {
           <Search className="h-5 w-5" aria-hidden />
         </Link>
         {user ? (
-          <Link href="/notifications" aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} non lues` : "Notifications"}
+          <Link href="/notifications" prefetch={false} aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} non lues` : "Notifications"}
             className="relative grid h-11 w-11 place-items-center rounded-full text-rvm-soft transition-colors hover:bg-white/10 hover:text-rvm-text">
             <Bell className="h-5 w-5" aria-hidden />
             {unreadCount > 0 ? (
@@ -214,14 +219,14 @@ function MusicTopBar() {
           </Link>
         ) : null}
         {user ? (
-          <Link href="/profile" aria-label="Mon profil" title="Mon profil"
+          <Link href="/profile" prefetch={false} aria-label="Mon profil" title="Mon profil"
             className="relative ml-1 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-rvm-raised text-sm font-bold text-rvm-text ring-4 ring-rvm-surface transition hover:scale-105 motion-reduce:hover:scale-100">
             {profile?.avatar_url ? <Image src={profile.avatar_url} alt="" fill sizes="40px" className="object-cover" /> : <span aria-hidden>{initial}</span>}
           </Link>
         ) : loading ? (
           <span aria-hidden className="ml-1 h-10 w-10 rounded-full bg-rvm-raised" />
         ) : (
-          <Link href={`/auth/login?next=${encodeURIComponent(pathname)}`}
+          <Link href={`/auth/login?next=${encodeURIComponent(pathname)}`} prefetch={false}
             className="ml-1 flex h-10 items-center gap-2 rounded-full bg-rvm-text px-4 text-sm font-bold text-rvm-ground transition hover:scale-105 motion-reduce:hover:scale-100">
             <UserRound className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Se connecter</span><span className="sr-only sm:hidden">Se connecter</span>
           </Link>
@@ -287,7 +292,7 @@ function MobileNav() {
       <ul className="grid h-14 grid-cols-4">
         {items.map((it) => (
           <li key={it.label}>
-            <Link href={it.href} aria-current={it.active ? "page" : undefined}
+            <Link href={it.href} prefetch={it.label === "Marketplace" ? false : undefined} aria-current={it.active ? "page" : undefined}
               className={cn("flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold", it.active ? "text-rvm-text" : "text-rvm-soft")}>
               <it.icon className={cn("h-6 w-6", it.active && "text-rvm-accent")} aria-hidden />
               {it.label}
@@ -320,7 +325,7 @@ function MusicFooter() {
         <ul className="flex flex-wrap gap-x-5 gap-y-1">
           {links.map((l) => (
             <li key={l.label}>
-              <Link href={l.href} className="inline-block py-1 text-[13px] text-rvm-soft transition-colors hover:text-rvm-text hover:underline">{l.label}</Link>
+              <Link href={l.href} prefetch={false} className="inline-block py-1 text-[13px] text-rvm-soft transition-colors hover:text-rvm-text hover:underline">{l.label}</Link>
             </li>
           ))}
           <li>

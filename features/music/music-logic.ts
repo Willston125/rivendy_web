@@ -503,3 +503,50 @@ export function headerTint(rgb: [number, number, number]): [number, number, numb
   for (let k = 0; k < 20 && 1.05 / (lum(c) + 0.05) < 4.5; k++) c = c.map((x) => Math.round(x * 0.85)) as [number, number, number];
   return c;
 }
+
+// ── Lot « Musique web » (2026-10-23) ───────────────────────────────────────
+
+/** Ce que l'accueil montre déjà en entier : titres du Hit, sorties, artistes. */
+export const HOME_SHOWS = { hit: 5, releases: 12, artists: 12 } as const;
+
+export type HomeRubric = "hit" | "explore" | "artists" | "clips";
+
+/**
+ * Raccourcis de rubrique qui apportent quelque chose : tant que l'accueil
+ * montre déjà tout le catalogue, un raccourci vers une page qui le répète,
+ * ou vers une page vide (aucun clip), est retiré.
+ */
+export function usefulRubrics(c: { hitTracks: number; releases: number; artists: number; clips: number }): HomeRubric[] {
+  const out: HomeRubric[] = [];
+  if (c.hitTracks > HOME_SHOWS.hit) out.push("hit");
+  if (c.releases > HOME_SHOWS.releases) out.push("explore");
+  if (c.artists > HOME_SHOWS.artists) out.push("artists");
+  if (c.clips > 0) out.push("clips");
+  return out;
+}
+
+/** Entrées récentes de la bibliothèque à ajouter (0 à 2) pour des rangées pleines : 2, 3, 4, 6 ou 8 raccourcis. */
+export function shortcutFill(base: number, available: number): number {
+  const full = [2, 3, 4, 6, 8];
+  for (const k of [2, 1]) if (k <= available && full.includes(base + k)) return k;
+  return 0;
+}
+
+export type InstallHint = "ios" | "android" | null;
+/** « Plus tard » : l'invitation se tait 30 jours. */
+export const INSTALL_HINT_SNOOZE_MS = 30 * 24 * 3_600_000;
+
+/**
+ * Téléphone : comment garder Rivendy Musique sous la main. iPhone (aucune
+ * appli iOS) : « Sur l'écran d'accueil » ; Android : l'appli Rivendy. Rien
+ * dans le navigateur intégré d'une appli, une fois installée, ni pendant
+ * 30 jours après « Plus tard ».
+ */
+export function installHint(p: { ua: string; standalone: boolean; touchPoints: number; dismissedAt: number | null; now: number }): InstallHint {
+  if (p.standalone) return null;
+  if (p.dismissedAt !== null && p.now - p.dismissedAt < INSTALL_HINT_SNOOZE_MS) return null;
+  if (/FBAN|FBAV|FB_IAB|Instagram|Snapchat|TikTok|Line\/|; wv\)/i.test(p.ua)) return null;
+  if (/iPhone|iPod|iPad/.test(p.ua) || (/Macintosh/.test(p.ua) && p.touchPoints > 1)) return "ios";
+  if (/Android/.test(p.ua)) return "android";
+  return null;
+}

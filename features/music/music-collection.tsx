@@ -22,6 +22,13 @@ export const DEFAULT_TINT: [number, number, number] = [18, 52, 58];
 
 const tints = new Map<string, [number, number, number]>();
 
+/** Économiseur de données ou réseau 2G : on s'épargne les images facultatives (lot « Musique web »). */
+export function lightData(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return !!c && (c.saveData === true || /2g$/.test(c.effectiveType ?? ""));
+}
+
 /**
  * Couleur moyenne d'une pochette (vignette 48 px lue dans un canevas ; le
  * stockage autorise la lecture : Access-Control-Allow-Origin *), assombrie
@@ -33,7 +40,8 @@ export function useCoverTint(url: string | null | undefined): [number, number, n
     () => ({ src, rgb: src ? tints.get(src) ?? null : null }),
   );
   useEffect(() => {
-    if (!src || !src.startsWith("https://")) return;
+    // Économiseur de données ou réseau 2G : pas d'image de plus, l'en-tête garde le vert Rivendy.
+    if (!src || !src.startsWith("https://") || lightData()) return;
     const known = tints.get(src);
     if (known) { setTint({ src, rgb: known }); return; }
     let alive = true;
@@ -62,8 +70,14 @@ export function useCoverTint(url: string | null | undefined): [number, number, n
         if (alive) setTint({ src, rgb });
       } catch { /* lecture refusée : teinte par défaut */ }
     };
-    img.src = src;
-    return () => { alive = false; };
+    // Après les chargements utiles de la page (titres, pochettes visibles).
+    const start = () => { if (alive) img.src = src; };
+    const idle = typeof window.requestIdleCallback === "function";
+    const handle = idle ? window.requestIdleCallback(start, { timeout: 2500 }) : window.setTimeout(start, 600);
+    return () => {
+      alive = false;
+      if (idle) window.cancelIdleCallback(handle); else window.clearTimeout(handle);
+    };
   }, [src]);
   return tint.src === src ? tint.rgb : null;
 }

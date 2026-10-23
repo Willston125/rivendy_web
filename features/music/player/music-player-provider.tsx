@@ -3,7 +3,6 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { useDialogs } from "@/features/ui/dialogs";
@@ -16,7 +15,7 @@ import {
   previousAction, shouldCount, shouldPrefetchNext, shuffleKeepingCurrent, streamErrorMessage, thumbUrl,
   type MusicRelease, type MusicTrack, type RepeatMode,
 } from "../music-logic";
-import { loginHref, savePending } from "../music-pending";
+import { inviteLogin } from "../music-login-invite";
 
 /**
  * Lecteur Rivendy Music du site (Omnicanal lot D, 2026-10-21) : UN élément
@@ -94,8 +93,6 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const { user, session } = useAuth();
   const { country } = useCountry();
   const dialogs = useDialogs();
-  const router = useRouter();
-  const pathname = usePathname();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -205,8 +202,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       }
       if (res.error === "not_authenticated") {
         setPlaying(false);
-        savePending({ kind: "play", id: item.track.id, path: pathname || "/music", label: item.track.title }, items.slice(i));
-        router.push(loginHref(pathname || "/music"));
+        inviteLogin({ kind: "play", label: item.track.title, action: { kind: "play", id: item.track.id, label: item.track.title }, items: items.slice(i) });
         return;
       }
       if (SKIPPABLE_STREAM_ERRORS.has(res.error) && failures.current < 5) {
@@ -232,7 +228,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       setPlaying(false);
     }
     setLoading(false);
-  }, [dialogs, finishListen, grantFor, pathname, router]);
+  }, [dialogs, finishListen, grantFor]);
   useEffect(() => { loadAtRef.current = loadAt; }, [loadAt]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
@@ -245,11 +241,10 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       ? Math.floor(Math.random() * playable.length)
       : Math.max(0, playable.findIndex((x) => x.track.id === startId));
     if (!user) {
-      // Écouter exige un compte : la file est gardée, la page d'origine
-      // propose de la reprendre après la connexion (un geste reste requis).
+      // Écouter exige un compte : une invitation l'explique sur place ;
+      // « Se connecter » garde la file, que la page propose au retour (un geste reste requis).
       const first = playable[i];
-      savePending({ kind: "play", id: first.track.id, path: pathname || "/music", label: first.track.title }, playable.slice(i));
-      router.push(loginHref(pathname || "/music"));
+      inviteLogin({ kind: "play", label: first.track.title, action: { kind: "play", id: first.track.id, label: first.track.title }, items: playable.slice(i) });
       return;
     }
     setSource(options?.source ?? null);
@@ -265,7 +260,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     setShuffled(false);
     setQueue(playable);
     void loadAt(playable, i);
-  }, [dialogs, loadAt, pathname, router, user]);
+  }, [dialogs, loadAt, user]);
 
   const playAt = useCallback((i: number) => {
     if (i < 0 || i >= queueRef.current.length) return;

@@ -16,6 +16,7 @@ import { fetchArtistTopTracks, fetchLikedTracks, fetchPlaylist, fetchRelease } f
 import { IconTile, PlaylistCover } from "./music-collection";
 import { useMusicLayout, type LibraryView } from "./music-layout";
 import { useMusicLibrary } from "./music-library";
+import { inviteLogin } from "./music-login-invite";
 import { filterLibrary, libraryKinds, sortLibrary, type LibraryEntry, type LibraryKind, type LibrarySort } from "./music-logic";
 import { loginHref } from "./music-pending";
 import { Cover, iconButton, toQueue } from "./music-ui";
@@ -54,6 +55,9 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
   useEffect(() => {
     if (kind && kind !== "liked" && !kinds.includes(kind as "playlist" | "album" | "artist")) setLibKind(null);
   }, [kind, kinds, setLibKind]);
+
+  // Visiteur (ou session pas encore lue) : un rail ; ses boutons expliquent le compte.
+  if (!page && !user) return <VisitorRail busy={loading} />;
 
   if (mode === "collapsed") {
     return (
@@ -184,6 +188,26 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
 }
 
 /** Pochette d'une entrée : favoris (dégradé vert), playlist (mosaïque), album, artiste (rond). */
+/**
+ * Rail du visiteur (lot « Musique web », 2026-10-23) : la bibliothèque et
+ * « Créer » ouvrent une invitation qui explique le compte, sans quitter la page.
+ */
+function VisitorRail({ busy }: { busy: boolean }) {
+  return (
+    <nav aria-label="Ma bibliothèque" className="flex h-full flex-col items-center gap-2 py-3">
+      <button type="button" disabled={busy} onClick={() => inviteLogin({ kind: "library" })}
+        aria-label="Ma bibliothèque" title="Ma bibliothèque" className={cn(iconButton, "h-11 w-11 text-rvm-soft")}>
+        <Library className="h-6 w-6" aria-hidden />
+      </button>
+      <button type="button" disabled={busy} onClick={() => inviteLogin({ kind: "create" })}
+        aria-label="Créer une playlist" title="Créer une playlist"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-white/15 disabled:opacity-40">
+        <Plus className="h-5 w-5" aria-hidden />
+      </button>
+    </nav>
+  );
+}
+
 /** Vignette d’une entrée (aussi dans les raccourcis de l’accueil). */
 export function EntryCover({ entry: e, className, size = 160 }: { entry: LibraryEntry; className?: string; size?: 160 | 320 }) {
   if (e.kind === "liked") return <IconTile icon={Heart} className={cn("rounded shadow-none", className)} />;
@@ -379,7 +403,7 @@ function SignedOut({ path }: { path: string }) {
       <div className="rounded-lg bg-rvm-raised p-4">
         <p className="font-bold">Créez votre première playlist</p>
         <p className="mt-1 text-sm text-rvm-soft">Connectez-vous : vos playlists, titres likés, albums et artistes suivis vous attendent ici, comme dans l’application.</p>
-        <Link href={loginHref(path)} className="mt-4 inline-flex h-9 items-center rounded-full bg-rvm-text px-4 text-sm font-bold text-rvm-ground hover:scale-105 motion-reduce:hover:scale-100">
+        <Link href={loginHref(path)} prefetch={false} className="mt-4 inline-flex h-9 items-center rounded-full bg-rvm-text px-4 text-sm font-bold text-rvm-ground hover:scale-105 motion-reduce:hover:scale-100">
           Se connecter
         </Link>
       </div>

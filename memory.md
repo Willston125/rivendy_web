@@ -226,6 +226,29 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     retirés avant commit) : vidéo et captures dans
     `rivendy-docs/docs/musique-refonte/mise-en-page-app/`. Avec un vrai compte :
     à essayer par le propriétaire.
+- **Lot « Musique web » (2026-10-23, branche `feat/musique-web`)** : la coque
+  réglée sur le web réel (visiteurs, connexion lente, petit catalogue, iPhone).
+  - **Visiteur** (ou session pas encore lue) : bibliothèque en rail de 72 px,
+    mot d'accueil sur l'accueil. Écouter, liker, enregistrer, suivre, ranger :
+    une INVITATION sur place (`music-login-invite.tsx`, petit magasin partagé
+    car le lecteur est monté au-dessus de la bibliothèque) au lieu du renvoi
+    vers /auth/login ; « Se connecter » garde l'action (`music-pending.ts`).
+    Pas d'extrait sans compte (décision du propriétaire, 23/10).
+  - **Connexion lente** : `prefetch={false}` sur les liens secondaires (pied de
+    page, connexion, notifications, profil, marketplace, Rivendy+, Play) — en
+    développement Next ne précharge jamais : à contrôler sur un aperçu.
+    Pochettes 480 au lieu de 720 (panneau droit, en-tête de sortie) ; couleur
+    d'en-tête calculée au repos du navigateur, jamais en économie de données
+    ou en 2G (`lightData`), ni la bannière d'artiste du panneau droit.
+  - **Petit catalogue** : `usefulRubrics` (raccourci seulement s'il montre plus
+    que l'accueil, Clips seulement s'il existe un clip), `shortcutFill` (rangées
+    pleines), pas de « Tout voir » qui répète l'accueil.
+  - **Écran d'accueil** : `public/musique.webmanifest` (seulement sur /music et
+    /artist, via les métadonnées de `app/(musique)/layout.tsx`, s'ouvre sur
+    /music) ; Android renvoie vers l'appli (`prefer_related_applications`).
+    `MusicInstallHint` : iPhone « Partager → Sur l'écran d'accueil », Android
+    l'appli ; jamais dans une appli intégrée ni une fois installée ; « Plus
+    tard » = 30 jours (`installHint`). Essai sur un vrai iPhone : propriétaire.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 

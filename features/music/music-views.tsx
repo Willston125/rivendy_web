@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AudioLines, Clapperboard, Clock, Compass, Heart, Lock, MicVocal, Search, Share2, Smartphone, Trophy, X,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
+import { fetchCatalog } from "@/features/play/play-api";
 import { appIntentUrl } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -20,13 +21,15 @@ import { useMusicLibrary } from "./music-library";
 import { EntryCover } from "./music-library-panel";
 import {
   artistName, availableGenres, distinctArtistIds, filterByGenre, hitMovement, homeShelves, recentIsUseful,
-  releaseKindLabel, releaseYear, searchable, totalDurationLabel, uniqueReleases,
-  type MusicRelease, type MusicTrack,
+  releaseKindLabel, releaseYear, searchable, shortcutFill, totalDurationLabel, uniqueReleases, usefulRubrics,
+  type HomeRubric, type MusicRelease, type MusicTrack,
 } from "./music-logic";
+import { MusicInstallHint } from "./music-install-hint";
+import { loginHref } from "./music-pending";
 import {
   ArtistCard, CardRow, CardRowSkeleton, Cover, EmptyState, ErrorState, ExplicitTag, FollowArtistButton, ListSkeleton,
   PageTitle, PlayAllButton, PremiumTag, ReleaseGrid, ReleaseShelf, SaveReleaseButton, Section, ShuffleButton, TrackList,
-  iconButton, toQueue, useLoad, useSearchDraft,
+  iconButton, primaryButton, toQueue, useLoad, useSearchDraft,
 } from "./music-ui";
 import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
 
@@ -66,23 +69,27 @@ function useScrolledPast() {
  * raccourcis compacts (rubriques, puis ce que le compte a écouté ou
  * enregistré), la sélection et les nouveautés (jamais deux fois les mêmes
  * sorties), les titres populaires, les artistes. Tout suit le catalogue
- * réel : rien n'est inventé pour remplir.
+ * réel : rien n'est inventé pour remplir. Petit catalogue (lot « Musique
+ * web », 2026-10-23) : l'accueil montre tout d'un coup, et un raccourci
+ * n'apparaît que s'il mène à plus que ce que l'accueil montre déjà.
  */
 export function MusicHomeView() {
   const market = useMusicMarket();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const library = useMusicLibrary();
   const [genre, setGenre] = useState<string | null>(null);
   const [sentinel, stuck] = useScrolledPast();
 
   const home = useLoad(`home:${market ?? ""}`, async () => {
-    const [featured, fresh, hit, genres] = await Promise.all([
+    const [featured, fresh, hit, genres, clips] = await Promise.all([
       fetchFeatured(market), fetchNewReleases(market, 48), fetchHit("all", "", market),
       fetchGenres().catch(() => [] as MusicGenre[]),
+      // Un seul clip suffit à savoir si le raccourci vers Rivendy Play mène quelque part.
+      fetchCatalog(market, "clip", 1).catch(() => []),
     ]);
     const all = uniqueReleases([featured, fresh]);
     const artists = await fetchArtistsByIds(distinctArtistIds(all).slice(0, 18)).catch(() => [] as MusicArtist[]);
-    return { featured, fresh, hit, genres, artists, all };
+    return { featured, fresh, hit, genres, artists, all, clips: clips.length };
   });
   const recent = useLoad(user ? `recent:${user.id}` : null, () => fetchHistory().then((rows) => rows.slice(0, 12)));
 
@@ -95,20 +102,30 @@ export function MusicHomeView() {
     return { items, ranks };
   }, [data, genre]);
 
-  // Raccourcis : les rubriques, puis les entrées les plus récentes de la bibliothèque.
+  // Raccourcis : le compte, les rubriques UTILES (petit catalogue : aucune),
+  // puis de quoi remplir la rangée avec les entrées récentes de la bibliothèque.
   const tile = "h-full rounded-none shadow-none";
+  const rubrics = data
+    ? usefulRubrics({ hitTracks: data.hit.length, releases: data.all.length, artists: data.artists.length, clips: data.clips })
+    : [];
+  const RUBRICS: Record<HomeRubric, Shortcut> = {
+    hit: { href: "/music/hit", label: "Rivendy Hit", tile: <IconTile icon={Trophy} className={tile} /> },
+    explore: { href: "/music/explore", label: "Explorer les genres", tile: <IconTile icon={Compass} tone="night" className={tile} /> },
+    artists: { href: "/music/artists", label: "Artistes", tile: <IconTile icon={MicVocal} tone="night" className={tile} /> },
+    clips: { href: "/play/clips", label: "Clips · Rivendy Play", tile: <IconTile icon={Clapperboard} tone="night" className={tile} />, outside: true },
+  };
+  const base: Shortcut[] = [
+    ...(user ? [
+      { href: "/music/favorites", label: "Titres likés", tile: <IconTile icon={Heart} className={tile} /> },
+      { href: "/music/history", label: "Écoutés récemment", tile: <IconTile icon={Clock} tone="night" className={tile} /> },
+    ] : []),
+    ...rubrics.map((r) => RUBRICS[r]),
+  ];
   const latest = (library.entries ?? []).filter((e) => e.kind !== "liked")
     .sort((a, b) => (b.usedAt ?? "").localeCompare(a.usedAt ?? "")).slice(0, 2);
-  // Par paires seulement : les rangées de raccourcis restent pleines.
-  const recentEntries = latest.length === 2 ? latest : [];
-  const shortcuts: Array<{ href: string; label: string; tile: ReactNode }> = [
-    ...(user ? [{ href: "/music/favorites", label: "Titres likés", tile: <IconTile icon={Heart} className={tile} /> }] : []),
-    { href: "/music/hit", label: "Rivendy Hit", tile: <IconTile icon={Trophy} className={tile} /> },
-    { href: "/music/explore", label: "Explorer les genres", tile: <IconTile icon={Compass} tone="night" className={tile} /> },
-    { href: "/music/artists", label: "Artistes", tile: <IconTile icon={MicVocal} tone="night" className={tile} /> },
-    ...(user ? [{ href: "/music/history", label: "Écoutés récemment", tile: <IconTile icon={Clock} tone="night" className={tile} /> }] : []),
-    { href: "/play/clips", label: "Clips · Rivendy Play", tile: <IconTile icon={Clapperboard} tone="night" className={tile} /> },
-    ...recentEntries.map((e) => ({
+  const shortcuts: Shortcut[] = [
+    ...base,
+    ...latest.slice(0, shortcutFill(base.length, latest.length)).map((e) => ({
       href: e.href, label: e.title,
       tile: <EntryCover entry={e} className={cn("h-full w-full", e.kind !== "artist" && "rounded-none")} />,
     })),
@@ -137,17 +154,22 @@ export function MusicHomeView() {
       ) : <div className="h-3" />}
 
       <div className="relative px-4 pb-2 @2xl:px-6">
-        {/* 2 colonnes, puis 3 (6 raccourcis) ou 4 (4 ou 8) : jamais de rangée à moitié vide. */}
-        <ul className={cn("grid grid-cols-2 gap-2", shortcuts.length % 3 === 0 ? "@2xl:grid-cols-3" : "@4xl:grid-cols-4")} aria-label="Raccourcis">
+        <MusicInstallHint />
+        {!user && !authLoading ? <VisitorWelcome /> : null}
+        {/* 2 colonnes, puis 3 (3 ou 6 raccourcis) ou 4 (4 ou 8) : jamais de rangée à moitié vide. */}
+        {shortcuts.length > 0 ? (
+        <ul className={cn("grid grid-cols-2 gap-2", shortcuts.length % 3 === 0 ? "@2xl:grid-cols-3" : shortcuts.length >= 4 && "@4xl:grid-cols-4")}
+          aria-label="Raccourcis">
           {shortcuts.map((s) => (
             <li key={s.href} className="min-w-0">
-              <Link href={s.href} className="flex h-14 items-center gap-3 overflow-hidden rounded-md bg-white/[0.08] pr-3 transition-colors hover:bg-white/[0.16] @3xl:h-16">
+              <Link href={s.href} prefetch={s.outside ? false : undefined} className="flex h-14 items-center gap-3 overflow-hidden rounded-md bg-white/[0.08] pr-3 transition-colors hover:bg-white/[0.16] @3xl:h-16">
                 <span className="aspect-square h-full shrink-0 overflow-hidden">{s.tile}</span>
                 <span className="line-clamp-2 min-w-0 break-words text-[13px] font-bold leading-tight @md:text-[14px] @3xl:text-[15px]">{s.label}</span>
               </Link>
             </li>
           ))}
         </ul>
+        ) : null}
 
         {home.error ? <div className="mt-6"><ErrorState onRetry={home.reload} /></div>
           : !data ? (
@@ -162,26 +184,50 @@ export function MusicHomeView() {
             </div>
           ) : (
             <HomeSections data={data} genre={genre} genreName={genres.find((g) => g.id === genre)?.name}
-              hitItems={hit.items} ranks={hit.ranks} recent={recent.data} />
+              hitItems={hit.items} ranks={hit.ranks} recent={recent.data} rubrics={rubrics} />
           )}
       </div>
     </div>
   );
 }
 
-function HomeSections({ data, genre, genreName, hitItems, ranks, recent }: {
+type Shortcut = { href: string; label: string; tile: ReactNode; outside?: boolean };
+
+/**
+ * Visiteur : ce qu'est l'espace, et pourquoi se connecter (écouter, liker,
+ * ranger). Pas de promesse au-delà de ce que le site fait.
+ */
+function VisitorWelcome() {
+  const pathname = usePathname() || "/music";
+  return (
+    <section aria-labelledby="rvm-welcome" className="mb-3 flex flex-col gap-3 rounded-lg bg-white/[0.06] p-4 @xl:flex-row @xl:items-center @xl:gap-6">
+      <div className="min-w-0 flex-1">
+        <h2 id="rvm-welcome" className="text-lg font-black">Bienvenue sur Rivendy Musique</h2>
+        <p className="mt-1 text-sm leading-relaxed text-rvm-soft">
+          Les sorties validées par Rivendy et le Rivendy Hit de la semaine. Connectez-vous pour écouter, liker des titres
+          et créer vos playlists : le compte est gratuit.
+        </p>
+      </div>
+      <Link href={loginHref(pathname)} prefetch={false} className={cn(primaryButton, "shrink-0 self-start @xl:self-center")}>Se connecter</Link>
+    </section>
+  );
+}
+
+function HomeSections({ data, genre, genreName, hitItems, ranks, recent, rubrics }: {
   data: { featured: MusicRelease[]; fresh: MusicRelease[]; artists: MusicArtist[]; all: MusicRelease[] };
   genre: string | null;
   genreName?: string;
   hitItems: QueueItem[];
   ranks: Map<string, { rank: number; move: string }>;
   recent: Array<{ track: MusicTrack }> | null;
+  /** Rubriques qui montrent plus que l'accueil : sinon, pas de « Tout voir ». */
+  rubrics: HomeRubric[];
 }) {
   const shelves = homeShelves(filterByGenre(data.featured, genre), filterByGenre(data.fresh, genre));
   const artists = genre ? data.artists.filter((a) => data.all.some((r) => r.genre_id === genre && r.artist_id === a.id)) : data.artists;
   const shown = new Set((shelves.mode === "one" ? shelves.releases : [...shelves.selection, ...shelves.news]).map((r) => r.id));
   const showRecent = !!recent && recentIsUseful(recent.map((r) => r.track.release_id), shown);
-  const moreHref = genre ? `/music/explore?genre=${genre}` : "/music/explore";
+  const moreHref = !rubrics.includes("explore") ? undefined : genre ? `/music/explore?genre=${genre}` : "/music/explore";
   return (
     <>
       {shelves.mode === "one" ? (
@@ -211,7 +257,7 @@ function HomeSections({ data, genre, genreName, hitItems, ranks, recent }: {
       ) : null}
 
       {artists.length > 0 ? (
-        <Section title="Artistes à découvrir" href="/music/artists">
+        <Section title="Artistes à découvrir" href={rubrics.includes("artists") ? "/music/artists" : undefined}>
           <CardRow label="Artistes à découvrir">{artists.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
         </Section>
       ) : null}
@@ -502,7 +548,7 @@ export function AlbumView({ release, tracks, highlight }: { release: MusicReleas
 
   return (
     <CollectionPage tint={tint} kicker={releaseKindLabel(release.kind)} title={release.title}
-      cover={<Cover url={release.cover_url} size={720} alt={`Pochette de ${release.title}`} priority className="w-full shadow-2xl shadow-black/50" rounded="rounded-md" />}
+      cover={<Cover url={release.cover_url} size={480} alt={`Pochette de ${release.title}`} priority className="w-full shadow-2xl shadow-black/50" rounded="rounded-md" />}
       description={release.description}
       meta={<MetaLine parts={[
         release.artist_id
@@ -532,7 +578,7 @@ export function AlbumView({ release, tracks, highlight }: { release: MusicReleas
       {release.is_premium ? (
         <p className="mx-2 mb-4 flex flex-wrap items-center gap-1.5 text-[13px] text-rvm-soft">
           <Lock className="h-3.5 w-3.5 text-rvm-premium" aria-hidden /> Sortie Premium : écoute complète avec
-          <Link href="/plus" className="font-semibold text-rvm-accent hover:underline">Rivendy+</Link>, extraits de 30 s sinon.
+          <Link href="/plus" prefetch={false} className="font-semibold text-rvm-accent hover:underline">Rivendy+</Link>, extraits de 30 s sinon.
         </p>
       ) : null}
       {queue.length === 0 ? <EmptyState title="Les titres de cette sortie arrivent bientôt" />

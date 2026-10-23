@@ -39,7 +39,7 @@ function AccountOnly({ icon, title, text, children }: { icon: LucideIcon; title:
     return (
       <div className="px-4 py-8 @2xl:px-6">
         <EmptyState icon={icon} title={title} text={text}
-          action={<Link href={loginHref(pathname)} className={primaryButton}>Se connecter</Link>} />
+          action={<Link href={loginHref(pathname)} prefetch={false} className={primaryButton}>Se connecter</Link>} />
       </div>
     );
   }

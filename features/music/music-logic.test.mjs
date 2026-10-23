@@ -264,3 +264,49 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
   }
   assert.deepEqual(headerTint([30, 30, 60]), [30, 30, 60]);
 });
+
+import { HOME_SHOWS, usefulRubrics, shortcutFill, installHint, INSTALL_HINT_SNOOZE_MS } from "./music-logic.ts";
+
+test("accueil, petit catalogue : pas de raccourci vers une page qui répète l'accueil ou une page vide", () => {
+  // Le catalogue d'aujourd'hui : 2 sorties, 2 titres au Hit, 1 artiste, aucun clip.
+  assert.deepEqual(usefulRubrics({ hitTracks: 2, releases: 2, artists: 1, clips: 0 }), []);
+  assert.deepEqual(usefulRubrics({ hitTracks: 2, releases: 2, artists: 1, clips: 3 }), ["clips"]);
+  assert.deepEqual(
+    usefulRubrics({ hitTracks: HOME_SHOWS.hit + 1, releases: HOME_SHOWS.releases + 1, artists: HOME_SHOWS.artists + 1, clips: 1 }),
+    ["hit", "explore", "artists", "clips"],
+  );
+  assert.deepEqual(usefulRubrics({ hitTracks: HOME_SHOWS.hit, releases: HOME_SHOWS.releases, artists: HOME_SHOWS.artists, clips: 0 }), []);
+});
+
+test("raccourcis : des rangées pleines (2, 3, 4, 6 ou 8)", () => {
+  assert.equal(shortcutFill(2, 5), 2); // titres likés + historique + 2 entrées = 4
+  assert.equal(shortcutFill(2, 1), 1); // 3
+  assert.equal(shortcutFill(3, 5), 1); // 4, pas 5
+  assert.equal(shortcutFill(4, 5), 2); // 6
+  assert.equal(shortcutFill(5, 5), 1); // 6
+  assert.equal(shortcutFill(6, 5), 2); // 8
+  assert.equal(shortcutFill(0, 0), 0); // visiteur : rien à ajouter
+  assert.equal(shortcutFill(7, 5), 1); // 8
+  assert.equal(shortcutFill(8, 5), 0);
+});
+
+test("écran d'accueil : iPhone, appli Android, jamais dans une appli ni après « Plus tard »", () => {
+  const now = Date.UTC(2026, 9, 23);
+  const base = { standalone: false, touchPoints: 5, dismissedAt: null, now };
+  const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+  const ipad = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
+  const android = "Mozilla/5.0 (Linux; Android 14; SM-A145F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36";
+  const webview = "Mozilla/5.0 (Linux; Android 14; SM-A145F; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0 Mobile Safari/537.36";
+  const facebook = `${iphone} [FBAN/FBIOS;FBAV/480.0]`;
+  const desktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36";
+  assert.equal(installHint({ ...base, ua: iphone }), "ios");
+  assert.equal(installHint({ ...base, ua: ipad }), "ios");
+  assert.equal(installHint({ ...base, ua: ipad, touchPoints: 0 }), null); // un vrai Mac
+  assert.equal(installHint({ ...base, ua: android }), "android");
+  assert.equal(installHint({ ...base, ua: webview }), null);
+  assert.equal(installHint({ ...base, ua: facebook }), null);
+  assert.equal(installHint({ ...base, ua: desktop, touchPoints: 0 }), null);
+  assert.equal(installHint({ ...base, ua: iphone, standalone: true }), null);
+  assert.equal(installHint({ ...base, ua: iphone, dismissedAt: now - 1000 }), null);
+  assert.equal(installHint({ ...base, ua: iphone, dismissedAt: now - INSTALL_HINT_SNOOZE_MS - 1 }), "ios");
+});
