@@ -41,7 +41,10 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8">
       <div className="grid gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
         {/* ── Menu latéral ──────────────────────────────────────── */}
-        <aside className="lg:sticky lg:top-24 lg:h-fit">
+        {/* min-w-0, comme le contenu : sous lg, la colonne unique est
+            automatique et la barre d'onglets lui imposait toute sa longueur
+            (page de 1 150 px au téléphone) au lieu de défiler. */}
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:h-fit">
           <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-wider text-slate-400">
             Mon compte
           </p>
