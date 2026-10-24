@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PlayHomeView } from "@/features/play/play-views";
+import { PlayHomeView } from "@/features/play/play-home";
 
 export const metadata: Metadata = {
   title: "Rivendy Play — Films, séries et clips",

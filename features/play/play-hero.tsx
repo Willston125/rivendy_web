@@ -2,86 +2,88 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Info, Play, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, Play } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { fetchEpisodes } from "./play-api";
 import {
-  ageLabel, countLabel, currentEpisode, heroBadge, kindOf, landscapeArt, metaParts, playImage, playSrcSet, posterArt,
-  resumeAt, titlePath, watchHref,
-  type PlayEpisode, type PlayTitle, type WatchProgress,
+  ageLabel, countLabel, currentEpisode, heroBadge, heroTitleSize, kindOf, metaParts, playImage, playSrcSet, resumeAt,
+  sceneArt, titlePath, watchHref,
+  type HeroTitleSize, type PlayEpisode, type PlayTitle, type WatchProgress,
 } from "./play-logic";
-import { Chip, ListButton, PremiumBadge, btnIcon, btnPrimary } from "./play-ui";
+import { usePageBackdrop } from "./play-shell";
+import { HERO_SIZES_POSTER, HERO_SIZES_WIDE, HERO_WIDTHS, btnIcon, btnPrimary, btnRound, display, eyebrow } from "./play-theme";
+import { ListButton, PremiumBadge } from "./play-ui";
 
 /**
- * Bannière de Rivendy Play — mise en page « application » du 2026-10-23
- * (maquette du propriétaire) : une CARTE à bords arrondis, le texte à
- * gauche, la scène à droite, avec les VRAIES images du titre :
- * - fond paysage (dashboard, « Image de fond 16:9 ») : plein cadre sur la
- *   droite, fondu vers le texte — le rendu exact de la maquette ;
- * - sinon (titres actuels : une affiche portrait seulement) : l'affiche
- *   ENTIÈRE, nette, sur son extension floutée — jamais étirée ni recadrée
- *   sur un visage. (Le visuel paysage de la maquette était une image de
- *   démonstration générée, pas un fichier officiel.)
- * La carte se règle sur SA largeur (@container) : texte à côté de la scène
- * dès 576 px, affiche au-dessus du texte en dessous. Une seule image
- * téléchargée par titre (l'affiche nette et son ambiance : même adresse).
+ * Bannière de Rivendy Play — « key art » (« Emerald Cinema », 2026-10-24).
+ * Ce n'est plus « le texte à gauche, l'affiche dans une carte à droite » :
+ * l'image du titre EST la bannière.
+ * - Fond paysage (dashboard, « Image de fond 16:9 ») : plein cadre.
+ * - Sinon (titres actuels : une affiche portrait seulement) : l'affiche,
+ *   grande, cadrée sur son haut (là où sont les visages), fondue vers le
+ *   texte et vers le bas ; derrière elle, la même image floutée prolonge le
+ *   décor sur toute la bannière. Jamais étirée (object-fit: cover).
+ * Par-dessus : halo émeraude, voile côté texte (97 % → 75 % → 15 %), bas
+ * assombri, vignettage et grain très léger (classes rvp-* de site.css).
+ * Une seule image téléchargée par titre (même adresse et mêmes tailles pour
+ * l'ambiance, l'image nette et l'ambiance de la page).
  *
- * Sélection MANUELLE (aucun défilement automatique) : flèches, indicateurs,
- * touches ← →, glissement du doigt. Fondus coupés si l'on réduit les
- * animations.
+ * Petit format (bannière < 576 px) : l'image en tête, en 4:5, le texte
+ * dessous. Sélection MANUELLE (aucun défilement automatique) : flèches,
+ * indicateurs, touches ← →, glissement du doigt. Changement de titre : l'image
+ * se pose (fondu, léger zoom), le titre monte, le reste suit — une
+ * bande-annonce silencieuse ; immobile si l'on réduit les animations.
  */
 
-/** Fond de la scène : fond paysage, ou extension floutée de l'affiche ; voile vers le texte. */
-function SceneArt({ title, priority }: { title: PlayTitle; priority?: boolean }) {
-  const wide = landscapeArt(title);
-  const ambient = posterArt(title) ?? wide;
+/** Image de la scène et sa place (`sizes`) : la même pour le décor, l'image nette et l'ambiance de la page. */
+export function sceneImage(title: PlayTitle): { src: string | null; wide: boolean; sizes: string } {
+  const { src, wide } = sceneArt(title);
+  return { src, wide, sizes: wide ? HERO_SIZES_WIDE : HERO_SIZES_POSTER };
+}
+
+/** L'ambiance de la page reprend l'image de la scène (même adresse : rien de plus à télécharger). */
+export function useSceneBackdrop(title: PlayTitle | null) {
+  const scene = title ? sceneImage(title) : null;
+  usePageBackdrop(scene?.src ?? null, HERO_WIDTHS, scene?.sizes ?? HERO_SIZES_POSTER);
+}
+
+/** Couches visuelles de la scène (décor, halo, image nette, voiles). */
+function SceneLayers({ title, priority }: { title: PlayTitle; priority?: boolean }) {
+  const { src, wide, sizes } = sceneImage(title);
+  const img = src ? { src: playImage(src, 720) ?? src, srcSet: playSrcSet(src, HERO_WIDTHS), sizes } : null;
   return (
-    <div aria-hidden key={title.id} className="rvp-fade-in absolute inset-0 -z-10 overflow-hidden">
-      {wide ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={playImage(wide, 1080) ?? wide} srcSet={playSrcSet(wide, [720, 1080, 1440, 1920])}
-          sizes="(min-width: 1280px) 60vw, 100vw" alt="" decoding="async" fetchPriority={priority ? "high" : "auto"}
-          className="absolute inset-x-0 top-0 aspect-video w-full object-cover @min-[36rem]:inset-y-0 @min-[36rem]:left-auto @min-[36rem]:aspect-auto @min-[36rem]:h-full @min-[36rem]:w-[74%] @min-[36rem]:object-[60%_30%] @min-[36rem]:[mask-image:linear-gradient(to_right,transparent,black_40%)]" />
-      ) : ambient ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={playImage(ambient, 480) ?? ambient} alt="" decoding="async"
-          className="absolute inset-0 h-full w-full scale-125 object-cover object-[50%_25%] blur-2xl brightness-[0.5] saturate-[1.2] @min-[36rem]:left-auto @min-[36rem]:w-[80%] @min-[36rem]:[mask-image:linear-gradient(to_right,transparent,black_42%)]" />
-      ) : null}
-      {/* Voile : vers le bas en petit format (le texte est sous l'image), vers la gauche en grand format. */}
-      <div className="absolute inset-0 bg-gradient-to-b from-rvp-deep/10 via-rvp-deep/75 to-rvp-deep @min-[36rem]:bg-gradient-to-r @min-[36rem]:from-rvp-deep @min-[36rem]:from-25% @min-[36rem]:via-rvp-deep/70 @min-[36rem]:via-50% @min-[36rem]:to-rvp-deep/0" />
-      <div className="absolute inset-x-0 bottom-0 hidden h-1/3 bg-gradient-to-t from-rvp-deep/80 to-transparent @min-[36rem]:block" />
+    <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden">
+      {img ? (
+        <>
+          {/* Le décor : l'image elle-même, floutée et assombrie, sur toute la bannière. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img key={`decor-${title.id}`} {...img} alt="" decoding="async"
+            className="rvp-fade-in absolute inset-0 h-full w-full scale-125 object-cover object-[50%_20%] blur-2xl brightness-[0.42] saturate-[1.3]" />
+          <div className="rvp-hero-glow absolute inset-0" />
+          <div className="rvp-parallax absolute inset-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img key={title.id} {...img} alt="" decoding="async" fetchPriority={priority ? "high" : "auto"}
+              className={cn("rvp-art-in absolute object-cover", wide ? "rvp-art-wide" : "rvp-art-poster")} />
+          </div>
+        </>
+      ) : (
+        <div className="rvp-hero-glow absolute inset-0" />
+      )}
+      <div className="rvp-hero-veil rvp-grain absolute inset-0" />
     </div>
   );
 }
 
 /**
- * L'affiche entière, nette : au-dessus du texte en petit format, à droite sur
- * son ambiance en grand format. Avec un fond paysage : la place de l'image
- * en tête de carte (petit format), rien en grand format.
+ * Scène commune à la bannière d'accueil et aux fiches (CinematicScene).
+ * `swipe` : glissement horizontal du doigt (précédent / suivant), sans gêner
+ * le défilement vertical ; un glissement n'ouvre jamais un lien.
  */
-function ScenePoster({ title, priority }: { title: PlayTitle; priority?: boolean }) {
-  if (landscapeArt(title)) return <div aria-hidden className="aspect-video w-full @min-[36rem]:hidden" />;
-  const poster = posterArt(title);
-  if (!poster) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img key={title.id} src={playImage(poster, 480) ?? poster} alt={`Affiche de ${title.title}`} decoding="async"
-      fetchPriority={priority ? "high" : "auto"}
-      className="rvp-fade-in relative mx-auto mt-6 aspect-[2/3] w-[min(44%,190px)] rounded-2xl object-cover shadow-[0_30px_70px_-28px_rgba(0,0,0,0.95)] ring-1 ring-white/15 @min-[36rem]:absolute @min-[36rem]:right-[7%] @min-[36rem]:top-1/2 @min-[36rem]:mt-0 @min-[36rem]:h-[calc(100%-6.5rem)] @min-[36rem]:max-h-[440px] @min-[36rem]:w-auto @min-[36rem]:-translate-y-1/2" />
-  );
-}
-
-/**
- * Carte « scène » commune à la bannière d'accueil et aux fiches. `swipe` :
- * glissement horizontal du doigt (précédent / suivant), sans gêner le
- * défilement vertical de la page ; un glissement n'ouvre jamais un lien.
- */
-export function SceneCard({ title, priority, label, roledescription, onKeyDown, swipe, overlay, children }: {
+export function CinematicScene({ title, priority, label, roledescription, onKeyDown, swipe, className, children }: {
   title: PlayTitle; priority?: boolean; label?: string; roledescription?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void;
   swipe?: (dir: 1 | -1) => void;
-  /** Posé sur la scène (marque, indicateurs). */
-  overlay?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -106,14 +108,35 @@ export function SceneCard({ title, priority, label, roledescription, onKeyDown, 
     <section aria-label={label} aria-roledescription={roledescription} onKeyDown={onKeyDown}
       onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => { start.current = null; }}
       onClickCapture={(e) => { if (swiped.current) { e.preventDefault(); e.stopPropagation(); swiped.current = false; } }}
-      className={cn("@container relative isolate overflow-hidden rounded-[24px] border border-rvp-edge bg-rvp-deep", swipe && "touch-pan-y")}>
-      <SceneArt title={title} priority={priority} />
-      <div className="relative flex h-full flex-col @min-[36rem]:min-h-[var(--rvp-hero)]">
-        <ScenePoster title={title} priority={priority} />
-        {children}
-      </div>
-      {overlay}
+      className={cn("@container relative isolate overflow-hidden rounded-rvp-hero border border-white/[0.07] bg-rvp-ground shadow-rvp-deep", swipe && "touch-pan-y", className)}>
+      <SceneLayers title={title} priority={priority} />
+      <div className="relative">{children}</div>
     </section>
+  );
+}
+
+/** Taille du titre de la bannière (grand format : relative à la largeur de la bannière). */
+export const HERO_TITLE: Record<HeroTitleSize, string> = {
+  xl: "text-[clamp(2.75rem,8.6cqi,5.4rem)]",
+  lg: "text-[clamp(2.4rem,6.8cqi,4.4rem)]",
+  md: "text-[clamp(2rem,5.2cqi,3.4rem)]",
+};
+
+/** Le texte commence sous l'image en petit format (4:5 pour une affiche, 16:10 pour un fond paysage). */
+export function sceneTextOffset(title: PlayTitle): string {
+  const { src, wide } = sceneArt(title);
+  if (!src) return "pt-10";
+  return wide ? "pt-[calc(62.5cqi-4rem)]" : "pt-[calc(125cqi-7rem)]";
+}
+
+/** « RIVENDY PLAY ▶ | À LA UNE » : la marque, puis la raison réelle de la présence du titre. */
+export function HeroEyebrow({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <p className={cn(eyebrow, "flex items-center gap-2.5 text-rvp-accent", className)}>
+      <span className="flex items-center gap-1.5">Rivendy Play <Play className="h-2.5 w-2.5 fill-current" aria-hidden /></span>
+      <span aria-hidden className="h-3 w-px bg-white/30" />
+      <span className="text-rvp-text">{children}</span>
+    </p>
   );
 }
 
@@ -131,8 +154,8 @@ function useSeriesEpisodes(title: PlayTitle | null): PlayEpisode[] | null {
   return id ? known ?? null : null;
 }
 
-/** Action principale : regarder, reprendre, ou l'épisode à voir d'une série. */
-export function PrimaryAction({ title, progress, episodes, className }: {
+/** Bouton de lecture (PlayButton) : regarder, reprendre, ou l'épisode à voir d'une série. */
+export function PlayButton({ title, progress, episodes, className }: {
   title: PlayTitle; progress: WatchProgress[]; episodes: PlayEpisode[] | null; className?: string;
 }) {
   const cls = cn(btnPrimary, className);
@@ -160,28 +183,30 @@ export function PrimaryAction({ title, progress, episodes, className }: {
   );
 }
 
-/** Ligne de métadonnées : « 2023 · Film · Action · 14 min », classification, Rivendy+. */
-export function MetaLine({ title, episodes, className }: { title: PlayTitle; episodes?: number; className?: string }) {
+/** Métadonnées (HeroMetadata) : « 2023 · Film · Action · 14 min », classification, Rivendy+. */
+export function HeroMetadata({ title, episodes, className }: { title: PlayTitle; episodes?: number; className?: string }) {
   const parts = metaParts(title, episodes);
   const age = ageLabel(title.age_rating);
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-rvp-soft", className)}>
+    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-2 text-[14px] font-medium text-rvp-soft", className)}>
       {parts.map((p, i) => (
         <span key={`${p}-${i}`} className="flex items-center gap-2">
-          {i > 0 ? <span aria-hidden className="text-rvp-muted">·</span> : null}
+          {i > 0 ? <span aria-hidden className="text-rvp-faint">·</span> : null}
           {p}
         </span>
       ))}
       {age ? (
-        <span className="ml-1 rounded border border-white/25 px-1.5 text-[11px] font-semibold leading-5 text-rvp-text" title="Classification du titre">{age}</span>
+        <span className="ml-1 rounded-md border border-white/30 bg-white/[0.06] px-1.5 text-[11px] font-semibold leading-5 text-rvp-text" title="Classification du titre">{age}</span>
       ) : null}
       {title.is_premium && kindOf(title.kind) !== "clip" ? <PremiumBadge /> : null}
     </div>
   );
 }
 
-export function PlayHero({ titles, progress }: { titles: PlayTitle[]; progress: WatchProgress[] }) {
-  const [index, setIndex] = useState(0);
+/** Bannière de l'accueil (CinematicHero) : titre choisi par la page (`index`), pour que l'ambiance de la page le suive. */
+export function CinematicHero({ titles, progress, index, onIndex, className }: {
+  titles: PlayTitle[]; progress: WatchProgress[]; index: number; onIndex: (n: number) => void; className?: string;
+}) {
   const [now] = useState(() => new Date());
   const count = titles.length;
   const i = Math.min(index, Math.max(0, count - 1));
@@ -190,94 +215,92 @@ export function PlayHero({ titles, progress }: { titles: PlayTitle[]; progress: 
   if (!title) return null;
 
   const multi = count > 1;
-  const go = (n: number) => setIndex(((n % count) + count) % count);
+  const go = (n: number) => onIndex(((n % count) + count) % count);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (!multi || (e.target as HTMLElement).closest("input, textarea, select")) return;
     if (e.key === "ArrowRight") { e.preventDefault(); go(i + 1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
   };
   const synopsis = title.synopsis?.trim();
-  const round = "grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-rvp-deep/60 text-rvp-soft backdrop-blur-md transition-colors hover:border-white/35 hover:text-rvp-text";
 
   const dots = multi ? (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       <div className="flex items-center" role="group" aria-label="Choisir le titre à la une">
         {titles.map((t, n) => (
           <button key={t.id} type="button" onClick={() => go(n)} aria-current={n === i ? "true" : undefined}
             aria-label={`Afficher « ${t.title} » (${n + 1} sur ${count})`} className="flex h-11 items-center px-1">
-            <span className={cn("block h-[3px] rounded-full transition-all duration-300 motion-reduce:transition-none",
-              n === i ? "w-8 bg-rvp-accent" : "w-4 bg-white/25 hover:bg-white/50")} />
+            <span className={cn("block h-[3px] rounded-full transition-all duration-(--rvp-slow) ease-rvp motion-reduce:transition-none",
+              n === i ? "w-8 bg-rvp-accent shadow-rvp-dot" : "w-4 bg-white/25 hover:bg-white/50")} />
           </button>
         ))}
       </div>
-      <p aria-hidden className="text-[11px] font-semibold tabular-nums tracking-[0.16em] text-rvp-muted">
+      <p aria-hidden className="text-[12px] font-semibold tabular-nums tracking-[0.14em] text-rvp-muted">
         <span className="text-rvp-text">{countLabel(i + 1)}</span> / {countLabel(count)}
       </p>
     </div>
   ) : null;
 
   return (
-    <SceneCard title={title} priority label="À la une sur Rivendy Play" roledescription="carrousel" onKeyDown={onKeyDown}
-      swipe={multi ? (d) => go(i + d) : undefined}
-      overlay={(
-        <>
-          <p aria-hidden className="pointer-events-none absolute right-6 top-6 hidden items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.34em] text-white/50 @min-[36rem]:flex">
-            Rivendy Play <Play className="h-2 w-2 fill-current" />
-          </p>
-          {dots ? <div className="absolute bottom-3 right-5 hidden @min-[36rem]:block">{dots}</div> : null}
-        </>
+    <CinematicScene title={title} priority label="À la une sur Rivendy Play" roledescription="carrousel" onKeyDown={onKeyDown}
+      swipe={multi ? (d) => go(i + d) : undefined} className={className}>
+      <div className={cn(
+        "flex flex-col items-center px-5 pb-6 text-center @min-[36rem]:min-h-[var(--rvp-hero)] @min-[36rem]:items-start @min-[36rem]:justify-center @min-[36rem]:px-8 @min-[36rem]:pb-[4.5rem] @min-[36rem]:pt-12 @min-[36rem]:text-left @min-[48rem]:px-10",
+        sceneTextOffset(title),
       )}>
-      <div key={`txt-${title.id}`} role="group" aria-roledescription="diapositive" aria-label={`${i + 1} sur ${count}`}
-        className="rvp-rise-in relative flex flex-1 flex-col items-center px-5 pb-4 pt-5 text-center @min-[36rem]:max-w-[58%] @min-[36rem]:items-start @min-[36rem]:px-8 @min-[36rem]:pb-5 @min-[36rem]:pt-7 @min-[36rem]:text-left">
-        <Chip icon={Sparkles}>{heroBadge(title, now)}</Chip>
-        <h2 className="mt-4 break-words text-[clamp(1.85rem,5.6cqi,3.4rem)] font-extrabold leading-[1.02] tracking-tight text-rvp-text">
-          {title.title}
-        </h2>
-        <MetaLine title={title} episodes={episodes?.length} className="mt-4 justify-center @min-[36rem]:justify-start" />
-        {synopsis ? (
-          <p className="mt-3 line-clamp-3 max-w-md text-[14px] leading-6 text-rvp-soft @min-[36rem]:line-clamp-2">{synopsis}</p>
-        ) : null}
-        {/* Téléphone : « Regarder » sur toute la largeur, puis « Ma liste » et la fiche — même hauteur d'un titre à l'autre. */}
-        <div className="mt-6 flex w-full flex-wrap items-center justify-center gap-2.5 @min-[36rem]:w-auto @min-[36rem]:justify-start">
-          <PrimaryAction title={title} progress={progress} episodes={episodes} className="w-full @min-[36rem]:w-auto" />
-          <ListButton title={title} className="flex-1 @min-[36rem]:flex-none" />
-          <Link href={titlePath(title)} aria-label={`Fiche de « ${title.title} »`} title="Plus d’infos" className={btnIcon}>
-            <Info className="h-[18px] w-[18px]" aria-hidden />
-          </Link>
+        <div key={title.id} role="group" aria-roledescription="diapositive" aria-label={`${i + 1} sur ${count}`}
+          className="flex w-full flex-col items-center @min-[36rem]:max-w-[68%] @min-[36rem]:items-start @min-[48rem]:max-w-[min(36rem,56%)]">
+          <HeroEyebrow className="rvp-fade-in">{heroBadge(title, now)}</HeroEyebrow>
+          {/* L'interligne APRÈS la taille : cn (tailwind-merge) retire un interligne placé avant une taille de police. */}
+          <h2 className={cn("rvp-rise-in mt-4 text-balance break-words text-rvp-text", display, HERO_TITLE[heroTitleSize(title.title)], "leading-[0.95]")}>
+            {title.title}
+          </h2>
+          <HeroMetadata title={title} episodes={episodes?.length} className="rvp-fade-in mt-5 justify-center @min-[36rem]:justify-start" />
+          {synopsis ? (
+            <p className="rvp-rise-in-late mt-4 line-clamp-3 max-w-[46ch] text-[15px] leading-6 text-rvp-soft @min-[36rem]:line-clamp-2">{synopsis}</p>
+          ) : null}
+          {/* Téléphone : « Regarder » sur toute la largeur, puis « Ma liste » et la fiche — même hauteur d'un titre à l'autre. */}
+          <div className="rvp-rise-in-late mt-7 flex w-full flex-wrap items-center justify-center gap-3 @min-[36rem]:w-auto @min-[36rem]:justify-start">
+            <PlayButton title={title} progress={progress} episodes={episodes} className="w-full @min-[36rem]:w-auto" />
+            <ListButton title={title} className="flex-1 @min-[36rem]:flex-none" />
+            <Link href={titlePath(title)} aria-label={`Fiche de « ${title.title} »`} title="Plus d’infos" className={btnIcon}>
+              <Info className="h-[18px] w-[18px]" aria-hidden />
+            </Link>
+          </div>
         </div>
         {multi ? (
-          <div className="mt-auto flex w-full items-center justify-center pt-5 @min-[36rem]:justify-start">
-            <div className="hidden items-center gap-2 @min-[36rem]:flex">
-              <button type="button" onClick={() => go(i - 1)} aria-label="Titre précédent" className={round}>
-                <ChevronLeft className="h-4 w-4" aria-hidden />
-              </button>
-              <button type="button" onClick={() => go(i + 1)} aria-label="Titre suivant" className={round}>
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </button>
+          <>
+            <div className="mt-6 @min-[36rem]:hidden">{dots}</div>
+            <div className="absolute inset-x-8 bottom-4 hidden items-center justify-between @min-[36rem]:flex @min-[48rem]:inset-x-10">
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => go(i - 1)} aria-label="Titre précédent" className={btnRound}>
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </button>
+                <button type="button" onClick={() => go(i + 1)} aria-label="Titre suivant" className={btnRound}>
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+              {dots}
             </div>
-            <div className="@min-[36rem]:hidden">{dots}</div>
-          </div>
+          </>
         ) : null}
       </div>
-    </SceneCard>
+    </CinematicScene>
   );
 }
 
-export function HeroSkeleton() {
-  const pulse = "animate-pulse bg-rvp-raised/70 motion-reduce:animate-none";
+export function HeroSkeleton({ className }: { className?: string }) {
   return (
-    <div aria-hidden className="@container relative overflow-hidden rounded-[24px] border border-rvp-edge bg-rvp-card">
-      <div className="flex flex-col items-center gap-4 p-6 @min-[36rem]:min-h-[var(--rvp-hero)] @min-[36rem]:items-start @min-[36rem]:justify-center @min-[36rem]:p-8">
-        <div className={cn("aspect-[2/3] w-[min(44%,190px)] rounded-2xl @min-[36rem]:hidden", pulse)} />
-        <div className={cn("h-7 w-28 rounded-lg", pulse)} />
-        <div className={cn("h-12 w-4/5 max-w-md rounded-lg", pulse)} />
-        <div className={cn("h-4 w-56 rounded", pulse)} />
+    <div aria-hidden className={cn("@container relative overflow-hidden rounded-rvp-hero border border-white/[0.07] bg-rvp-ground", className)}>
+      <div className="rvp-skeleton absolute inset-x-0 top-0 aspect-[4/5] @min-[36rem]:inset-y-0 @min-[36rem]:left-auto @min-[36rem]:aspect-auto @min-[36rem]:w-[58%]" />
+      <div className="relative flex flex-col items-center gap-4 px-5 pb-6 pt-[calc(125cqi-6rem)] @min-[36rem]:min-h-[var(--rvp-hero)] @min-[36rem]:items-start @min-[36rem]:justify-center @min-[36rem]:px-10 @min-[36rem]:pt-10">
+        <div className="rvp-skeleton h-3.5 w-40 rounded bg-rvp-raised" />
+        <div className="rvp-skeleton h-14 w-4/5 max-w-sm rounded-lg bg-rvp-raised" />
+        <div className="rvp-skeleton h-4 w-56 rounded bg-rvp-raised" />
         <div className="mt-3 flex gap-3">
-          <div className={cn("h-11 w-32 rounded-xl", pulse)} />
-          <div className={cn("h-11 w-28 rounded-xl", pulse)} />
+          <div className="rvp-skeleton h-12 w-36 rounded-rvp bg-rvp-raised" />
+          <div className="rvp-skeleton h-12 w-32 rounded-rvp bg-rvp-raised" />
         </div>
       </div>
-      <div className={cn("absolute right-[7%] top-1/2 hidden aspect-[2/3] h-[calc(100%-6.5rem)] -translate-y-1/2 rounded-2xl @min-[36rem]:block", pulse)} />
     </div>
   );
 }

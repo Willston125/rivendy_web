@@ -9,7 +9,8 @@ import {
   playImage, playSrcSet, landscapeArt, posterArt, heroTitles, heroKicker, metaParts, watchHref, resumeHref,
   resumeEntries, remainingLabel, countLabel, homeRows, SMALL_CATALOG, foldText, searchTitles, genresOf,
   parsePendingListAdd, PENDING_TTL_MS, isRecent, sectionLabel, heroBadge, tileKicker, tileMeta, panelMeta,
-  kindFilters, byKindFilter, suggestionsFor, talentsTarget, initialsOf, firstNameOf, searchHref,
+  kindFilters, byKindFilter, suggestionsFor, talentsTarget, initialsOf, firstNameOf, searchHref, heroTitleSize,
+  resumeKicker, sceneArt,
 } from "./play-logic.ts";
 
 const ep = (id, season, n, extra = {}) => ({ id, title_id: "s", season, episode_number: n, title: id, video_status: "ready", ...extra });
@@ -331,4 +332,32 @@ test("carte des talents, compte et recherche", () => {
   assert.equal(searchHref("  Mbayé "), "/play/search?q=Mbay%C3%A9");
   assert.equal(searchHref(""), "/play/search");
   assert.equal(searchHref("x".repeat(80)).length, "/play/search?q=".length + 60);
+});
+
+test("bannière : taille du titre d'après sa longueur, capitales comptées plus larges", () => {
+  assert.equal(heroTitleSize("Mbayé Trambwé"), "xl");
+  assert.equal(heroTitleSize("CODE 1"), "xl");
+  assert.equal(heroTitleSize("Les Enfants du Lagon"), "lg");
+  assert.equal(heroTitleSize("LA BOUSSOLE DIGITAL"), "lg");
+  assert.equal(heroTitleSize("LA BOUSSOLE DIGITAL Saisons 1"), "md");
+  assert.equal(heroTitleSize("Anticonstitutionnellement"), "md");
+  assert.equal(heroTitleSize("  "), "xl");
+  assert.equal(heroTitleSize(null), "xl");
+});
+
+test("reprise : l'épisode en cours, sinon le type du titre", () => {
+  assert.equal(resumeKicker({ kind: "serie" }, { season: 1, episode_number: 3 }), "Saison 1 · Épisode 3");
+  assert.equal(resumeKicker({ kind: "film" }, null), "Film");
+  assert.equal(resumeKicker({ kind: "clip" }, undefined), "Clip");
+});
+
+test("scène : le fond paysage plein cadre, sinon l'affiche ; jamais une adresse non sûre", () => {
+  const poster = "https://x.supabase.co/storage/v1/object/public/play-images/posters/a.jpg";
+  const back = "https://x.supabase.co/storage/v1/object/public/play-images/backdrops/b.jpg";
+  assert.deepEqual(sceneArt({ kind: "film", poster_url: poster, backdrop_url: back }), { src: back, wide: true });
+  assert.deepEqual(sceneArt({ kind: "film", poster_url: poster, backdrop_url: null }), { src: poster, wide: false });
+  assert.deepEqual(sceneArt({ kind: "clip", poster_url: null, thumbnail_url: back }), { src: back, wide: true });
+  // La vignette d'un film (vidéo signée) n'est jamais prise pour un fond.
+  assert.deepEqual(sceneArt({ kind: "film", poster_url: null, thumbnail_url: back }), { src: null, wide: false });
+  assert.deepEqual(sceneArt({ kind: "film", poster_url: "http://non-sur/a.jpg" }), { src: null, wide: false });
 });

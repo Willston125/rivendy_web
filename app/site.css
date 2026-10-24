@@ -49,36 +49,40 @@
   --rvm-on-accent:      #03201C;  /* texte et icônes posés sur le vert  */
   --rvm-premium:        #F5B83D;  /* marque « Premium » seulement       */
 
-  /* Rivendy Play — salle de cinéma VERTE (refonte du 2026-10-22). Fonds vert
-     profond, blanc cassé pour le texte, le vert de la marque pour l'accent.
-     Contrastes sur --rvp-ground : texte 17:1, --rvp-soft 12:1, --rvp-muted
-     7:1, accent 8:1 ; --rvp-on-accent sur l'accent 7:1. Mêmes valeurs dans
-     l'app (PlayColors). L'or reste réservé à Rivendy+ (comme la Musique). */
-  --rvp-ground:         #061110;  /* fond des pages                     */
-  --rvp-panel:          #081513;  /* en-tête, pied de page              */
-  --rvp-surface:        #0C1A18;  /* cartes, encadrés                   */
-  --rvp-raised:         #12231F;  /* survol, champs, puces              */
-  --rvp-line:           #1C2F2B;  /* séparateurs, bordures              */
-  --rvp-text:           #F3F5F2;  /* blanc cassé                        */
-  --rvp-soft:           #C9D3D0;
-  --rvp-muted:          #95A6A1;
-  --rvp-accent:         var(--rv-primary-light);
-  --rvp-accent-hover:   #2CCFB8;
-  --rvp-accent-pressed: var(--rv-primary);
-  --rvp-on-accent:      #03201C;
-  --rvp-premium:        #F5B83D;
+  /* Rivendy Play — « Emerald Cinema » (refonte du 2026-10-24, palette du
+     propriétaire). Environ 80 % de noir et de vert très sombre, puis les
+     images ; le vert lumineux n'est qu'une LUMIÈRE : bouton principal,
+     éléments actifs, barres d'avancement, bords au survol, halos.
+     Contrastes du texte courant : --rvp-text 19:1 sur --rvp-ground ;
+     sur --rvp-raised (la surface la plus claire) --rvp-soft 7,5:1 et
+     --rvp-muted 5,2:1 ; --rvp-on-accent 10:1 sur l'accent. Le « texte
+     discret » du brief (#688078) ne fait que 4:1 sur les cartes : il est
+     gardé en --rvp-faint pour le décor (séparateurs), jamais pour un texte
+     à lire. L'or reste réservé à Rivendy+ (comme la Musique). */
+  --rvp-ground:         #020907;  /* fond principal                     */
+  --rvp-frame:          #04120D;  /* fond secondaire : barres, menu     */
+  --rvp-surface:        #071A14;  /* cartes, panneaux                   */
+  --rvp-raised:         #0A211A;  /* surface élevée : survol, champs    */
+  --rvp-line:           #0F2A21;  /* séparateurs pleins                 */
+  --rvp-edge:           rgb(0 214 163 / 0.13);  /* bordures discrètes  */
+  --rvp-edge-strong:    rgb(0 214 163 / 0.25);  /* « vert bordure » : survol, élément actif */
+  --rvp-text:           #F7FAF8;
+  --rvp-soft:           #9BB3A9;  /* texte secondaire                   */
+  --rvp-muted:          #7E968D;  /* texte discret (lisible partout)    */
+  --rvp-faint:          #688078;  /* décor seulement                    */
+  --rvp-accent:         #00D6A3;  /* vert Rivendy de Play               */
+  --rvp-accent-hover:   #2BE3B5;
+  --rvp-accent-pressed: #00B98D;
+  --rvp-on-accent:      #01140E;  /* texte et icônes posés sur le vert  */
+  --rvp-cinema:         #47FF7A;  /* vert cinéma : halos, reflets       */
+  --rvp-glow:           #6DFF45;  /* lueur émeraude : points de lumière */
+  --rvp-premium:        #F5B83D;  /* Rivendy+ seulement                 */
 
-  /* Coque « application » de Play (2026-10-23, maquette du propriétaire) :
-     une fenêtre vert profond posée sur --rvp-ground, menu latéral, cartes.
-     Teintes relevées sur la maquette ; l'accent reste le vert de la marque.
-     Contrastes : --rvp-muted 7:1 sur --rvp-frame, 6,5:1 sur --rvp-card ;
-     --rvp-sage 6,9:1 sur --rvp-frame. */
-  --rvp-frame:          #0A1B16;  /* fenêtre, panneau central           */
-  --rvp-side:           #0C211A;  /* menu latéral (haut du dégradé)     */
-  --rvp-card:           #0D221B;  /* bannière, panneau droit, vignettes */
-  --rvp-edge:           #17302A;  /* bordures de la fenêtre et des cartes */
-  --rvp-deep:           #05170F;  /* côté texte de la bannière, pied des vignettes */
-  --rvp-sage:           #7FAA95;  /* seconde moitié d'un titre          */
+  /* Mouvement de Play : durées et courbe uniques (survols, fondus). */
+  --rvp-fast:           200ms;
+  --rvp-base:           300ms;
+  --rvp-slow:           450ms;
+  --rvp-ease:           cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Jetons Tailwind de la Musique (bg-rvm-accent, text-rvm-muted…) : le SEUL
@@ -99,26 +103,49 @@
   --color-rvm-brand: var(--rv-primary);
   --color-rvm-premium: var(--rvm-premium);
 
-  /* Rivendy Play (bg-rvp-ground, text-rvp-accent…) */
+  /* Rivendy Play « Emerald Cinema » (bg-rvp-ground, text-rvp-accent,
+     rounded-rvp-card, shadow-rvp-glow, ease-rvp, font-rvp-display…) :
+     couleurs, rayons, ombres, courbe et polices — jamais une valeur écrite
+     en dur dans un composant Play. */
   --color-rvp-ground: var(--rvp-ground);
-  --color-rvp-panel: var(--rvp-panel);
+  --color-rvp-frame: var(--rvp-frame);
   --color-rvp-surface: var(--rvp-surface);
   --color-rvp-raised: var(--rvp-raised);
   --color-rvp-line: var(--rvp-line);
+  --color-rvp-edge: var(--rvp-edge);
+  --color-rvp-edge-strong: var(--rvp-edge-strong);
   --color-rvp-text: var(--rvp-text);
   --color-rvp-soft: var(--rvp-soft);
   --color-rvp-muted: var(--rvp-muted);
+  --color-rvp-faint: var(--rvp-faint);
   --color-rvp-accent: var(--rvp-accent);
   --color-rvp-accent-hover: var(--rvp-accent-hover);
   --color-rvp-accent-pressed: var(--rvp-accent-pressed);
   --color-rvp-on-accent: var(--rvp-on-accent);
+  --color-rvp-cinema: var(--rvp-cinema);
+  --color-rvp-glow: var(--rvp-glow);
   --color-rvp-premium: var(--rvp-premium);
-  --color-rvp-frame: var(--rvp-frame);
-  --color-rvp-side: var(--rvp-side);
-  --color-rvp-card: var(--rvp-card);
-  --color-rvp-edge: var(--rvp-edge);
-  --color-rvp-deep: var(--rvp-deep);
-  --color-rvp-sage: var(--rvp-sage);
+
+  /* Polices chargées par app/play/layout.tsx (next/font) : Urbanist pour les
+     titres, Inter pour l'interface — celles de l'application. */
+  --font-rvp-display: var(--font-urbanist), "Urbanist", ui-sans-serif, system-ui, sans-serif;
+  --font-rvp-body: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-rvp-sm: 10px;     /* puces, petites vignettes */
+  --radius-rvp: 14px;        /* boutons, champs          */
+  --radius-rvp-card: 16px;   /* cartes du catalogue      */
+  --radius-rvp-panel: 20px;  /* panneaux, menu           */
+  --radius-rvp-hero: 24px;   /* bannière                 */
+
+  --shadow-rvp-card: 0 18px 40px -24px rgb(0 0 0 / 0.9);
+  --shadow-rvp-deep: 0 40px 90px -40px rgb(0 0 0 / 0.95);
+  --shadow-rvp-cta: 0 12px 30px -12px rgb(0 214 163 / 0.6);
+  --shadow-rvp-cta-hover: 0 16px 38px -12px rgb(0 214 163 / 0.75);
+  --shadow-rvp-glow: 0 0 0 1px rgb(0 214 163 / 0.3), 0 18px 42px -20px rgb(0 214 163 / 0.55);
+  --shadow-rvp-active: 0 0 28px -10px rgb(0 214 163 / 0.6);
+  --shadow-rvp-dot: 0 0 10px rgb(0 214 163 / 0.85);
+
+  --ease-rvp: var(--rvp-ease);
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -235,36 +262,202 @@ body {
     .rvm-range::-webkit-slider-thumb { transition: none; }
   }
 
-  /* ── Rivendy Play ──────────────────────────────────────────────────────── */
+  /* ── Rivendy Play « Emerald Cinema » ───────────────────────────────────── */
   /* Focus clavier visible et vert sur tout l'espace Play (cartes, bannière,
-     lecteur) : les boutons à icône n'ont pas d'autre repère. */
+     lecteur) : les boutons à icône n'ont pas d'autre repère. La couleur est
+     posée d'avance : les éléments animés (transition sur outline-color)
+     montrent le contour vert tout de suite, sans fondu depuis leur texte. */
+  .rvp-scope :where(a, button, input, select, textarea, [tabindex]) {
+    outline-color: var(--rvp-accent);
+  }
   .rvp-scope :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--rvp-accent);
     outline-offset: 2px;
   }
 
-  /* Entrée d'une diapositive de la bannière : fondu court, immobile si l'on
-     réduit les animations. */
+  /* Fond de la salle : noir verdâtre, deux halos émeraude très doux et un
+     vignettage. Dégradés seulement (aucune image, aucun calcul au défilement). */
+  .rvp-atmosphere {
+    background:
+      radial-gradient(60% 50% at 82% -6%, rgb(0 214 163 / 0.09), transparent 70%),
+      radial-gradient(50% 40% at 4% 104%, rgb(71 255 122 / 0.045), transparent 70%),
+      radial-gradient(130% 100% at 50% 35%, transparent 60%, rgb(0 0 0 / 0.5) 100%),
+      var(--rvp-ground);
+  }
+
+  /* Grain de pellicule, à peine perceptible : un motif SVG de 160 px calculé
+     une seule fois par le navigateur. */
+  .rvp-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+    opacity: 0.045;
+  }
+
+  /* Lumière douce venue d'en haut (menu latéral, fenêtre « À propos »). */
+  .rvp-halo-top {
+    background: radial-gradient(90% 100% at 18% 0%, rgb(0 214 163 / 0.12), transparent 70%);
+  }
+
+  /* Voile de l'ambiance de page (image du titre floutée derrière le haut de
+     la page) : teinte émeraude, puis fondu vers le fond de la salle. */
+  .rvp-backdrop-veil {
+    background:
+      linear-gradient(to bottom, rgb(0 36 26 / 0.35), rgb(2 9 7 / 0.55) 45%, var(--rvp-ground) 100%),
+      radial-gradient(100% 70% at 50% 0%, transparent 40%, rgb(2 9 7 / 0.6) 100%);
+  }
+
+  /* Barre d'avancement : elle se remplit à l'apparition (transform seulement). */
+  @keyframes rvp-grow {
+    from { transform: scaleX(0); }
+    to { transform: none; }
+  }
+  .rvp-grow {
+    transform-origin: left;
+    animation: rvp-grow 900ms var(--rvp-ease);
+  }
+
+  /* Verre dépoli, avec parcimonie : barre du haut au défilement, panneau
+     « À découvrir », navigation basse, menus. */
+  .rvp-glass {
+    background: rgb(7 26 20 / 0.72);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgb(0 214 163 / 0.15);
+  }
+
+  /* ── Bannière « key art » ── Les couches (ambiance floutée, halo, image
+     nette, voiles) sont posées par CinematicScene (play-hero.tsx) ; leur
+     forme se règle sur la largeur de la bannière (conteneur @container). */
+  .rvp-hero-glow {
+    background:
+      radial-gradient(42% 60% at 72% 42%, rgb(71 255 122 / 0.13), transparent 70%),
+      radial-gradient(30% 40% at 88% 12%, rgb(0 214 163 / 0.12), transparent 70%);
+  }
+  /* Petit format : l'image en tête, le texte dessous sur un fondu sombre.
+     Dernière couche (10 %) : une affiche très claire reste dans la salle. */
+  .rvp-hero-veil {
+    background:
+      linear-gradient(to bottom, rgb(2 9 7 / 0.55) 0%, transparent 18%),
+      linear-gradient(to top, var(--rvp-ground) 0%, rgb(2 9 7 / 0.92) 30%, rgb(2 9 7 / 0.35) 52%, transparent 70%),
+      linear-gradient(rgb(2 9 7 / 0.1), rgb(2 9 7 / 0.1));
+  }
+  /* L'affiche portrait devient le « key art » : grande, cadrée sur son haut
+     (là où sont les visages), fondue vers le bas — jamais étirée. */
+  .rvp-art-poster {
+    inset: 0 0 auto 0;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-position: 50% 16%;
+    -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 42%);
+    mask-image: linear-gradient(to top, transparent 0%, #000 42%);
+  }
+  /* Fond paysage (« Image de fond 16:9 » du dashboard). */
+  .rvp-art-wide {
+    inset: 0 0 auto 0;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-position: 62% 30%;
+    -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 40%);
+    mask-image: linear-gradient(to top, transparent 0%, #000 40%);
+  }
+  /* Grand format : texte à gauche sur le voile du brief (97 % → 75 % → 15 %),
+     image à droite qui se prolonge derrière lui. */
+  @container (min-width: 36rem) {
+    .rvp-hero-veil {
+      background:
+        linear-gradient(90deg, rgb(2 9 7 / 0.97) 0%, rgb(2 9 7 / 0.75) 38%, rgb(2 9 7 / 0.15) 70%, transparent 100%),
+        linear-gradient(to top, rgb(2 9 7 / 0.9) 0%, rgb(2 9 7 / 0.3) 28%, transparent 50%),
+        radial-gradient(120% 130% at 72% 40%, transparent 55%, rgb(0 0 0 / 0.5) 100%),
+        linear-gradient(rgb(2 9 7 / 0.12), rgb(2 9 7 / 0.12));
+    }
+    .rvp-art-poster {
+      inset: 0 0 0 auto;
+      width: min(70%, calc(var(--rvp-hero) * 1.2));
+      height: 100%;
+      aspect-ratio: auto;
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 40%), linear-gradient(to top, transparent 0%, #000 30%);
+      -webkit-mask-composite: source-in;
+      mask-image: linear-gradient(to right, transparent 0%, #000 40%), linear-gradient(to top, transparent 0%, #000 30%);
+      mask-composite: intersect;
+    }
+    .rvp-art-wide {
+      inset: 0;
+      height: 100%;
+      aspect-ratio: auto;
+      object-position: 70% 30%;
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+  }
+
+  /* Squelettes de chargement : la surface sombre et un reflet émeraude qui
+     passe lentement (immobile si l'on réduit les animations). */
+  .rvp-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--rvp-surface);
+  }
+  .rvp-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(0 214 163 / 0.07), transparent);
+    animation: rvp-shimmer 1.8s var(--rvp-ease) infinite;
+  }
+  @keyframes rvp-shimmer {
+    to { transform: translateX(100%); }
+  }
+
+  /* Entrées : fondu, montée de 12 px, image qui se pose (léger zoom) — comme
+     une bande-annonce silencieuse. Sans « both » ni délai : si l'animation ne
+     tourne pas (onglet en arrière-plan, impression, robot), le contenu reste
+     VISIBLE. Les durées différentes font apparaître les informations l'une
+     après l'autre. */
   @keyframes rvp-fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
   }
   @keyframes rvp-rise-in {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: none; }
   }
-  /* Sans « both » ni délai : si l'animation ne tourne pas (onglet en
-     arrière-plan, impression, robot), le contenu reste VISIBLE. */
-  .rvp-fade-in { animation: rvp-fade-in 650ms ease-out; }
-  .rvp-rise-in { animation: rvp-rise-in 520ms ease-out; }
+  @keyframes rvp-art-in {
+    from { opacity: 0; transform: scale(1.05); }
+    to { opacity: 1; transform: none; }
+  }
+  .rvp-fade-in { animation: rvp-fade-in 650ms var(--rvp-ease); }
+  .rvp-rise-in { animation: rvp-rise-in 520ms var(--rvp-ease); }
+  .rvp-rise-in-late { animation: rvp-rise-in 760ms var(--rvp-ease); }
+  .rvp-art-in { animation: rvp-art-in 1100ms var(--rvp-ease); }
+
+  /* Parallaxe très légère de l'image de la bannière quand elle sort de
+     l'écran (navigateurs qui savent lier une animation au défilement). */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      @keyframes rvp-parallax {
+        to { transform: translateY(10%); }
+      }
+      .rvp-parallax {
+        animation: rvp-parallax linear both;
+        animation-timeline: view();
+        animation-range: exit 0% exit 100%;
+      }
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .rvp-fade-in, .rvp-rise-in { animation: none; }
+    .rvp-fade-in, .rvp-rise-in, .rvp-rise-in-late, .rvp-art-in, .rvp-grow { animation: none; }
+    .rvp-skeleton::after { animation: none; display: none; }
   }
 
   /* Bouton posé sur une carte (« Ma liste », retirer) : discret sur
      ordinateur (visible au survol ou au clavier), toujours visible au toucher. */
   @media (hover: hover) {
-    .rvp-card .rvp-reveal { opacity: 0; transition: opacity 150ms ease-out; }
+    .rvp-card .rvp-reveal { opacity: 0; transition: opacity var(--rvp-fast) ease-out; }
     .rvp-card:hover .rvp-reveal,
     .rvp-card:focus-within .rvp-reveal,
     .rvp-card .rvp-reveal[aria-pressed="true"] { opacity: 1; }
@@ -278,10 +471,10 @@ html[data-world="play"] body {
   background: var(--rvp-ground);
 }
 
-/* Coque « application » de Play (2026-10-23) : sur grand écran, la fenêtre
-   ne défile pas, seul le panneau central défile (#rvp-main) ; le menu
-   latéral et la barre du haut restent en place. Téléphone et tablette
-   gardent le défilement de la page (barre d'adresse, geste de retour). */
+/* Coque de Play : sur grand écran (≥ 1024 px), la fenêtre ne défile pas,
+   seul le panneau central défile (#rvp-main) ; le menu latéral et la barre
+   du haut restent en place. Téléphone et tablette gardent le défilement de
+   la page (barre d'adresse, geste de retour). */
 @media (min-width: 1024px) {
   html[data-world="play"] { overflow: hidden; }
   /* Hauteur de la fenêtre : 100vh d'abord pour un navigateur qui ignore dvh
@@ -289,9 +482,9 @@ html[data-world="play"] body {
   html[data-world="play"] .rvp-scope { height: 100vh; height: 100dvh; }
 }
 
-/* Hauteur de la bannière (accueil et fiches) sur grand format : à 1366 × 768,
-   la bannière, le panneau de droite et le haut du catalogue tiennent dans le
-   premier écran. */
+/* Hauteur de la bannière en grand format (accueil et fiches) : elle domine
+   le premier écran, et à 1366 × 768 le haut de la rubrique suivante reste
+   visible sous elle. */
 .rvp-scope {
-  --rvp-hero: clamp(320px, calc(100dvh - 430px), 400px);
+  --rvp-hero: clamp(400px, calc(100dvh - 290px), 560px);
 }

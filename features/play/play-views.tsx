@@ -1,383 +1,51 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock, History, Lock, Play, RotateCcw, Search, SearchX, Smartphone, Sparkles, Trash2, X } from "lucide-react";
+import { Bookmark, Clock, Film, History, Lock, Music, Play, RotateCcw, Search, SearchX, Smartphone, Trash2, Tv, X } from "lucide-react";
 import { ShareButton } from "@/components/ui/share-button";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
 import { ProductVideoPlayer } from "@/features/products/product-video-player";
 import { useDialogs } from "@/features/ui/dialogs";
 import { cn } from "@/lib/utils/cn";
-import {
-  clearTitleHistory, fetchCatalog, fetchEpisodesByIds, fetchProgress, fetchTitleHistory, fetchTitlesByIds, fetchTopWeek,
-  forgetProgress,
-} from "./play-api";
-import { HeroSkeleton, MetaLine, PlayHero, PrimaryAction, SceneCard } from "./play-hero";
+import { clearTitleHistory, fetchCatalog, fetchProgress, fetchTitleHistory, fetchTitlesByIds, forgetProgress } from "./play-api";
+import { ClipCard, MediaCard, PlayImg, ProgressTrack } from "./play-cards";
+import { CinematicScene, HERO_TITLE, HeroEyebrow, HeroMetadata, PlayButton, sceneTextOffset, useSceneBackdrop } from "./play-hero";
+import { useMyListTitles, useProgress } from "./play-hooks";
 import { appIntentUrl } from "./play-link-page";
 import { usePlayList } from "./play-list";
 import {
-  byKindFilter, currentEpisode, durationLabel, foldText, genresOf, hasTrailer, heroTitles, homeRows, inTerritory,
-  isArtistClip, isListable, isVideoReady, kindFilters, kindLabel, kindOf, landscapeArt, panelMeta, posterArt,
-  remainingLabel, resumeAt, resumeEntries, resumeHref, searchTitles, suggestionsFor, talentsTarget, titlePath,
-  type HomeRow, type KindFilter, type PlayEpisode, type PlayTitle, type WatchProgress,
+  currentEpisode, durationLabel, foldText, genresOf, hasTrailer, heroTitleSize, inTerritory, isArtistClip, isListable,
+  isVideoReady, kindLabel, kindOf, landscapeArt, posterArt, remainingLabel, resumeAt, resumeEntries, resumeHref,
+  searchTitles, titlePath,
+  type PlayEpisode, type PlayTitle, type WatchProgress,
 } from "./play-logic";
 import { usePlaySearch } from "./play-search";
+import { usePageBackdrop } from "./play-shell";
 import {
-  Chip, EmptyState, ErrorState, FilterChips, GridSkeleton, KindSwitch, LandscapeCard, LandscapeGrid, ListButton,
-  ListToggle, LoginNote, MarketPrompt, PageHeading, PlayImg, PlayPage, PosterCard, PremiumBadge, Rail, RailItem,
-  RailSkeleton, Section, Spinner, TalentsCard, TileGrid, TitleTile, btnGhost, btnPrimary, btnSecondary, progressRatio,
-  useLoginHref,
+  CARD_SIZES, CARD_WIDTHS, WIDE_SIZES, btnGhost, btnPrimary, btnSecondary, display, motion, sceneBleed,
+} from "./play-theme";
+import {
+  EmptyState, ErrorState, FEW_TITLES, FilterChips, GridSkeleton, ListButton, MarketPrompt, MediaGrid, PageHeading, PlayPage,
+  PremiumBadge, Section, Spinner, WideGrid, progressRatio, useLoginHref, useMarketPending,
 } from "./play-ui";
 
 /**
- * Rivendy Play sur le site — écrans. Refonte « salle de cinéma »
- * (2026-10-22), recomposée en mise en page « application » le 2026-10-23
- * (maquette du propriétaire). Mêmes tables et fonctions que l'app (lot C) :
- * une position, Ma liste ou l'historique enregistrés ici se retrouvent dans
- * l'app, et inversement. Rien n'est inventé pour remplir l'écran : une
- * rangée sans contenu réel n'est pas affichée, « Continuer à regarder »
- * n'existe qu'avec une vraie position.
+ * Rivendy Play sur le site — catalogues, fiches, Ma liste, récents et
+ * recherche (« Emerald Cinema », 2026-10-24 ; l'accueil est dans
+ * play-home.tsx). Mêmes tables et fonctions que l'app (lot C) : une
+ * position, Ma liste ou l'historique enregistrés ici se retrouvent dans
+ * l'app, et inversement.
  */
-
-const NO_PROGRESS: WatchProgress[] = [];
-
-/** Positions du compte (reprise, barres d'avancement). */
-function useProgress(): WatchProgress[] {
-  const { user } = useAuth();
-  const [progress, setProgress] = useState<WatchProgress[]>(NO_PROGRESS);
-  useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    void fetchProgress().then((p) => { if (alive) setProgress(p); });
-    return () => { alive = false; };
-  }, [user]);
-  return user ? progress : NO_PROGRESS;
-}
-
-/**
- * Titres de « Ma liste » (la liste du compte, lue une fois par PlayListProvider),
- * dans l'ordre de la liste. Un titre retiré du catalogue garde une entrée
- * vide : il n'est plus redemandé.
- */
-function useMyListTitles(): { titles: PlayTitle[]; waiting: boolean; failed: boolean; retry: () => void } {
-  const list = usePlayList();
-  const [byId, setById] = useState<Record<string, PlayTitle>>({});
-  const [failed, setFailed] = useState(false);
-  const ids = list.ids;
-  const missing = useMemo(() => (ids ?? []).filter((id) => !byId[id]), [ids, byId]);
-
-  useEffect(() => {
-    if (missing.length === 0) return;
-    let alive = true;
-    void fetchTitlesByIds(missing)
-      .then((found) => {
-        if (!alive) return;
-        setById((m) => ({ ...m, ...Object.fromEntries(missing.map((id) => [id, found.find((t) => t.id === id) ?? ({ id, kind: "", title: "" } as PlayTitle)])) }));
-        setFailed(false);
-      })
-      .catch(() => { if (alive) setFailed(true); });
-    return () => { alive = false; };
-  }, [missing]);
-
-  const titles = (ids ?? []).map((id) => byId[id]).filter((t): t is PlayTitle => !!t && !!t.title);
-  return {
-    titles,
-    waiting: ids !== null && missing.length > 0 && !failed,
-    failed: list.failed || failed,
-    retry: () => { setFailed(false); list.reload(); },
-  };
-}
-
-// ── Accueil ────────────────────────────────────────────────────────────────
-
-type HomeData = { key: string; ok: true; catalog: PlayTitle[]; clips: PlayTitle[]; top: string[] } | { key: string; ok: false };
-type ResumeItem = { entry: WatchProgress; title: PlayTitle; episode: PlayEpisode | null };
-
-/** « Votre cinéma. Votre univers. » (maquette) au-dessus de la bannière. */
-function HomeIntro() {
-  return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-1 lg:mb-5">
-      <p className="text-[21px] font-medium leading-tight tracking-tight text-rvp-text sm:text-[24px]">
-        Votre cinéma. <span className="text-rvp-sage">Votre univers.</span>
-      </p>
-      <p className="hidden items-center gap-2 pb-1 text-[12px] text-rvp-muted sm:flex">
-        <Sparkles className="h-3.5 w-3.5 text-rvp-accent/80" aria-hidden /> Des histoires de chez nous.
-      </p>
-    </div>
-  );
-}
-
-/** Grille du haut : bannière et panneau de droite côte à côte quand le panneau central le permet. */
-function TopGrid({ children }: { children: ReactNode }) {
-  return <div className="grid items-stretch gap-5 @min-[58rem]:grid-cols-[minmax(0,1fr)_17.5rem] @min-[64rem]:grid-cols-[minmax(0,1fr)_19rem] @min-[80rem]:grid-cols-[minmax(0,1fr)_20.5rem]">{children}</div>;
-}
-
-function PanelSkeleton({ rows = 3 }: { rows?: number }) {
-  const pulse = "animate-pulse rounded-lg bg-rvp-raised/70 motion-reduce:animate-none";
-  return (
-    <div aria-hidden className="mt-4 flex-1 space-y-4">
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <div className={cn("h-[54px] w-[40px] shrink-0", pulse)} />
-          <div className="flex-1 space-y-2"><div className={cn("h-3.5 w-3/4", pulse)} /><div className={cn("h-3 w-1/2", pulse)} /></div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TopSkeleton() {
-  return (
-    <TopGrid>
-      <HeroSkeleton />
-      <div aria-hidden className="flex flex-col rounded-[24px] border border-rvp-edge bg-rvp-card/80 p-5 xl:p-6">
-        <div className="h-5 w-28 animate-pulse rounded-md bg-rvp-raised/70 motion-reduce:animate-none" />
-        <PanelSkeleton />
-      </div>
-    </TopGrid>
-  );
-}
-
-export function PlayHomeView() {
-  const market = useHomeMarket();
-  const { user, loading: authLoading } = useAuth();
-  const { notify } = useDialogs();
-  const [round, setRound] = useState(0);
-  const [data, setData] = useState<HomeData | null>(null);
-  const [resume, setResume] = useState<ResumeItem[]>([]);
-  const [now] = useState(() => new Date());
-  const key = market ? `${market}:${round}` : null;
-
-  useEffect(() => {
-    if (!market || !key) return;
-    let alive = true;
-    void Promise.all([fetchCatalog(market), fetchCatalog(market, "clip", 40), fetchTopWeek(market)])
-      .then(([catalog, clips, top]) => {
-        if (alive) setData({ key, ok: true, catalog: catalog.filter(isListable), clips: clips.filter(isListable), top });
-      })
-      .catch(() => { if (alive) setData({ key, ok: false }); });
-    return () => { alive = false; };
-  }, [market, key]);
-
-  const progress = useProgress();
-  useEffect(() => {
-    const entries = resumeEntries(progress).slice(0, 20);
-    if (entries.length === 0) return;
-    let alive = true;
-    void Promise.all([
-      fetchTitlesByIds(entries.map((e) => e.title_id)),
-      fetchEpisodesByIds(entries.map((e) => e.episode_id).filter((id): id is string => !!id)),
-    ]).then(([titles, episodes]) => {
-      if (!alive) return;
-      const t = new Map(titles.map((x) => [x.id, x]));
-      const e = new Map(episodes.map((x) => [x.id, x]));
-      setResume(entries
-        .map((entry) => ({ entry, title: t.get(entry.title_id), episode: entry.episode_id ? e.get(entry.episode_id) ?? null : null }))
-        .filter((r): r is ResumeItem => !!r.title && isListable(r.title)));
-    });
-    return () => { alive = false; };
-  }, [progress]);
-
-  const current = data && data.key === key ? data : null;
-  const ready = current?.ok ? current : null;
-  const hero = useMemo(() => (ready ? heroTitles(ready.catalog) : []), [ready]);
-  const rows = useMemo(() => (ready ? homeRows(ready.catalog, ready.top, now) : []), [ready, now]);
-  // « Continuer à regarder » : seulement avec une VRAIE position (≥ 30 s, pas finie).
-  const resumeShown = user && resumeEntries(progress).length > 0 ? resume : [];
-
-  if (!market) {
-    return (
-      <PlayPage>
-        <h1 className="sr-only">Rivendy Play — films, séries et clips</h1>
-        <HomeIntro />
-        {user || authLoading ? <><TopSkeleton /><RailSkeleton layout="tile" /></> : <MarketPrompt />}
-      </PlayPage>
-    );
-  }
-
-  const forget = async (item: ResumeItem) => {
-    if (await forgetProgress(item.title.id)) {
-      setResume((l) => l.filter((r) => r.title.id !== item.title.id));
-      notify(`« ${item.title.title} » retiré de Continuer à regarder.`, "success");
-    } else notify("Action impossible pour l’instant.", "error");
-  };
-
-  const loginNote = <LoginNote text="Connectez-vous pour regarder, reprendre vos films là où vous les avez laissés et retrouver Ma liste — sur le site comme dans l’application." />;
-
-  return (
-    <PlayPage>
-      <h1 className="sr-only">Rivendy Play — films, séries et clips</h1>
-      <HomeIntro />
-      {current === null ? (
-        <><TopSkeleton /><RailSkeleton layout="tile" /></>
-      ) : !current.ok ? (
-        <ErrorState onRetry={() => setRound((n) => n + 1)} />
-      ) : (
-        <>
-          {hero.length > 0 ? (
-            <TopGrid>
-              <PlayHero titles={hero} progress={progress} />
-              <HomeSidePanel catalog={current.catalog} />
-            </TopGrid>
-          ) : null}
-          {resumeShown.length > 0 ? (
-            <Section id="row-resume" title="Continuer à regarder" count={resumeShown.length} className="mt-8 lg:mt-10">
-              <Rail label="Continuer à regarder" layout="tile">
-                {resumeShown.map((r) => (
-                  <RailItem key={r.title.id}>
-                    <TitleTile title={r.title} href={resumeHref(r.entry)}
-                      kicker={r.episode ? `Saison ${r.episode.season} · Épisode ${r.episode.episode_number}` : kindLabel(r.title.kind)}
-                      meta={remainingLabel(r.entry.position_seconds, r.entry.duration_seconds)}
-                      progress={r.entry.duration_seconds > 0 ? r.entry.position_seconds / r.entry.duration_seconds : null}
-                      onRemove={() => void forget(r)} removeLabel={`Retirer « ${r.title.title} » de Continuer à regarder`} />
-                  </RailItem>
-                ))}
-              </Rail>
-            </Section>
-          ) : null}
-          {rows.map((row, i) => (
-            <Fragment key={row.id}>
-              {row.id === "affiche"
-                ? <AfficheSection row={row} clipCount={current.clips.length} progress={progress} />
-                : <HomeRowSection row={row} progress={progress} />}
-              {i === 0 ? loginNote : null}
-            </Fragment>
-          ))}
-          {current.clips.length > 0 ? (
-            <Section id="row-clips" title="Clips" unit="clip" count={current.clips.length} href="/play/clips">
-              <Rail label="Clips" layout="landscape">
-                {current.clips.slice(0, 20).map((t) => <RailItem key={t.id}><LandscapeCard title={t} /></RailItem>)}
-              </Rail>
-            </Section>
-          ) : null}
-          {rows.length === 0 ? loginNote : null}
-          {rows.length === 0 && current.clips.length === 0 ? (
-            <EmptyState title="Le catalogue de votre pays arrive bientôt"
-              text="Aucun film, aucune série ni aucun clip n’est encore disponible dans votre pays. Revenez bientôt." />
-          ) : null}
-        </>
-      )}
-    </PlayPage>
-  );
-}
-
-/**
- * Panneau de droite de l'accueil : les FAVORIS du compte (Ma liste) s'il en
- * a ; sinon des SUGGESTIONS du catalogue, annoncées comme telles. Sous la
- * bannière quand la place manque (trois colonnes, ou une liste sur téléphone).
- */
-function HomeSidePanel({ catalog }: { catalog: PlayTitle[] }) {
-  const { user, loading } = useAuth();
-  const list = usePlayList();
-  const mine = useMyListTitles();
-  const waiting = loading || (!!user && !list.failed && (list.ids === null || mine.waiting));
-  const favorites = !!user && !mine.failed && mine.titles.length > 0;
-  const items = favorites ? mine.titles.slice(0, 3) : suggestionsFor(catalog, list.ids ?? [], 3);
-  const total = favorites ? mine.titles.length : items.length;
-  if (!waiting && items.length === 0) return null;
-
-  // Les suggestions sont annoncées comme telles (titre ET sous-titre).
-  const subtitle = favorites ? "Vos favoris, ici et dans l’application." : "Des suggestions à ajouter à votre liste.";
-  return (
-    <aside aria-labelledby="rvp-panneau" className="@container flex min-w-0 flex-col rounded-[24px] border border-rvp-edge bg-rvp-card/80 px-5 pb-3 pt-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="rvp-panneau" className="text-[17px] font-bold tracking-tight text-rvp-text">{favorites ? "Ma liste" : "À découvrir"}</h2>
-        {!waiting ? (
-          <span className="grid h-7 min-w-7 shrink-0 place-items-center rounded-lg border border-rvp-edge px-1.5 text-[11px] font-semibold tabular-nums text-rvp-soft">
-            <span aria-hidden>{total}</span>
-            <span className="sr-only">{total} titre{total > 1 ? "s" : ""}</span>
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-1 text-[13px] leading-5 text-rvp-muted">{subtitle}</p>
-      {waiting ? <PanelSkeleton /> : (
-        <ul className="mt-2 flex-1 divide-y divide-rvp-edge @min-[34rem]:mt-4 @min-[34rem]:grid @min-[34rem]:grid-cols-3 @min-[34rem]:gap-3 @min-[34rem]:divide-y-0">
-          {items.map((t) => <PanelItem key={t.id} title={t} />)}
-        </ul>
-      )}
-      <Link href="/play/my-list"
-        className="mt-1 flex h-11 items-center justify-between gap-2 border-t border-rvp-edge text-[13px] font-semibold text-rvp-soft transition-colors hover:text-rvp-accent">
-        {favorites ? `Voir toute ma liste${total > items.length ? ` (${total})` : ""}` : "Retrouver mes favoris"}
-        <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
-      </Link>
-    </aside>
-  );
-}
-
-function PanelItem({ title }: { title: PlayTitle }) {
-  return (
-    <li className="flex items-center gap-3 py-2.5 @min-[34rem]:rounded-2xl @min-[34rem]:border @min-[34rem]:border-rvp-edge @min-[34rem]:p-3">
-      <Link href={titlePath(title)} className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg">
-        <span className="relative h-[54px] w-[40px] shrink-0 overflow-hidden rounded-lg bg-rvp-raised ring-1 ring-white/10">
-          <PlayImg src={posterArt(title) ?? landscapeArt(title)} widths={[160, 320]} sizes="40px"
-            className="absolute inset-0 h-full w-full object-cover" />
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-[14px] font-semibold text-rvp-text transition-colors group-hover:text-rvp-accent @min-[34rem]:line-clamp-2 @min-[34rem]:whitespace-normal">{title.title}</span>
-          <span className="mt-0.5 block truncate text-[12px] text-rvp-muted">{panelMeta(title)}</span>
-        </span>
-      </Link>
-      <ListToggle titleId={title.id} label={title.title} tone="panel" className="h-9 w-9" />
-    </li>
-  );
-}
-
-/**
- * « À l'affiche » (petit catalogue) : toutes les vignettes, filtre Tout /
- * Films / Séries s'il y a les deux, et la carte « L'espace des talents ».
- */
-function AfficheSection({ row, clipCount, progress }: { row: HomeRow; clipCount: number; progress: WatchProgress[] }) {
-  const filters = kindFilters(row.titles);
-  const [filter, setFilter] = useState<KindFilter>("all");
-  const active = filters.includes(filter) ? filter : "all";
-  const shown = byKindFilter(row.titles, active);
-  const talents = talentsTarget(clipCount);
-  return (
-    <Section id="row-affiche" title={row.title} count={row.titles.length} className="mt-8 lg:mt-10"
-      actions={filters.length ? <KindSwitch label="Filtrer À l’affiche" options={filters} value={active} onChange={setFilter} /> : undefined}>
-      <TileGrid max={4}>
-        {shown.map((t, i) => (
-          <li key={t.id}>
-            <TitleTile title={t} eager={i < 4} progress={kindOf(t.kind) === "film" ? progressRatio(progress, t.id) : null} />
-          </li>
-        ))}
-        {active === "all" ? <li><TalentsCard href={talents.href} label={talents.label} /></li> : null}
-      </TileGrid>
-      <p aria-live="polite" className="sr-only">
-        {active === "all" ? "" : `${shown.length} ${active === "film" ? "film" : "série"}${shown.length > 1 ? "s" : ""} à l’affiche`}
-      </p>
-    </Section>
-  );
-}
-
-/** Grand catalogue : une rangée par rubrique (classement, nouveautés, genres, types). */
-function HomeRowSection({ row, progress }: { row: HomeRow; progress: WatchProgress[] }) {
-  const id = `row-${foldText(row.id).replace(/[^a-z0-9]+/g, "-")}`;
-  const posters = row.layout !== "landscape";
-  return (
-    <Section id={id} title={row.title} count={row.titles.length} href={row.href} total={row.total}>
-      <Rail label={row.title} layout={posters ? "poster" : "tile"}>
-        {row.titles.map((t, i) => (
-          <RailItem key={t.id}>
-            {posters ? (
-              <PosterCard title={t} rank={row.layout === "ranked" ? i + 1 : undefined}
-                progress={kindOf(t.kind) === "film" ? progressRatio(progress, t.id) : null} />
-            ) : (
-              <TitleTile title={t} progress={kindOf(t.kind) === "film" ? progressRatio(progress, t.id) : null} />
-            )}
-          </RailItem>
-        ))}
-      </Rail>
-    </Section>
-  );
-}
 
 // ── Catalogues ─────────────────────────────────────────────────────────────
 
+const CATALOG_ICON = { film: Film, serie: Tv, clip: Music } as const;
+
 export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" | "clip"; heading: string; intro: string }) {
   const market = useHomeMarket();
-  const { user, loading: authLoading } = useAuth();
+  const pending = useMarketPending();
   const progress = useProgress();
   const [round, setRound] = useState(0);
   const [data, setData] = useState<{ key: string; titles: PlayTitle[] | null } | null>(null);
@@ -398,20 +66,33 @@ export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" |
   const genres = useMemo(() => genresOf(titles), [titles]);
   const shown = genre ? titles.filter((t) => foldText(t.genre?.trim() ?? "") === foldText(genre)) : titles;
   const clips = kind === "clip";
-  const layout = clips ? "landscape" : "tile";
+  const layout = clips ? "wide" : "card";
   const noun = clips ? "clip" : kind === "serie" ? "série" : "film";
+  // Ambiance : la première carte, floutée en haut de la page (même image que la carte).
+  const first = shown[0] ?? null;
+  usePageBackdrop(first ? (clips ? landscapeArt(first) ?? posterArt(first) : posterArt(first) ?? landscapeArt(first)) : null,
+    CARD_WIDTHS, clips ? WIDE_SIZES : CARD_SIZES);
 
   return (
     <PlayPage>
-      <PageHeading title={heading} intro={intro} count={current?.titles && titles.length > 0 ? titles.length : null} unit={noun} />
+      <PageHeading title={heading} intro={intro} icon={CATALOG_ICON[kind]}
+        count={current?.titles && titles.length > 0 ? titles.length : null} unit={noun}>
+        {/* Les clips gardent leur identité : celle des artistes, toujours gratuits. */}
+        {clips ? (
+          <span className="inline-flex h-9 items-center gap-2 rounded-full border border-rvp-edge-strong bg-rvp-accent/10 px-3.5 text-[13px] font-semibold text-rvp-accent">
+            <Music className="h-4 w-4" aria-hidden /> Toujours gratuits
+          </span>
+        ) : null}
+      </PageHeading>
       {!market ? (
-        user || authLoading ? <GridSkeleton layout={layout} /> : <MarketPrompt />
+        pending ? <GridSkeleton layout={layout} /> : <MarketPrompt />
       ) : current === null ? (
         <GridSkeleton layout={layout} />
       ) : current.titles === null ? (
         <ErrorState onRetry={() => setRound((n) => n + 1)} />
       ) : titles.length === 0 ? (
-        <EmptyState title={clips ? "Aucun clip pour le moment" : kind === "serie" ? "Aucune série pour le moment" : "Aucun film pour le moment"}
+        <EmptyState icon={clips ? Music : undefined}
+          title={clips ? "Aucun clip pour le moment" : kind === "serie" ? "Aucune série pour le moment" : "Aucun film pour le moment"}
           text="Le catalogue de votre pays s’enrichit : revenez bientôt.">
           <Link href="/play" className={btnSecondary}>Retour à l’accueil</Link>
           {clips ? <Link href="/music/artists" prefetch={false} className={btnSecondary}>Les artistes de Rivendy Musique</Link> : null}
@@ -423,15 +104,15 @@ export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" |
               options={genres.map((g) => ({ value: g, label: g }))} />
           ) : null}
           {clips ? (
-            <LandscapeGrid>{shown.map((t) => <li key={t.id}><LandscapeCard title={t} /></li>)}</LandscapeGrid>
+            <WideGrid>{shown.map((t, i) => <li key={t.id}><ClipCard title={t} eager={i < 3} /></li>)}</WideGrid>
           ) : (
-            <TileGrid>
+            <MediaGrid few={shown.length <= FEW_TITLES}>
               {shown.map((t, i) => (
                 <li key={t.id}>
-                  <TitleTile title={t} eager={i < 4} progress={kind === "film" ? progressRatio(progress, t.id) : null} />
+                  <MediaCard title={t} eager={i < 4} progress={kind === "film" ? progressRatio(progress, t.id) : null} />
                 </li>
               ))}
-            </TileGrid>
+            </MediaGrid>
           )}
         </>
       )}
@@ -448,7 +129,11 @@ function useTerritory(title: PlayTitle): boolean {
 }
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="mx-auto mt-6 max-w-xl rounded-xl border border-rvp-edge bg-rvp-card/80 px-4 py-3 text-left text-sm text-rvp-soft @min-[36rem]:mx-0">{children}</p>;
+  return (
+    <p className="mx-auto mt-6 max-w-xl rounded-rvp border border-rvp-edge bg-rvp-ground/60 px-4 py-3 text-left text-sm text-rvp-soft backdrop-blur-md @min-[36rem]:mx-0">
+      {children}
+    </p>
+  );
 }
 
 function PremiumNote({ title }: { title: PlayTitle }) {
@@ -473,25 +158,34 @@ function SecondaryActions({ title }: { title: PlayTitle }) {
   );
 }
 
-/** En-tête d'une fiche : la même carte « scène » que la bannière d'accueil (vraies images du titre). */
+/**
+ * En-tête d'une fiche : la même scène « key art » que la bannière d'accueil
+ * (vraies images du titre), son image en ambiance de la page.
+ */
 function DetailHero({ title, kicker, heading, children }: { title: PlayTitle; kicker: string; heading?: ReactNode; children: ReactNode }) {
+  useSceneBackdrop(title);
   return (
-    <SceneCard title={title} priority>
-      <div className="relative flex flex-1 flex-col items-center px-5 pb-7 pt-5 text-center @min-[36rem]:max-w-[62%] @min-[36rem]:items-start @min-[36rem]:justify-center @min-[36rem]:px-9 @min-[36rem]:py-9 @min-[36rem]:text-left">
-        {kicker ? <Chip>{kicker}</Chip> : null}
+    <CinematicScene title={title} priority className={sceneBleed}>
+      <div className={cn(
+        "flex flex-col items-center px-5 pb-8 text-center @min-[36rem]:min-h-[var(--rvp-hero)] @min-[36rem]:max-w-[min(42rem,70%)] @min-[36rem]:items-start @min-[36rem]:justify-center @min-[36rem]:px-8 @min-[36rem]:py-12 @min-[36rem]:text-left @min-[48rem]:max-w-[min(42rem,64%)] @min-[48rem]:px-10",
+        sceneTextOffset(title),
+      )}>
+        {kicker ? <HeroEyebrow className="rvp-fade-in">{kicker}</HeroEyebrow> : null}
         {heading ?? (
-          <h1 className="mt-4 break-words text-[clamp(1.9rem,5.4cqi,3.4rem)] font-extrabold leading-[1.02] tracking-tight text-rvp-text">{title.title}</h1>
+          <h1 className={cn("rvp-rise-in mt-4 text-balance break-words text-rvp-text", display, HERO_TITLE[heroTitleSize(title.title)], "leading-[0.95]")}>
+            {title.title}
+          </h1>
         )}
         {children}
       </div>
-    </SceneCard>
+    </CinematicScene>
   );
 }
 
 function Synopsis({ text }: { text: string | null | undefined }) {
   const s = text?.trim();
   if (!s) return null;
-  return <p className="mx-auto mt-5 max-w-2xl whitespace-pre-line text-left text-[15px] leading-7 text-rvp-soft @min-[36rem]:mx-0">{s}</p>;
+  return <p className="mx-auto mt-6 max-w-2xl whitespace-pre-line text-left text-[15px] leading-7 text-rvp-soft @min-[36rem]:mx-0">{s}</p>;
 }
 
 function Trailer({ title }: { title: PlayTitle }) {
@@ -499,7 +193,7 @@ function Trailer({ title }: { title: PlayTitle }) {
   if (!uid) return null;
   return (
     <Section id="bande-annonce" title="Bande-annonce">
-      <div className="relative aspect-video w-full max-w-4xl overflow-hidden rounded-[20px] border border-rvp-edge bg-black">
+      <div className="relative aspect-video w-full max-w-4xl overflow-hidden rounded-rvp-panel border border-rvp-edge bg-black shadow-rvp-deep">
         {/* Sans fond paysage, l'image de la bande-annonce elle-même (jamais l'affiche recadrée). */}
         <ProductVideoPlayer uid={uid} thumbnail={landscapeArt(title)} title={`Bande-annonce — ${title.title}`} />
       </div>
@@ -507,7 +201,8 @@ function Trailer({ title }: { title: PlayTitle }) {
   );
 }
 
-const actionsRow = "mt-7 flex flex-wrap items-center justify-center gap-2.5 @min-[36rem]:justify-start";
+const actionsRow = "rvp-rise-in-late mt-7 flex flex-wrap items-center justify-center gap-3 @min-[36rem]:justify-start";
+const metaRow = "rvp-fade-in mt-5 justify-center @min-[36rem]:justify-start";
 
 /** Fiche film ou clip. */
 export function TitleView({ title }: { title: PlayTitle }) {
@@ -520,14 +215,14 @@ export function TitleView({ title }: { title: PlayTitle }) {
   const watch = clip ? `/play/watch/clip/${title.id}` : `/play/watch/movie/${title.id}`;
 
   return (
-    <PlayPage>
+    <PlayPage className="max-sm:pt-0">
       <DetailHero title={title} kicker={[kindLabel(title.kind), title.genre?.trim()].filter(Boolean).join(" · ")}>
         {isArtistClip(title) && title.artist ? (
           <p className="mt-3 text-base font-semibold text-rvp-soft">
             <Link href={`/artist/${title.artist_id}`} className="underline-offset-4 hover:text-rvp-accent hover:underline">{title.artist}</Link>
           </p>
         ) : null}
-        <MetaLine title={title} className="mt-4 justify-center @min-[36rem]:justify-start" />
+        <HeroMetadata title={title} className={metaRow} />
         {!allowed ? <Notice>Ce titre n’est pas disponible dans votre pays.</Notice>
           : !ready ? <Notice>Bientôt disponible. Ajoutez-le à Ma liste pour le retrouver.</Notice> : null}
         <div className={actionsRow}>
@@ -563,13 +258,13 @@ export function SeriesView({ title, episodes }: { title: PlayTitle; episodes: Pl
   const shownSeason = season ?? current?.season ?? seasons[0] ?? 1;
 
   return (
-    <PlayPage>
+    <PlayPage className="max-sm:pt-0">
       <DetailHero title={title} kicker={[kindLabel(title.kind), title.genre?.trim()].filter(Boolean).join(" · ")}>
-        <MetaLine title={title} episodes={episodes.length} className="mt-4 justify-center @min-[36rem]:justify-start" />
+        <HeroMetadata title={title} episodes={episodes.length} className={metaRow} />
         {!allowed ? <Notice>Cette série n’est pas disponible dans votre pays.</Notice>
           : episodes.length === 0 ? <Notice>Les épisodes arrivent bientôt. Ajoutez la série à Ma liste pour la retrouver.</Notice> : null}
         <div className={actionsRow}>
-          {allowed && current ? <PrimaryAction title={title} progress={progress} episodes={episodes} /> : null}
+          {allowed && current ? <PlayButton title={title} progress={progress} episodes={episodes} /> : null}
           <SecondaryActions title={title} />
         </div>
         <PremiumNote title={title} />
@@ -600,30 +295,41 @@ export function SeriesView({ title, episodes }: { title: PlayTitle; episodes: Pl
   );
 }
 
+/** Épisode sans vignette : l'affiche de la série floutée, et son numéro en grand. */
+function EpisodeArt({ number, poster }: { number: number; poster: string | null }) {
+  return (
+    <span aria-hidden className="absolute inset-0 grid place-items-center overflow-hidden bg-gradient-to-br from-rvp-raised to-rvp-ground">
+      {poster ? (
+        <PlayImg src={poster} widths={[160, 320]} sizes="192px"
+          className="absolute inset-0 h-full w-full scale-125 object-cover object-[50%_20%] opacity-60 blur-md" />
+      ) : null}
+      <span className="absolute inset-0 bg-gradient-to-t from-rvp-ground/85 to-rvp-ground/25" />
+      <span className="rvp-hero-glow absolute inset-0" />
+      <span className={cn(display, "relative text-[28px] text-rvp-text")}>É{number}</span>
+    </span>
+  );
+}
+
 function EpisodeRow({ series, episode: e, ratio, locked, current }: {
   series: PlayTitle; episode: PlayEpisode; ratio: number; locked: boolean; current: boolean;
 }) {
   const fallbackArt = landscapeArt(series);
+  const thumb = e.thumbnail_url?.startsWith("https://") ? e.thumbnail_url : null;
+  const numbered = <EpisodeArt number={e.episode_number} poster={posterArt(series)} />;
   return (
-    <div className={cn("group flex gap-4 rounded-[20px] border bg-rvp-card/80 p-3 transition-colors hover:bg-rvp-raised/70",
-      current ? "border-rvp-accent/60" : "border-rvp-edge")}>
+    <div className={cn("group flex gap-4 rounded-rvp-panel border bg-rvp-surface/70 p-3 hover:border-rvp-edge-strong hover:bg-rvp-raised/70", motion,
+      current ? "border-rvp-edge-strong shadow-rvp-active" : "border-white/[0.06]")}>
       <Link href={`/play/watch/episode/${e.id}`} aria-label={`Regarder l’épisode ${e.episode_number} : ${e.title}`}
-        className="relative block aspect-video w-36 shrink-0 overflow-hidden rounded-xl bg-rvp-raised sm:w-48">
-        <PlayImg src={e.thumbnail_url?.startsWith("https://") ? e.thumbnail_url : fallbackArt} widths={[320, 480]} sizes="192px"
+        className="relative block aspect-video w-36 shrink-0 overflow-hidden rounded-rvp bg-rvp-raised sm:w-48">
+        <PlayImg src={thumb ?? fallbackArt} widths={[320, 480]} sizes="192px"
           className="absolute inset-0 h-full w-full object-cover"
-          fallback={fallbackArt && e.thumbnail_url?.startsWith("https://") ? (
-            <PlayImg src={fallbackArt} widths={[320, 480]} sizes="192px" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <span className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-rvp-raised to-rvp-deep text-2xl font-black text-rvp-accent/80">É{e.episode_number}</span>
-          )} />
-        <span className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition group-hover:opacity-100" aria-hidden>
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-rvp-accent text-rvp-on-accent"><Play className="h-5 w-5 translate-x-px fill-current" /></span>
+          fallback={fallbackArt && thumb ? (
+            <PlayImg src={fallbackArt} widths={[320, 480]} sizes="192px" className="absolute inset-0 h-full w-full object-cover" fallback={numbered} />
+          ) : numbered} />
+        <span aria-hidden className={cn("absolute inset-0 grid place-items-center bg-rvp-ground/35 opacity-0 group-hover:opacity-100", motion)}>
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-rvp-accent text-rvp-on-accent shadow-rvp-cta"><Play className="h-5 w-5 translate-x-px fill-current" /></span>
         </span>
-        {ratio > 0 ? (
-          <span className="absolute inset-x-2 bottom-2 h-1 overflow-hidden rounded-full bg-white/25" aria-hidden>
-            <span className="block h-full rounded-full bg-rvp-accent" style={{ width: `${Math.max(3, Math.round(ratio * 100))}%` }} />
-          </span>
-        ) : null}
+        {ratio > 0 ? <ProgressTrack ratio={ratio} className="absolute inset-x-2 bottom-2" /> : null}
       </Link>
       <div className="min-w-0 flex-1 py-0.5">
         <Link href={`/play/episode/${e.id}`} className="line-clamp-2 font-semibold text-rvp-text underline-offset-4 hover:text-rvp-accent hover:underline">
@@ -650,16 +356,16 @@ export function EpisodeView({ episode, series }: { episode: PlayEpisode; series:
   const locked = !!series.is_premium && !episode.is_free_preview;
   const heading = (
     <>
-      <p className="mt-4 text-base font-semibold text-rvp-soft">
+      <p className="rvp-fade-in mt-4 text-base font-semibold text-rvp-soft">
         <Link href={`/play/series/${series.id}`} className="underline-offset-4 hover:text-rvp-accent hover:underline">{series.title}</Link>
       </p>
-      <h1 className="mt-2 break-words text-[clamp(1.75rem,4.6cqi,3rem)] font-extrabold leading-[1.05] tracking-tight text-rvp-text">{episode.title}</h1>
+      <h1 className={cn("rvp-rise-in mt-2 text-balance break-words text-[clamp(1.9rem,5cqi,3.2rem)] leading-[1] text-rvp-text", display)}>{episode.title}</h1>
     </>
   );
   return (
-    <PlayPage>
+    <PlayPage className="max-sm:pt-0">
       <DetailHero title={series} kicker={`Saison ${episode.season} · Épisode ${episode.episode_number}`} heading={heading}>
-        <p className="mt-4 flex flex-wrap items-center justify-center gap-2.5 text-sm text-rvp-soft @min-[36rem]:justify-start">
+        <p className="rvp-fade-in mt-5 flex flex-wrap items-center justify-center gap-2.5 text-sm text-rvp-soft @min-[36rem]:justify-start">
           {durationLabel(episode.duration_seconds)}
           {locked ? <PremiumBadge /> : null}
           {series.is_premium && episode.is_free_preview ? <span className="font-semibold text-rvp-accent">Épisode offert</span> : null}
@@ -682,16 +388,12 @@ export function EpisodeView({ episode, series }: { episode: PlayEpisode; series:
 // ── Compte : Ma liste, récents ─────────────────────────────────────────────
 
 function AccountTabs({ active }: { active: "list" | "history" }) {
-  const tab = (on: boolean) => cn("relative flex h-11 items-center px-1 text-[15px] transition-colors",
-    on ? "font-semibold text-rvp-text" : "font-medium text-rvp-soft hover:text-rvp-text");
+  const tab = (on: boolean) => cn("flex h-10 items-center rounded-[10px] px-4 text-[14px] font-semibold", motion,
+    on ? "bg-rvp-raised text-rvp-text shadow-rvp-active ring-1 ring-inset ring-rvp-edge-strong" : "text-rvp-muted hover:text-rvp-text");
   return (
-    <nav aria-label="Mon espace Play" className="mb-8 flex gap-6 border-b border-rvp-edge">
-      <Link href="/play/my-list" aria-current={active === "list" ? "page" : undefined} className={tab(active === "list")}>
-        Ma liste{active === "list" ? <span aria-hidden className="absolute inset-x-0 -bottom-px h-[3px] rounded-t-full bg-rvp-accent" /> : null}
-      </Link>
-      <Link href="/play/history" aria-current={active === "history" ? "page" : undefined} className={tab(active === "history")}>
-        Récents{active === "history" ? <span aria-hidden className="absolute inset-x-0 -bottom-px h-[3px] rounded-t-full bg-rvp-accent" /> : null}
-      </Link>
+    <nav aria-label="Mon espace Play" className="mb-8 inline-flex rounded-rvp border border-rvp-edge bg-rvp-surface/60 p-1 backdrop-blur-md">
+      <Link href="/play/my-list" aria-current={active === "list" ? "page" : undefined} className={tab(active === "list")}>Ma liste</Link>
+      <Link href="/play/history" aria-current={active === "history" ? "page" : undefined} className={tab(active === "history")}>Récents</Link>
     </nav>
   );
 }
@@ -711,30 +413,33 @@ export function MyListView() {
   const progress = useProgress();
   const mine = useMyListTitles();
   const ids = list.ids;
+  const first = user ? mine.titles[0] ?? null : null;
+  usePageBackdrop(first ? posterArt(first) ?? landscapeArt(first) : null, CARD_WIDTHS, CARD_SIZES);
 
   return (
     <PlayPage>
-      <PageHeading title="Ma liste" intro="La même liste que dans l’application Rivendy." count={user && ids && !mine.waiting && !mine.failed ? mine.titles.length : null} />
+      <PageHeading title="Ma liste" kicker="Votre espace" icon={Bookmark} intro="La même liste que dans l’application Rivendy."
+        count={user && ids && !mine.waiting && !mine.failed ? mine.titles.length : null} />
       <AccountTabs active="list" />
       {loading ? <Spinner /> : !user ? (
         <SignInState title="Retrouvez Ma liste" text="Connectez-vous pour enregistrer des films et des séries, et les retrouver sur le site comme dans l’application." />
       ) : mine.failed ? (
         <ErrorState text="Impossible de charger Ma liste. Vérifiez votre connexion." onRetry={mine.retry} />
       ) : ids === null || mine.waiting ? (
-        <GridSkeleton layout="tile" />
+        <GridSkeleton layout="card" />
       ) : mine.titles.length === 0 ? (
-        <EmptyState title="Votre liste est vide" text="Ajoutez un film ou une série avec le bouton « + » de sa vignette ou « Ma liste » de sa fiche.">
+        <EmptyState icon={Bookmark} title="Votre liste est vide" text="Ajoutez un film ou une série avec le bouton « + » de sa carte ou « Ma liste » de sa fiche.">
           <Link href="/play/movies" className={btnSecondary}>Voir les films</Link>
           <Link href="/play/series" className={btnSecondary}>Voir les séries</Link>
         </EmptyState>
       ) : (
-        <TileGrid>
+        <MediaGrid few={mine.titles.length <= FEW_TITLES}>
           {mine.titles.map((t, i) => (
             <li key={t.id}>
-              <TitleTile title={t} eager={i < 4} progress={kindOf(t.kind) === "film" ? progressRatio(progress, t.id) : null} />
+              <MediaCard title={t} eager={i < 4} progress={kindOf(t.kind) === "film" ? progressRatio(progress, t.id) : null} />
             </li>
           ))}
-        </TileGrid>
+        </MediaGrid>
       )}
     </PlayPage>
   );
@@ -769,22 +474,22 @@ export function HistoryView() {
 
   return (
     <PlayPage>
-      <PageHeading title="Récents" intro="Ce que vous avez regardé, sur le site et dans l’application." />
+      <PageHeading title="Récents" kicker="Votre espace" icon={Clock} intro="Ce que vous avez regardé, sur le site et dans l’application." />
       <AccountTabs active="history" />
       {loading ? <Spinner /> : !user ? (
         <SignInState title="Retrouvez vos récents" text="Connectez-vous pour voir ce que vous avez regardé et reprendre vos films en cours." />
-      ) : current === null ? <Spinner /> : !current.ok ? (
+      ) : current === null ? <GridSkeleton layout="card" count={4} /> : !current.ok ? (
         <ErrorState onRetry={() => setRound((n) => n + 1)} />
       ) : (
         <>
           {current.inProgress.length > 0 ? (
             <Section id="en-cours" title="En cours" count={current.inProgress.length} className="mt-0 lg:mt-0">
-              <TileGrid>
+              <MediaGrid few={current.inProgress.length <= FEW_TITLES}>
                 {current.inProgress.map((t) => {
                   const entry = resumeEntries(current.progress).find((x) => x.title_id === t.id);
                   return (
                     <li key={t.id}>
-                      <TitleTile title={t} href={entry ? resumeHref(entry) : undefined}
+                      <MediaCard title={t} href={entry ? resumeHref(entry) : undefined}
                         meta={entry ? remainingLabel(entry.position_seconds, entry.duration_seconds) : undefined}
                         progress={entry && entry.duration_seconds > 0 ? entry.position_seconds / entry.duration_seconds : null}
                         removeLabel={`Retirer « ${t.title} » de En cours`}
@@ -797,7 +502,7 @@ export function HistoryView() {
                     </li>
                   );
                 })}
-              </TileGrid>
+              </MediaGrid>
             </Section>
           ) : null}
           <Section id="deja-vus" title="Déjà vus" count={current.history.length} className={current.inProgress.length ? undefined : "mt-0 lg:mt-0"}>
@@ -807,14 +512,20 @@ export function HistoryView() {
               </EmptyState>
             ) : (
               <>
-                <ul className="divide-y divide-rvp-edge overflow-hidden rounded-[20px] border border-rvp-edge bg-rvp-card/80">
+                <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-rvp-panel border border-rvp-edge bg-rvp-surface/60">
                   {current.history.map((h) => (
                     <li key={`${h.title.id}-${h.viewed_at}`}>
-                      <Link href={titlePath(h.title)} className="flex min-h-14 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-rvp-raised/70">
-                        <Clock className="h-4 w-4 shrink-0 text-rvp-accent" aria-hidden />
-                        <span className="min-w-0 flex-1 truncate font-semibold text-rvp-text">{h.title.title}</span>
+                      <Link href={titlePath(h.title)} className={cn("group flex min-h-16 items-center gap-4 px-4 py-2.5 hover:bg-rvp-raised/60", motion)}>
+                        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-rvp-sm bg-rvp-raised ring-1 ring-white/10">
+                          <PlayImg src={posterArt(h.title) ?? landscapeArt(h.title)} widths={[160]} sizes="44px"
+                            className="absolute inset-0 h-full w-full object-cover object-[50%_18%]" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className={cn("block truncate font-semibold text-rvp-text group-hover:text-rvp-accent", motion)}>{h.title.title}</span>
+                          <span className="block text-xs text-rvp-muted sm:hidden">{dateLabel(h.viewed_at)}</span>
+                        </span>
                         <span className="hidden text-xs text-rvp-muted sm:inline">{kindLabel(h.title.kind)}</span>
-                        <span className="text-xs text-rvp-muted">{dateLabel(h.viewed_at)}</span>
+                        <span className="hidden w-36 text-right text-xs text-rvp-muted sm:inline">{dateLabel(h.viewed_at)}</span>
                       </Link>
                     </li>
                   ))}
@@ -841,13 +552,13 @@ export function HistoryView() {
 // ── Recherche ──────────────────────────────────────────────────────────────
 
 /**
- * Recherche : sur ordinateur, le champ est celui de la barre du haut ; sur
- * téléphone et tablette, celui de la page. Même saisie (usePlaySearch), les
+ * Recherche : sur tablette et ordinateur, le champ est celui de la barre du
+ * haut ; sur téléphone, celui de la page. Même saisie (usePlaySearch), les
  * résultats suivent la frappe.
  */
 export function SearchView() {
   const market = useHomeMarket();
-  const { user, loading: authLoading } = useAuth();
+  const pending = useMarketPending();
   const { query, setQuery, inputRef } = usePlaySearch();
   const [round, setRound] = useState(0);
   const [data, setData] = useState<{ key: string; titles: PlayTitle[] | null } | null>(null);
@@ -862,7 +573,7 @@ export function SearchView() {
     return () => { alive = false; };
   }, [market, key]);
 
-  // Ordinateur : arrivée sur la page sans saisie en cours → le champ de la barre du haut.
+  // Tablette et ordinateur : arrivée sur la page sans saisie en cours → le champ de la barre du haut.
   useEffect(() => {
     const el = inputRef.current;
     if (el && el.offsetParent !== null && (document.activeElement === document.body || document.activeElement === null)) el.focus();
@@ -878,13 +589,13 @@ export function SearchView() {
 
   return (
     <PlayPage>
-      <PageHeading title="Recherche" intro="Titres, genres et artistes du catalogue de votre pays, avec ou sans accents." />
-      <form role="search" onSubmit={(e) => e.preventDefault()} className="relative mb-8 lg:hidden">
+      <PageHeading title="Recherche" icon={Search} intro="Titres, genres et artistes du catalogue de votre pays, avec ou sans accents." />
+      <form role="search" onSubmit={(e) => e.preventDefault()} className="relative mb-8 md:hidden">
         <label htmlFor="play-search" className="sr-only">Titre, genre ou artiste</label>
         <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-rvp-muted" aria-hidden />
         <input id="play-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus
           enterKeyHint="search" autoComplete="off" maxLength={60} placeholder="Titre, genre, artiste…"
-          className="h-14 w-full rounded-2xl border border-rvp-edge bg-rvp-card pl-12 pr-14 text-lg text-rvp-text placeholder:text-rvp-muted focus:border-rvp-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden" />
+          className="h-14 w-full rounded-rvp-card border border-white/10 bg-rvp-surface/70 pl-12 pr-14 text-lg text-rvp-text backdrop-blur-md placeholder:text-rvp-muted focus:border-rvp-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden" />
         {q ? (
           <button type="button" onClick={() => setQuery("")} aria-label="Effacer la recherche"
             className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-rvp-soft hover:bg-white/10 hover:text-rvp-text">
@@ -894,9 +605,9 @@ export function SearchView() {
       </form>
 
       {!market ? (
-        user || authLoading ? <Spinner /> : <MarketPrompt />
+        pending ? <GridSkeleton layout="card" /> : <MarketPrompt />
       ) : current === null ? (
-        <GridSkeleton layout="tile" />
+        <GridSkeleton layout="card" />
       ) : current.titles === null ? (
         <ErrorState onRetry={() => setRound((n) => n + 1)} />
       ) : (
@@ -919,12 +630,12 @@ export function SearchView() {
             <>
               {shows.length > 0 ? (
                 <Section id="res-titres" title={q ? "Films et séries" : "Tout le catalogue"} count={shows.length} className="mt-0 lg:mt-0">
-                  <TileGrid>{shows.map((t) => <li key={t.id}><TitleTile title={t} /></li>)}</TileGrid>
+                  <MediaGrid few={shows.length <= FEW_TITLES}>{shows.map((t) => <li key={t.id}><MediaCard title={t} /></li>)}</MediaGrid>
                 </Section>
               ) : null}
               {clips.length > 0 ? (
                 <Section id="res-clips" title="Clips" unit="clip" count={clips.length} className={shows.length ? undefined : "mt-0 lg:mt-0"}>
-                  <LandscapeGrid>{clips.map((t) => <li key={t.id}><LandscapeCard title={t} /></li>)}</LandscapeGrid>
+                  <WideGrid>{clips.map((t) => <li key={t.id}><ClipCard title={t} /></li>)}</WideGrid>
                 </Section>
               ) : null}
               {!q && results.length === 0 ? (

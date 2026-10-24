@@ -121,6 +121,16 @@ jamais le réécrire hors couche. Seule règle hors couche voulue pour la police
 sur écran tactile ou étroit (< 768 px), un champ de saisie jamais sous 16 px
 (sinon Safari sur iPhone agrandit la page au toucher du champ).
 
+## 10. `cn()` (tailwind-merge) retire un interligne placé AVANT une taille
+
+`cn("leading-[0.95]", "text-[clamp(…)]")` ne garde pas l'interligne :
+tailwind-merge considère qu'une classe de taille de police (`text-…`) remplace
+tout `leading-…` qui la précède (les tailles nommées de Tailwind fixent aussi
+l'interligne). Vécu le 2026-10-24 : le grand titre de la bannière de Play
+s'affichait en interligne 1,5 au lieu de 0,95. Dans un `cn()` — même à
+l'intérieur d'une seule chaîne —, écrire l'interligne APRÈS la taille. (Dans un
+`className` simple, sans `cn`, rien n'est retiré.)
+
 ## Vérifications avant de livrer
 
 `npx tsc --noEmit` → **0 erreur** (obligatoire)

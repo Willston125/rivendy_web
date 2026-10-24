@@ -397,4 +397,55 @@ latéral, barre du haut, bannière en carte, panneau de droite et catalogue en v
   servies localement, écritures interceptées, rien envoyé au serveur), clavier,
   pannes simulées. Avec un vrai compte : à essayer par le propriétaire.
 
-*Dernière mise à jour : 23 octobre 2026 (mise en page « application » de Play)*
+## Refonte « Emerald Cinema » de Play du 2026-10-24 (branche `feat/play-emerald`)
+
+Brief du propriétaire (« RIVENDY PLAY — EMERALD CINEMA ») et nouvelle maquette de
+référence : passer d'un tableau de bord à une salle de cinéma, sans rien changer aux
+données, aux routes, au compte, à la lecture ni à Supabase.
+
+- **Jetons** (`app/site.css`) : palette du brief — fonds #020907 / #04120D, surfaces
+  #071A14 / #0A211A, vert Play #00D6A3 (accent), #47FF7A et #6DFF45 réservés aux
+  halos. « Texte discret » du brief (#688078) trop faible sur les cartes (4:1) :
+  gardé en `--rvp-faint` pour le décor, `--rvp-muted` éclairci (#7E968D, 5,2:1).
+  Rayons, ombres, courbe et durées (`--rvp-fast/base/slow`, `ease-rvp`) dans
+  `@theme` ; recettes de classes dans `features/play/play-theme.ts`. Effets
+  (atmosphère, grain, verre, voiles de bannière, squelettes, fondus, parallaxe liée
+  au défilement) : classes `rvp-*` de site.css, coupées si l'on réduit les animations.
+  Anciens jetons `--rvp-card/side/deep/panel/sage` supprimés.
+- **Polices** : Urbanist (titres) et Inter (interface), celles de l'application,
+  chargées par `app/play/layout.tsx` (next/font, sur /play seulement ; Inter sans
+  préchargement pour laisser passer l'image de la bannière).
+- **Composants** (un fichier par rôle) : `play-shell` (coque, ambiance de page,
+  navigation basse), `play-sidebar`, `play-header`, `play-footer` (+ « À propos »),
+  `play-brand`, `play-hero` (CinematicScene, CinematicHero, HeroMetadata, PlayButton),
+  `play-cards` (MediaCard 4:3, ResumeCard et ClipCard 16:9, PosterCard), `play-talents`
+  (illustration SVG dessinée : projecteur, micro, foule — aucune photo inventée),
+  `play-home` (accueil), `play-hooks` (positions, Ma liste), `play-ui` (MediaRow,
+  grilles, états), `play-views` (catalogues, fiches, Ma liste, Récents, recherche).
+- **Bannière « key art »** : l'affiche n'est plus dans une carte à droite ; elle EST la
+  bannière — grande, cadrée sur son haut (visages), fondue vers le texte et le bas,
+  avec son extension floutée derrière et un halo émeraude. Fond paysage
+  (`backdrop_url`) → plein cadre. Une SEULE image téléchargée : même adresse et mêmes
+  `sizes` pour le décor, l'image nette et l'ambiance de la page (`usePageBackdrop`).
+  Taille du titre d'après sa longueur (`heroTitleSize`). Téléphone : affiche en 4:5
+  d'un bord à l'autre, sous la barre du haut transparente.
+- **Coque** : menu flottant (complet ≥ 1280 px, en icônes de 768 à 1279 px — la
+  tablette a désormais le menu au lieu de la navigation basse), barre du haut
+  transparente puis en verre au défilement, ambiance de page (image du titre floutée
+  derrière le haut de l'accueil, des fiches, des catalogues et de Ma liste, mêmes
+  tailles que l'image affichée : aucun téléchargement de plus).
+- **Accueil** : bannière + « À découvrir » (verre) ; « Continuer à regarder » en cartes
+  16:9 (reprise directe, barre d'avancement) ; « À l'affiche » 4:3 (rangée glissante
+  sur téléphone, trois colonnes ensuite) avec « L'espace des talents » dans la colonne
+  du panneau, même haut et même bas que les cartes.
+- **Pas de « Rivendy Play Original »** : aucune colonne ne dit qu'un titre est une
+  production originale ; la bannière dit la raison réelle (« À la une », « Nouveau
+  film », le type). Une section Originals demanderait une colonne (zone protégée).
+- Vérifié (Chromium sans fenêtre, de 390 à 1920 px) : aucun débordement, 0 erreur
+  console, parcours carrousel / filtres / Ctrl K / recherche / « À propos » / « + »
+  sans compte / panne / chargement, tabulation (contour vert 26/26), animations
+  réduites ; compte SIMULÉ (reprise, épisode en cours, favoris, compteur, menu,
+  ajout et retrait — écritures interceptées, rien envoyé). Marketplace et Musique
+  inchangées. `npm run check` OK (play 25/25).
+
+*Dernière mise à jour : 24 octobre 2026 (refonte « Emerald Cinema » de Play)*

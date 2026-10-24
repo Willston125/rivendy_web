@@ -618,6 +618,45 @@ export function searchHref(q: string): string {
   return v ? `/play/search?q=${encodeURIComponent(v)}` : "/play/search";
 }
 
+// ── « Emerald Cinema » (2026-10-24) ────────────────────────────────────────
+
+export type HeroTitleSize = "xl" | "lg" | "md";
+
+/**
+ * Taille du titre de la bannière d'après sa longueur : immense pour un titre
+ * court (« Mbayé Trambwé »), plus petite pour un titre long ou écrit en
+ * capitales, plus larges (« LA BOUSSOLE DIGITAL Saisons 1 ») — pour qu'il
+ * tienne en trois lignes au plus, sans jamais être coupé.
+ */
+export function heroTitleSize(title: string | null | undefined): HeroTitleSize {
+  const t = (title ?? "").trim();
+  const letters = Array.from(t.replace(/\s+/g, ""));
+  const upper = letters.filter((c) => c !== c.toLocaleLowerCase("fr")).length;
+  const weight = letters.length > 0 && upper / letters.length > 0.6 ? 1.3 : 1;
+  const length = Array.from(t).length * weight;
+  const longest = Math.max(0, ...t.split(/\s+/).map((w) => Array.from(w).length)) * weight;
+  if (length <= 16 && longest <= 10) return "xl";
+  if (length <= 26 && longest <= 13) return "lg";
+  return "md";
+}
+
+/**
+ * Image de la scène (bannière, fiche, ambiance de la page) : le fond paysage
+ * s'il existe — plein cadre —, sinon l'affiche portrait, mise en « key art ».
+ */
+export function sceneArt(t: Pick<PlayTitle, "kind" | "backdrop_url" | "thumbnail_url" | "poster_url">): { src: string | null; wide: boolean } {
+  const wide = landscapeArt(t);
+  return wide ? { src: wide, wide: true } : { src: posterArt(t), wide: false };
+}
+
+/** Au-dessus du titre d'une carte « Continuer à regarder » : l'épisode en cours, sinon le type. */
+export function resumeKicker(
+  t: Pick<PlayTitle, "kind">,
+  episode: Pick<PlayEpisode, "season" | "episode_number"> | null | undefined,
+): string {
+  return episode ? `Saison ${episode.season} · Épisode ${episode.episode_number}` : kindLabel(t.kind);
+}
+
 // ── « Ma liste » demandée sans compte ──────────────────────────────────────
 
 export interface PendingListAdd { titleId: string; label: string; at: number }

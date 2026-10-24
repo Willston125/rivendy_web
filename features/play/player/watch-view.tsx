@@ -16,7 +16,8 @@ import {
   isArtistClip, kindOf, nextEpisode, playbackErrorMessage, resumeAt, titlePath, upNextAt, wideImage,
   type PlayEpisode, type PlayTitle,
 } from "../play-logic";
-import { EmptyState, PlayPage, Spinner, btnPrimary, btnSecondary } from "../play-ui";
+import { btnPrimary, btnSecondary, display } from "../play-theme";
+import { EmptyState, PlayPage, Spinner } from "../play-ui";
 import { VideoPlayer, type FatalReason } from "./video-player";
 
 /**
@@ -346,7 +347,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
   return (
     <PlayPage className="max-w-[1320px]">
       {back}
-      <h1 className="mb-4 text-2xl font-black tracking-tight text-rvp-text sm:text-3xl">{heading}</h1>
+      <h1 className={`${display} mb-4 text-2xl text-rvp-text sm:text-3xl`}>{heading}</h1>
       {grant.preview ? (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-rvp-premium/30 bg-rvp-premium/10 px-4 py-3 text-sm text-rvp-soft">
           <Lock className="h-4 w-4 shrink-0 text-rvp-premium" aria-hidden />
@@ -395,8 +396,8 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
 function Notice({ title, text, children }: { title: string; text: string; children?: React.ReactNode }) {
   return (
-    <div className="mx-auto mt-6 max-w-xl rounded-[24px] border border-rvp-edge bg-rvp-card/80 px-6 py-8 text-center">
-      <h2 className="text-lg font-black text-rvp-text">{title}</h2>
+    <div className="rvp-glass mx-auto mt-6 max-w-xl rounded-rvp-hero px-6 py-8 text-center">
+      <h2 className={`${display} text-xl text-rvp-text`}>{title}</h2>
       <p className="mt-2 text-sm leading-6 text-rvp-soft">{text}</p>
       {children ? <div className="mt-5 flex flex-wrap justify-center gap-3">{children}</div> : null}
     </div>
