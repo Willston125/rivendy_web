@@ -84,11 +84,16 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
-    // Hôtes autorisés pour l'optimiseur next/image. Restreint au Storage
-    // Supabase (source unique des images marchandes — vérifié en prod le
-    // 2026-07-16 : tous les /_next/image servis pointent ce host). Le joker
-    // "**" précédent faisait de l'optimiseur un proxy d'images ouvert
-    // (RIV-007). Si un nouvel hôte d'images est introduit, l'ajouter ici.
+    // Audit 21, P0-5 : l'optimiseur /_next/image de Vercel renvoyait 402
+    // (OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED, quota épuisé) → toute image de
+    // vendeur non encore en cache était cassée. On sert les images SANS passer
+    // par l'optimiseur : elles viennent du Storage Supabase et sont déjà
+    // compressées à l'upload (app et site). Plus de 402, coût nul.
+    // Évolution possible : un `loader` vers Cloudflare Images ou les
+    // transformations Supabase (offre payante) pour le redimensionnement.
+    unoptimized: true,
+    // Conservé comme documentation des hôtes d'images autorisés (inopérant
+    // tant que unoptimized=true, mais à garder si l'optimiseur revient).
     remotePatterns: [
       {
         protocol: "https",
