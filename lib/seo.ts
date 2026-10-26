@@ -1,5 +1,10 @@
 import { cache } from "react";
 import { PLAY_STORE_URL } from "@/lib/config/app-links";
+
+// Sérialisation JSON-LD sûre (anti-XSS). Vit dans un fichier pur sans import
+// pour rester testable sous `node --test` ; réexportée ici pour que les pages
+// l'importent depuis @/lib/seo comme le reste du SEO (audit 21, WEBMEDIA-1).
+export { safeJsonLd } from "./safe-json-ld";
 import { inMarket } from "@/lib/utils/market-phrase";
 import { getSellerMarket } from "@/services/public-data";
 import type { Country } from "@/types/rivendy";

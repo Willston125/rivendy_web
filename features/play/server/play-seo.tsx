@@ -1,4 +1,4 @@
-import { SITE_URL, clip } from "@/lib/seo";
+import { SITE_URL, clip, safeJsonLd } from "@/lib/seo";
 import { cover, durationLabel, kindLabel, streamThumbnail, titlePath, wideImage, type PlayEpisode, type PlayTitle } from "../play-logic";
 
 /**
@@ -70,7 +70,8 @@ export function episodeDescription(e: PlayEpisode, series: PlayTitle): string {
   return clip(e.synopsis?.trim() || `Saison ${e.season}, épisode ${e.episode_number} de « ${series.title} »${d ? ` (${d})` : ""}, sur Rivendy Play.`, 155);
 }
 
-/** Bloc JSON-LD : « < » échappé (aucun </script> dans un titre saisi). */
+/** Bloc JSON-LD : « < » réellement échappé via safeJsonLd (aucun </script>
+ *  saisi par l'artiste ne peut fermer la balise — audit 21, WEBMEDIA-1). */
 export function JsonLd({ data }: { data: Record<string, unknown> }) {
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\u003c") }} />;
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(data) }} />;
 }

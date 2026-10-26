@@ -8,7 +8,7 @@ import { HideInPlay } from "@/components/layout/hide-in-play";
 import { HideInMusic } from "@/components/layout/hide-in-music";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { AppDownloadBanner } from "@/features/app-banner/app-download-banner";
-import { PLAY_LISTING_URL, SITE_URL } from "@/lib/seo";
+import { PLAY_LISTING_URL, safeJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata: Metadata = {
   // Pas de modèle « %s | Rivendy » : chaque page nomme déjà Rivendy dans son
@@ -82,7 +82,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <script
           type="application/ld+json"
           // Contenu 100 % statique défini ci-dessus — aucune donnée utilisateur.
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSONLD) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(SITE_JSONLD) }}
         />
         <Providers>
           {/* Rivendy Play a son en-tête et son pied de page sombres (refonte du 2026-10-22) ;

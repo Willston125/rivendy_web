@@ -22,7 +22,7 @@ import { findPhaseBListing, isPhaseBCategory } from "@/lib/listings";
 import { locationPriceUnit, locationPriceValue } from "@/features/products/location-listings";
 import { inMarket } from "@/lib/utils/market-phrase";
 import { MarketHint } from "@/features/country/market-hint";
-import { clip, marketHomePath, SITE_URL } from "@/lib/seo";
+import { clip, marketHomePath, safeJsonLd, SITE_URL } from "@/lib/seo";
 
 /**
  * Marché de l'ARTICLE : il fixe la devise du prix affiché. Le pays du profil
@@ -154,7 +154,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c"),
+          __html: safeJsonLd(productJsonLd),
         }}
       />
 
