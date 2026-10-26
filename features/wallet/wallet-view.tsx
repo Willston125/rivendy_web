@@ -72,12 +72,10 @@ export function WalletView() {
     setLoading(true);
     try {
       // 1. Charger les commandes vendeur (pour stats et gains en attente)
+      // Audit 21 (DBSEC-7) : seller_orders() au lieu d'une lecture directe
+      // d'orders (plus de coordonnées acheteur côté vendeur).
       const { data: ordersData } = await supabase
-        .from("orders")
-        .select("*, order_items(*)")
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .rpc("seller_orders", { p_limit: 50, p_offset: 0 });
 
       setOrders(
         ((ordersData ?? []) as Array<Record<string, unknown>>).map((row) => ({

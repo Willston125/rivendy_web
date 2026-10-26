@@ -99,7 +99,9 @@ export function SellerDashboard() {
     try {
       const [prodResp, orderResp, walletResp] = await Promise.all([
         supabase.from("products").select("*").eq("seller_id", user.id).eq("is_deleted", false).is("deleted_at", null).order("created_at", { ascending: false }),
-        supabase.from("orders").select("*, order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false }).limit(50),
+        // Audit 21 (DBSEC-7) : plus de lecture directe d'orders par le vendeur
+        // (fuite coordonnées). seller_orders() renvoie la liste sans PII.
+        supabase.rpc("seller_orders", { p_limit: 50, p_offset: 0 }),
         supabase.from("wallets").select("balance, currency, country_id").eq("user_id", user.id).maybeSingle(),
       ]);
       setProducts(((prodResp.data ?? []) as Product[]).filter((p) => p.status !== "deleted"));

@@ -123,10 +123,14 @@ export function SellerSalesView() {
       // vendeur qui a tout supprimé n'apparaissait jamais.
       const [prodRes, orderRes] = await Promise.all([
         supabase.from("products").select("*").eq("seller_id", user.id).eq("is_deleted", false).is("deleted_at", null).order("created_at", { ascending: false }),
-        supabase.from("orders").select("*, items:order_items(*)").eq("seller_id", user.id).order("created_at", { ascending: false })
+        // Audit 21 (DBSEC-7) : seller_orders() au lieu d'une lecture directe
+        // d'orders (sans coordonnées acheteur) ; 100 ventes les plus récentes.
+        supabase.rpc("seller_orders", { p_limit: 100, p_offset: 0 })
       ]);
       setProducts(((prodRes.data ?? []) as Product[]).filter((p) => p.status !== "deleted"));
-      setOrders((orderRes.data ?? []) as AppOrder[]);
+      setOrders(((orderRes.data ?? []) as Array<Record<string, unknown>>).map(
+        (row) => ({ ...row, items: row.order_items }) as unknown as AppOrder,
+      ));
     } catch {
       // ne pas bloquer l'UI
     } finally {
