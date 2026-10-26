@@ -78,3 +78,29 @@ export function detectPhoneCountryId(phone: string): string | null {
   }
   return matched;
 }
+
+/**
+ * Identifiants de connexion CANDIDATS (chiffres) pour un numéro saisi, dans
+ * l'ordre à essayer. Le PREMIER est l'identifiant HISTORIQUE (chiffres bruts) :
+ * la connexion habituelle reste strictement identique. Les suivants rattrapent
+ * le MÊME numéro saisi autrement — local ↔ international — pour qu'un compte créé
+ * sous une forme ne soit pas injoignable sous l'autre (audit 21, APPSOCLE-1).
+ * Règle PURE, à garder identique à l'app (phone_validator.dart :
+ * loginDigitCandidates).
+ */
+export function loginDigitCandidates(phone: string): string[] {
+  const raw = (phone ?? "").replace(/\D/g, "");
+  const out: string[] = [];
+  const add = (d: string) => {
+    if (d.length >= 7 && d.length <= 15 && !out.includes(d)) out.push(d);
+  };
+  add(raw); // historique — inchangé, essayé en premier
+  if (raw.startsWith("00") && raw.length >= 9) add(raw.slice(2));
+  for (const rule of Object.values(RULES)) {
+    if (raw.startsWith(rule.dialDigits)) {
+      const local = raw.slice(rule.dialDigits.length);
+      if (rule.localLengths.includes(local.length)) add(local);
+    }
+  }
+  return out.slice(0, 4);
+}
