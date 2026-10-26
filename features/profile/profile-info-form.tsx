@@ -45,6 +45,15 @@ export function ProfileInfoForm() {
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Changement d'adresse de récupération : passe par la fonction serveur
+  // change-email (mot de passe exigé), car real_email est figée côté client
+  // (audit 21, EDGE-1). On recueille le mot de passe dans une petite invite.
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [emailPwd, setEmailPwd] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNote, setEmailNote] = useState("");
+
   const hasChanges =
     fullName !== (profile?.full_name ?? "") ||
     phone !== (profile?.whatsapp_number ?? "") ||
@@ -102,7 +111,6 @@ export function ProfileInfoForm() {
     const candidates: { col: string; next: string | null; prev: string }[] = [
       { col: "full_name",         next: fullName.trim(),                 prev: profile?.full_name ?? "" },
       { col: "whatsapp_number",   next: phone.trim(),                    prev: profile?.whatsapp_number ?? "" },
-      { col: "real_email",        next: email.trim(),                    prev: profile?.real_email ?? "" },
       { col: "avatar_url",        next: avatarUrl,                       prev: profile?.avatar_url ?? "" },
       { col: "store_name",        next: storeName.trim() || null,        prev: profile?.store_name ?? "" },
       { col: "store_description", next: storeDescription.trim() || null, prev: profile?.store_description ?? "" },
@@ -115,42 +123,97 @@ export function ProfileInfoForm() {
       if ((next ?? "") !== prev) patch[col] = next;
     }
 
-    if (Object.keys(patch).length === 0) {
+    // L'adresse de récupération (real_email) ne s'écrit plus directement : elle
+    // est figée côté client et ne change que par la fonction change-email (mot
+    // de passe exigé — audit 21, EDGE-1). On la traite à part, APRÈS les autres
+    // champs, via une invite mot de passe.
+    const newEmail = email.trim();
+    const emailChanged = newEmail !== (profile?.real_email ?? "");
+
+    if (Object.keys(patch).length === 0 && !emailChanged) {
       setSaving(false);
       setMessage("Aucune modification à enregistrer.");
       setTimeout(() => setMessage(""), 3000);
       return;
     }
 
-    // .select() : on ne dit « mis à jour » que si une ligne a réellement été
-    // écrite (une écriture refusée par RLS ne renvoie pas d'erreur).
-    const { data: written, error: err } = await supabase
-      .from("profiles")
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq("id", user.id)
-      .select("id");
+    if (Object.keys(patch).length > 0) {
+      // .select() : on ne dit « mis à jour » que si une ligne a réellement été
+      // écrite (une écriture refusée par RLS ne renvoie pas d'erreur).
+      const { data: written, error: err } = await supabase
+        .from("profiles")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", user.id)
+        .select("id");
 
-    if (err || !written || written.length === 0) {
-      setSaving(false);
-      return setError("La mise à jour n'a pas pu être enregistrée. Réessayez.");
-    }
+      if (err || !written || written.length === 0) {
+        setSaving(false);
+        return setError("La mise à jour n'a pas pu être enregistrée. Réessayez.");
+      }
 
-    // Comme AuthProvider.updatePhone de l'app : les métadonnées du compte
-    // suivent le profil, sinon un écran qui les lit en premier réaffiche
-    // l'ancienne valeur. Best effort — profiles fait foi.
-    const metadata: Record<string, string> = {};
-    if ("whatsapp_number" in patch) metadata.whatsapp_number = patch.whatsapp_number ?? "";
-    if ("full_name" in patch) metadata.full_name = patch.full_name ?? "";
-    if ("real_email" in patch) metadata.real_email = patch.real_email ?? "";
-    if (Object.keys(metadata).length > 0) {
-      const { error: metaErr } = await supabase.auth.updateUser({ data: metadata });
-      if (metaErr) console.error("Métadonnées du compte non synchronisées :", metaErr.message);
+      // Comme AuthProvider.updatePhone de l'app : les métadonnées suivent le
+      // profil. Best effort — profiles fait foi. (real_email n'y est plus :
+      // elle est posée par change-email.)
+      const metadata: Record<string, string> = {};
+      if ("whatsapp_number" in patch) metadata.whatsapp_number = patch.whatsapp_number ?? "";
+      if ("full_name" in patch) metadata.full_name = patch.full_name ?? "";
+      if (Object.keys(metadata).length > 0) {
+        const { error: metaErr } = await supabase.auth.updateUser({ data: metadata });
+        if (metaErr) console.error("Métadonnées du compte non synchronisées :", metaErr.message);
+      }
+      await refreshProfile();
     }
 
     setSaving(false);
-    await refreshProfile();
+
+    if (emailChanged) {
+      if (!newEmail) {
+        // Le retrait d'une adresse de récupération passe par Rivendy.
+        setEmail(profile?.real_email ?? "");
+        setError("Pour retirer votre adresse de récupération, contactez Rivendy.");
+        return;
+      }
+      setPendingEmail(newEmail);
+      setEmailPwd("");
+      setEmailNote("");
+      setShowEmailModal(true);
+      return;
+    }
+
     setMessage("✅ Informations mises à jour !");
     setTimeout(() => setMessage(""), 3000);
+  }
+
+  // Confirme le changement d'adresse de récupération via change-email (le
+  // JWT du compte connecté est joint automatiquement par supabase-js).
+  async function submitEmailChange() {
+    if (!pendingEmail) return;
+    if (!emailPwd) { setEmailNote("Entrez votre mot de passe actuel."); return; }
+    setEmailBusy(true);
+    setEmailNote("");
+    const { data, error: fnErr } = await supabase.functions.invoke("change-email", {
+      body: { email: pendingEmail, password: emailPwd },
+    });
+    setEmailBusy(false);
+    const res = (data ?? {}) as { ok?: boolean; reason?: string };
+    if (fnErr || !res.ok) {
+      const map: Record<string, string> = {
+        wrong_password: "Mot de passe incorrect.",
+        email_taken: "Cette adresse est déjà utilisée par un autre compte.",
+        invalid_email: "Adresse e-mail invalide.",
+        missing_password: "Entrez votre mot de passe actuel.",
+        rate_limited: "Trop de tentatives. Réessayez dans une heure.",
+        email_not_configured: "L'envoi d'e-mails est momentanément indisponible.",
+        email_failed: "Le courriel n'a pas pu être envoyé. Réessayez.",
+      };
+      setEmailNote(map[res.reason ?? ""] ?? "La modification a échoué. Réessayez.");
+      return;
+    }
+    setShowEmailModal(false);
+    setEmailPwd("");
+    await refreshProfile();
+    setMessage("📧 Un lien de confirmation a été envoyé à votre nouvelle adresse. Ouvrez-le pour l'activer.");
+    setTimeout(() => setMessage(""), 6000);
   }
 
   // ── Avatar initiale ────────────────────────────────────────
@@ -235,6 +298,11 @@ export function ProfileInfoForm() {
             className="h-12 w-full rounded-2xl border border-slate-200 pl-10 pr-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
           />
         </FormField>
+        <p className="-mt-2 text-xs text-slate-500">
+          Adresse de récupération, utile si vous oubliez votre mot de passe. La
+          changer demande votre mot de passe actuel, puis une confirmation par
+          courriel.
+        </p>
 
         {/* Champs Boutique */}
         <div className="pt-4 pb-2">
@@ -309,6 +377,45 @@ export function ProfileInfoForm() {
           )}
         </button>
       </div>
+
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-black text-[#1A1A1A]">Confirmer le changement d&apos;adresse</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Entrez votre mot de passe actuel. Un lien de confirmation sera
+              envoyé à <span className="font-semibold">{pendingEmail}</span>.
+            </p>
+            <input
+              type="password"
+              value={emailPwd}
+              onChange={(e) => setEmailPwd(e.target.value)}
+              placeholder="Mot de passe actuel"
+              autoComplete="current-password"
+              className="mt-4 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+            />
+            {emailNote && <p className="mt-2 text-xs font-semibold text-red-500">{emailNote}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowEmailModal(false); setEmailPwd(""); setEmail(profile?.real_email ?? ""); }}
+                disabled={emailBusy}
+                className="h-11 flex-1 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={submitEmailChange}
+                disabled={emailBusy || !emailPwd}
+                className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-[#009688] text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {emailBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
