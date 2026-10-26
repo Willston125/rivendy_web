@@ -22,7 +22,7 @@ import { motion } from "./play-theme";
  * (Ctrl K), notifications, compte. Téléphone : logo, recherche, compte.
  */
 
-const BAR_SCROLLED = "bg-rvp-ground/80 shadow-[0_1px_0_var(--rvp-edge)] backdrop-blur-xl";
+export const BAR_SCROLLED = "bg-rvp-ground/80 shadow-[0_1px_0_var(--rvp-edge)] backdrop-blur-xl";
 
 export function PlayHeader({ pathname, scrolled }: { pathname: string; scrolled: boolean }) {
   return (
@@ -117,7 +117,7 @@ function SearchBox() {
   );
 }
 
-function NotificationsLink() {
+export function NotificationsLink() {
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
   if (!user) return null;
@@ -146,7 +146,7 @@ function Avatar({ url, initials, className }: { url: string | null | undefined; 
  * Compte : « Se connecter » pour un visiteur ; sinon l'avatar, le prénom et
  * « Mon espace », qui ouvrent les raccourcis du compte (Échap referme).
  */
-function AccountMenu({ compact }: { compact?: boolean }) {
+export function AccountMenu({ compact }: { compact?: boolean }) {
   const { user, profile, loading, signOut } = useAuth();
   const pathname = usePathname() || "/play";
   const homeHref = useHomeHref();

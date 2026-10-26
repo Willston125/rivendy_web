@@ -11,6 +11,9 @@ import { playImage, playSrcSet } from "./play-logic";
 import { PlaySearchProvider, usePlaySearch } from "./play-search";
 import { EXPLORE, MY_LIST, PlaySidebar, type NavItem } from "./play-sidebar";
 import { motion } from "./play-theme";
+import { isClipsPath } from "./clips/clips-logic";
+import { ClipsHeader, ClipsMobileNav, ClipsMobileTopBar, ClipsSidebar } from "./clips/clips-shell";
+import { ClipsProvider } from "./clips/clips-store";
 
 /**
  * Coque de Rivendy Play — « Emerald Cinema » (refonte du 2026-10-24) : la
@@ -23,6 +26,11 @@ import { motion } from "./play-theme";
  *
  * Aucun prix ni lien d'achat dans la coque : les pages /play/short/… sont
  * ouvertes depuis l'app Android (règle Google Play).
+ *
+ * Rivendy Clips (refonte du 2026-10-26) : sur /play/clips et /play/clip/…,
+ * la même fenêtre prend la coque Clips (menu, barre, navigation basse et
+ * palette graphite propres aux clips et aux artistes). Les films, séries et
+ * documentaires gardent la coque ci-dessus, inchangée.
  */
 
 /** Téléphone : cinq destinations ; « Récents » est un onglet de Ma liste. */
@@ -77,7 +85,9 @@ export function PlayShell({ fontClassName, children }: { fontClassName?: string;
   return (
     <PlayListProvider>
       <PlaySearchProvider>
-        <ShellFrame fontClassName={fontClassName}>{children}</ShellFrame>
+        <ClipsProvider>
+          <ShellFrame fontClassName={fontClassName}>{children}</ShellFrame>
+        </ClipsProvider>
       </PlaySearchProvider>
     </PlayListProvider>
   );
@@ -91,6 +101,14 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
   const about = useRef<HTMLDialogElement>(null);
   const [backdrop, setBackdropState] = useState<Backdrop>(null);
   const [scrolled, setScrolled] = useState(false);
+  const clips = isClipsPath(pathname);
+
+  // Pages Clips : fond graphite jusque dans le rebond du défilement (site.css).
+  useEffect(() => {
+    const html = document.documentElement;
+    html.toggleAttribute("data-clips", clips);
+    return () => html.removeAttribute("data-clips");
+  }, [clips]);
 
   const setBackdrop = useCallback((b: Backdrop) => {
     setBackdropState((cur) => (cur?.src === b?.src && cur?.sizes === b?.sizes ? cur : b));
@@ -139,25 +157,25 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
   return (
     <BackdropContext.Provider value={setBackdrop}>
       {/* lg:h-dvh dès le rendu serveur : la fenêtre a sa hauteur avant même que html[data-world] soit posé. */}
-      <div className={cn("rvp-scope rvp-atmosphere font-rvp-body text-rvp-text md:flex lg:h-dvh lg:overflow-hidden", fontClassName)}>
+      <div className={cn("rvp-scope font-rvp-body text-rvp-text md:flex lg:h-dvh lg:overflow-hidden", clips ? "rvc-scope bg-rvp-ground" : "rvp-atmosphere", fontClassName)}>
         <a href="#rvp-contenu"
           className="sr-only rounded-rvp bg-rvp-accent px-4 py-2.5 text-sm font-bold text-rvp-on-accent focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70]">
           Aller au contenu
         </a>
-        <PlaySidebar pathname={pathname} onAbout={openAbout} />
+        {clips ? <ClipsSidebar pathname={pathname} /> : <PlaySidebar pathname={pathname} onAbout={openAbout} />}
         {/* « relative » : les éléments positionnés de la page (textes pour lecteurs d'écran
             compris) défilent et sont rognés avec le panneau, au lieu d'allonger la fenêtre.
             « isolate » : l'ambiance de la page se pose sous le contenu, jamais sous le fond. */}
         <div ref={main} id="rvp-main" className="relative isolate flex min-h-dvh min-w-0 flex-1 flex-col lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
-          <PageBackdrop backdrop={backdrop} />
-          <MobileTopBar pathname={pathname} scrolled={scrolled} />
-          <PlayHeader pathname={pathname} scrolled={scrolled} />
+          {clips ? null : <PageBackdrop backdrop={backdrop} />}
+          {clips ? <ClipsMobileTopBar scrolled={scrolled} /> : <MobileTopBar pathname={pathname} scrolled={scrolled} />}
+          {clips ? <ClipsHeader scrolled={scrolled} /> : <PlayHeader pathname={pathname} scrolled={scrolled} />}
           <div id="rvp-contenu" tabIndex={-1} className="flex-1 outline-none">{children}</div>
           <PlayFooter onAbout={openAbout} />
           {/* Place de la navigation basse (téléphone). */}
           <div aria-hidden className="h-[calc(4rem+env(safe-area-inset-bottom))] shrink-0 md:hidden" />
         </div>
-        <MobileNav pathname={pathname} />
+        {clips ? <ClipsMobileNav pathname={pathname} /> : <MobileNav pathname={pathname} />}
         <AboutDialog dialogRef={about} />
       </div>
     </BackdropContext.Provider>

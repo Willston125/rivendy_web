@@ -83,6 +83,49 @@
   --rvp-base:           300ms;
   --rvp-slow:           450ms;
   --rvp-ease:           cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Rivendy Clips (refonte du 2026-10-26, maquette du propriétaire) : la
+     même coque que Play, mais en GRAPHITE — surfaces sombres neutres,
+     légèrement différenciées — et un turquoise pour les éléments actifs.
+     Ces valeurs ne servent que sous .rvc-scope, qui les reporte sur les
+     jetons --rvp-* : le thème de Play (films, séries) ne change pas.
+     Contrastes : --rvc-text 17:1 sur --rvc-ground ; sur --rvc-raised (la
+     surface la plus claire) --rvc-soft 7,9:1 et --rvc-muted 5,1:1 ;
+     --rvc-on-accent 7,8:1 sur l'accent. */
+  --rvc-ground:         #0D1215;  /* fond de la page                    */
+  --rvc-frame:          #12181C;  /* menu latéral, barres               */
+  --rvc-surface:        #161E22;  /* cartes, panneaux                   */
+  --rvc-raised:         #1D272C;  /* survol, champs, puces              */
+  --rvc-line:           #243137;  /* séparateurs pleins                 */
+  --rvc-edge:           rgb(255 255 255 / 0.08);
+  --rvc-edge-strong:    rgb(28 200 180 / 0.45);
+  --rvc-text:           #F2F6F7;
+  --rvc-soft:           #AFBCC2;
+  --rvc-muted:          #8A989F;
+  --rvc-accent:         #1CC8B4;  /* turquoise Rivendy                  */
+  --rvc-accent-hover:   #3DD8C6;
+  --rvc-accent-pressed: #13A997;
+  --rvc-on-accent:      #032421;
+}
+
+/* Coque Clips : les composants de Play (menu de compte, puces, états vides,
+   lecteur) prennent la palette graphite sans être réécrits. Seulement des
+   variables ici (§9 : aucune propriété hors couche qui écraserait une classe). */
+.rvc-scope {
+  --rvp-ground: var(--rvc-ground);
+  --rvp-frame: var(--rvc-frame);
+  --rvp-surface: var(--rvc-surface);
+  --rvp-raised: var(--rvc-raised);
+  --rvp-line: var(--rvc-line);
+  --rvp-edge: var(--rvc-edge);
+  --rvp-edge-strong: var(--rvc-edge-strong);
+  --rvp-text: var(--rvc-text);
+  --rvp-soft: var(--rvc-soft);
+  --rvp-muted: var(--rvc-muted);
+  --rvp-accent: var(--rvc-accent);
+  --rvp-accent-hover: var(--rvc-accent-hover);
+  --rvp-accent-pressed: var(--rvc-accent-pressed);
+  --rvp-on-accent: var(--rvc-on-accent);
 }
 
 /* Jetons Tailwind de la Musique (bg-rvm-accent, text-rvm-muted…) : le SEUL
@@ -469,6 +512,11 @@ body {
 html[data-world="play"],
 html[data-world="play"] body {
   background: var(--rvp-ground);
+}
+/* Pages Clips (posé par la coque) : le même rebond, en graphite. */
+html[data-world="play"][data-clips],
+html[data-world="play"][data-clips] body {
+  background: var(--rvc-ground);
 }
 
 /* Coque de Play : sur grand écran (≥ 1024 px), la fenêtre ne défile pas,

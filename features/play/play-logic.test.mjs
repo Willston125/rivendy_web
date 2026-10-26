@@ -180,7 +180,7 @@ test("métadonnées : seulement ce qui est renseigné", () => {
 
 test("liens de lecture et reprise", () => {
   assert.equal(watchHref({ id: "a", kind: "film" }), "/play/watch/movie/a");
-  assert.equal(watchHref({ id: "a", kind: "clip" }), "/play/watch/clip/a");
+  assert.equal(watchHref({ id: "a", kind: "clip" }), "/play/clip/a");
   assert.equal(watchHref({ id: "a", kind: "serie" }), null);
   assert.equal(resumeHref({ title_id: "s", episode_id: "e" }), "/play/watch/episode/e");
   assert.equal(resumeHref({ title_id: "f", episode_id: null }), "/play/watch/movie/f");

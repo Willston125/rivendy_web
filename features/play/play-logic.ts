@@ -370,11 +370,14 @@ export function metaParts(t: PlayTitle, episodes?: number): string[] {
   return parts;
 }
 
-/** Lecture directe d'un film ou d'un clip (une série passe par un épisode). */
+/**
+ * Lecture directe d'un film ou d'un clip (une série passe par un épisode).
+ * Un clip se lit sur son propre écran (refonte Clips du 2026-10-26).
+ */
 export function watchHref(t: Pick<PlayTitle, "id" | "kind">): string | null {
   const k = kindOf(t.kind);
   if (k === "film") return `/play/watch/movie/${t.id}`;
-  if (k === "clip") return `/play/watch/clip/${t.id}`;
+  if (k === "clip") return `/play/clip/${t.id}`;
   return null;
 }
 

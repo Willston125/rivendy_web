@@ -1,12 +1,18 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { CatalogView } from "@/features/play/play-views";
+import { ClipsHomeView } from "@/features/play/clips/clips-home";
 
 export const metadata: Metadata = {
-  title: "Clips — Rivendy Play",
-  description: "Les clips des artistes Rivendy, toujours gratuits, sur le site et dans l’application Rivendy.",
+  title: "Rivendy Clips — les clips des artistes",
+  description: "Les clips musicaux des artistes de Rivendy, toujours gratuits : découvrez, cliquez, regardez, sur le site et dans l’application Rivendy.",
   alternates: { canonical: "/play/clips" },
 };
 
+/** Accueil de Rivendy Clips (refonte du 2026-10-26) : filtre et recherche dans l'adresse. */
 export default function PlayClipsPage() {
-  return <CatalogView kind="clip" heading="Clips" intro="Les clips des artistes Rivendy, toujours gratuits." />;
+  return (
+    <Suspense>
+      <ClipsHomeView />
+    </Suspense>
+  );
 }
