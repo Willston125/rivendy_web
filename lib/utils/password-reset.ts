@@ -99,3 +99,43 @@ export function applyResetToken(token: string, newPassword: string) {
 export function verifyEmailToken(token: string) {
   return invoke({ action: "verify_email", token });
 }
+
+/**
+ * Demande de récupération de compte SANS session (audit 21, APPSOCLE-16), pour
+ * un compte sans adresse e-mail enregistrée. Fonction Edge dédiée
+ * (recover-account) : l'équipe la voit dans « Demandes d'aide » et renvoie un
+ * accès. Réponse identique qu'un compte existe ou non (pas d'annuaire).
+ */
+export async function requestAccountRecovery(
+  input: { phone: string; name: string; message: string },
+): Promise<ResetResponse> {
+  try {
+    const { data } = await supabase.functions.invoke("recover-account", {
+      body: {
+        phone: input.phone.trim(),
+        name: input.name.trim(),
+        message: input.message.trim(),
+        source: "web",
+      },
+    });
+    return (data ?? {}) as ResetResponse;
+  } catch (e: unknown) {
+    const ctx = (e as { context?: unknown })?.context;
+    if (ctx instanceof Response) {
+      try {
+        return (await ctx.json()) as ResetResponse;
+      } catch {
+        /* corps illisible */
+      }
+    }
+    return { ok: false, reason: "network" };
+  }
+}
+
+/** Messages FR des échecs de récupération (recover-account). */
+export const RECOVERY_MESSAGES: Record<string, string> = {
+  invalid_phone: "Numéro invalide.",
+  name_required: "Indiquez votre nom.",
+  message_too_short: "Décrivez votre problème (10 caractères minimum).",
+  network: "Connexion impossible. Réessayez dans quelques instants.",
+};

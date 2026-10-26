@@ -8,8 +8,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Info, Loader2, Mail } from "lucide-react";
-import { requestResetLink, resetMessage } from "@/lib/utils/password-reset";
+import { CheckCircle, Info, LifeBuoy, Loader2, Mail } from "lucide-react";
+import {
+  RECOVERY_MESSAGES,
+  requestAccountRecovery,
+  requestResetLink,
+  resetMessage,
+} from "@/lib/utils/password-reset";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -36,6 +41,27 @@ export function ForgotPasswordForm() {
     if (!res.ok) return setError(resetMessage(res));
     setSent(true);
     setCooldown(60);
+  }
+
+  // ── « Récupérer mon compte » sans session (APPSOCLE-16) ─────────────
+  const [showRecover, setShowRecover] = useState(false);
+  const [rName, setRName] = useState("");
+  const [rPhone, setRPhone] = useState("");
+  const [rMessage, setRMessage] = useState("");
+  const [rBusy, setRBusy] = useState(false);
+  const [rSent, setRSent] = useState(false);
+  const [rError, setRError] = useState("");
+
+  async function sendRecovery() {
+    if (rName.trim().length < 2) return setRError("Indiquez votre nom.");
+    if (rPhone.replace(/\D/g, "").length < 7) return setRError("Indiquez votre numéro.");
+    if (rMessage.trim().length < 10) return setRError("Décrivez votre problème (10 caractères minimum).");
+    setRError("");
+    setRBusy(true);
+    const res = await requestAccountRecovery({ phone: rPhone, name: rName, message: rMessage });
+    setRBusy(false);
+    if (!res.ok) return setRError(RECOVERY_MESSAGES[res.reason ?? ""] ?? "Envoi impossible. Réessayez.");
+    setRSent(true);
   }
 
   return (
@@ -80,15 +106,75 @@ export function ForgotPasswordForm() {
 
             {/* L'email est facultatif à l'inscription : le serveur ne dira jamais
                 qu'un compte n'en a pas (ce serait un annuaire), c'est donc ici
-                qu'il faut l'expliquer. */}
+                qu'il faut l'expliquer — et offrir le canal de secours. */}
             <div className="flex gap-2.5 rounded-2xl bg-slate-50 p-4">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
               <p className="text-xs leading-relaxed text-slate-500">
                 L&apos;email est facultatif à l&apos;inscription. Si vous n&apos;en avez
-                jamais enregistré, aucun lien ne peut vous être envoyé : passez par
-                Aide &amp; Support pour que l&apos;équipe Rivendy vous identifie.
+                jamais enregistré, aucun lien ne peut vous être envoyé : utilisez
+                « Récupérer mon compte » ci-dessous pour que l&apos;équipe Rivendy
+                vous identifie.
               </p>
             </div>
+
+            {/* Canal de secours sans session (audit 21, APPSOCLE-16). */}
+            {!showRecover && !rSent && (
+              <button
+                type="button"
+                onClick={() => setShowRecover(true)}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#009688] text-sm font-black text-[#009688] transition hover:bg-[#E0F2F1]"
+              >
+                <LifeBuoy className="h-4 w-4" /> Récupérer mon compte
+              </button>
+            )}
+
+            {showRecover && !rSent && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 p-4">
+                <p className="text-sm font-black text-[#1A1A1A]">Récupérer mon compte</p>
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Sans adresse e-mail enregistrée ? Envoyez une demande : l&apos;équipe
+                  Rivendy vérifie votre identité et vous rend l&apos;accès.
+                </p>
+                <input
+                  value={rName}
+                  onChange={(e) => setRName(e.target.value)}
+                  placeholder="Votre nom complet"
+                  className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+                />
+                <input
+                  type="tel"
+                  value={rPhone}
+                  onChange={(e) => setRPhone(e.target.value)}
+                  placeholder="Votre numéro (ex. +269 321 45 67)"
+                  className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+                />
+                <textarea
+                  value={rMessage}
+                  onChange={(e) => setRMessage(e.target.value)}
+                  placeholder="Expliquez votre problème"
+                  className="h-24 w-full resize-none rounded-2xl border border-slate-200 p-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+                />
+                {rError && <p className="text-xs font-semibold text-red-500">{rError}</p>}
+                <button
+                  type="button"
+                  onClick={sendRecovery}
+                  disabled={rBusy}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#009688] text-sm font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
+                >
+                  {rBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Envoyer la demande"}
+                </button>
+              </div>
+            )}
+
+            {rSent && (
+              <div className="flex gap-2.5 rounded-2xl bg-[#E0F2F1] p-4">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#009688]" />
+                <p className="text-xs leading-relaxed text-[#00695C]">
+                  Demande envoyée. L&apos;équipe Rivendy vérifiera votre identité et
+                  vous recontactera sur le numéro indiqué.
+                </p>
+              </div>
+            )}
 
             <p className="text-center text-sm text-slate-500">
               Vous vous en souvenez ?{" "}
