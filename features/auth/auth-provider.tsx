@@ -13,7 +13,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { syntheticEmailFromPhone } from "@/lib/utils/format";
 import { friendlyLoginError, friendlySignupError } from "@/lib/utils/auth-errors";
-import { detectPhoneCountryId } from "@/lib/utils/phone-validator";
+import { detectPhoneCountryId, loginDigitCandidates } from "@/lib/utils/phone-validator";
 import { DEFAULT_COUNTRY_ID, type Profile } from "@/types/rivendy";
 
 type AuthContextValue = {
@@ -133,10 +133,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
 
-    const email = syntheticEmailFromPhone(phone);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(friendlyLoginError(error.message));
-    await refreshProfile();
+    // Connexion rétrocompatible (audit 21, APPSOCLE-1) : on essaie l'identifiant
+    // historique (chiffres bruts) EN PREMIER — comportement strictement
+    // identique à avant — puis, seulement sur un refus d'identifiants, les
+    // formes dérivées du même numéro (local ↔ international), pour qu'un compte
+    // créé sous une forme reste joignable sous l'autre.
+    const candidates = loginDigitCandidates(phone).map((d) => `${d}@nikey.app`);
+    if (candidates.length === 0) candidates.push(syntheticEmailFromPhone(phone));
+
+    let lastMessage = "";
+    for (const email of candidates) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error) {
+        await refreshProfile();
+        return;
+      }
+      lastMessage = error.message;
+      // Sur une limite de débit, on s'arrête : multiplier les essais aggraverait.
+      if (/rate|too many|429/i.test(error.message)) break;
+    }
+    throw new Error(friendlyLoginError(lastMessage));
   }, [refreshProfile]);
 
   const signUpWithPhone = useCallback(
