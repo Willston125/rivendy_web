@@ -35,6 +35,8 @@ export const RESET_MESSAGES: Record<string, string> = {
   invalid_token: "Ce lien n'est plus valable. Demandez-en un nouveau.",
   expired: "Ce lien a expiré. Demandez-en un nouveau.",
   update_failed: "Le mot de passe n'a pas pu être enregistré. Réessayez.",
+  // Vérification d'adresse de récupération (change-email / verify_email).
+  stale: "Votre adresse de récupération a changé depuis l'envoi de ce lien.",
 };
 
 export function resetMessage(res: ResetResponse): string {
@@ -87,4 +89,13 @@ export function applyResetToken(token: string, newPassword: string) {
     token,
     new_password: newPassword,
   });
+}
+
+/**
+ * Confirme (prouve) une adresse de récupération posée par change-email. Tant
+ * qu'elle n'est pas prouvée, password-reset n'y envoie aucun lien (audit 21,
+ * EDGE-1). Le lien est cliqué depuis la boîte mail — aucune session requise.
+ */
+export function verifyEmailToken(token: string) {
+  return invoke({ action: "verify_email", token });
 }
