@@ -489,7 +489,15 @@ export function CheckoutForm() {
                 : structuredAddress.deliveryFeeKmf,
             }
           : zoneFee > 0
-            ? { p_delivery_fee_kmf: deliveryFeeAssigned ? 0 : zoneFee }
+            ? {
+                p_delivery_fee_kmf: deliveryFeeAssigned ? 0 : zoneFee,
+                // Audit 21 (WEB-1) : on envoie l'ID de la zone pour que le
+                // SERVEUR impose son tarif (le montant ci-dessus n'est plus
+                // qu'indicatif). Uniquement sur la commande qui porte les frais
+                // (une seule livraison par panier multi-vendeurs) ; les suivantes
+                // restent à 0, sans zone.
+                ...(deliveryFeeAssigned ? {} : { p_delivery_zone_id: selectedZone?.id }),
+              }
             : {};
 
         // Appeler le RPC sécurisé pour créer la commande et les articles.
