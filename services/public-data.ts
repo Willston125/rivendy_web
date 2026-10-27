@@ -228,17 +228,7 @@ export async function getAdvertisements({
 // Tri du catalogue — parity Flutter search_screen.dart (_sortOrder)
 export type ProductSort = "recent" | "price_asc" | "price_desc";
 
-export async function getProducts({
-  countryId = DEFAULT_COUNTRY_ID,
-  category,
-  subcategory,
-  search,
-  priceMin,
-  priceMax,
-  sort = "recent",
-  limit = 60,
-  offset = 0,
-}: {
+type GetProductsOpts = {
   countryId?: string;
   category?: CategoryId | string;
   subcategory?: string;
@@ -249,7 +239,37 @@ export async function getProducts({
   limit?: number;
   /** Pagination — miroir du `range(offset, offset + limit - 1)` de l'app. */
   offset?: number;
-}) {
+};
+
+/**
+ * Catalogue : la NAVIGATION (marché/catégorie/tri/page) est mise en cache 5 min
+ * (audit 21, WEBCOMMERCE-26) — allège les invocations Vercel et l'egress
+ * Supabase (important sur les offres gratuites). La RECHERCHE libre n'est PAS
+ * cachée (une clé par frappe, réutilisation nulle). Les boosts peuvent rester
+ * en tête 5 min au plus, déjà borné par expire-boosts (pg_cron, 15 min).
+ */
+export async function getProducts(opts: GetProductsOpts) {
+  if (opts.search?.trim()) return fetchProducts(opts);
+  return getProductsBrowseCached(opts);
+}
+
+const getProductsBrowseCached = unstable_cache(
+  (opts: GetProductsOpts) => fetchProducts(opts),
+  ["products-browse-v1"],
+  { revalidate: 300, tags: ["products"] },
+);
+
+async function fetchProducts({
+  countryId = DEFAULT_COUNTRY_ID,
+  category,
+  subcategory,
+  search,
+  priceMin,
+  priceMax,
+  sort = "recent",
+  limit = 60,
+  offset = 0,
+}: GetProductsOpts) {
   const supabase = createAnonServerClient();
   let query = supabase.from("visible_products").select("*");
 
@@ -288,16 +308,27 @@ export async function getProducts({
 }
 
 export async function getProductById(id: string) {
-  const supabase = createAnonServerClient();
-  const { data, error } = await supabase
-    .from("products")
-    .select("*, profiles!seller_id(id, full_name, store_name, store_description, avatar_url, store_banner_url, voice_note_url, is_certified, total_sales, country_id, created_at)")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return normalizeProduct(data as ProductRow);
+  return getProductByIdCached(id);
 }
+
+// Fiche produit mise en cache 5 min (audit 21, WEBCOMMERCE-26). Une modification
+// vendeur apparaît sous 5 min ; le prix réel est de toute façon recalculé côté
+// serveur à la commande (secure_create_order).
+const getProductByIdCached = unstable_cache(
+  async (id: string) => {
+    const supabase = createAnonServerClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select("*, profiles!seller_id(id, full_name, store_name, store_description, avatar_url, store_banner_url, voice_note_url, is_certified, total_sales, country_id, created_at)")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return normalizeProduct(data as ProductRow);
+  },
+  ["product-by-id-v1"],
+  { revalidate: 300, tags: ["products"] },
+);
 
 /**
  * Note moyenne d'un article — même RPC que l'app
@@ -314,21 +345,30 @@ export async function getProductAverageRating(productId: string): Promise<number
 }
 
 export async function getSimilarProducts(product: Product, limit = 8) {
-  const supabase = createAnonServerClient();
-  const { data, error } = await supabase
-    .from("visible_products")
-    .select("*")
-    .eq("category", product.category)
-    .neq("id", product.id)
-    // Même marché que l'ARTICLE (pas le pays du profil vendeur, figé à DJ
-    // pour les comptes créés depuis le 2026-09-02).
-    .eq("country_id", product.country_id || product.seller_country_id || DEFAULT_COUNTRY_ID)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error || !data) return [];
-  return data.map((row) => normalizeProduct(row as ProductRow));
+  // Même marché que l'ARTICLE (pas le pays du profil vendeur, figé à DJ pour
+  // les comptes créés depuis le 2026-09-02).
+  const country = product.country_id || product.seller_country_id || DEFAULT_COUNTRY_ID;
+  return getSimilarProductsCached(String(product.category ?? ""), product.id, country, limit);
 }
+
+const getSimilarProductsCached = unstable_cache(
+  async (category: string, excludeId: string, country: string, limit: number) => {
+    const supabase = createAnonServerClient();
+    const { data, error } = await supabase
+      .from("visible_products")
+      .select("*")
+      .eq("category", category)
+      .neq("id", excludeId)
+      .eq("country_id", country)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error || !data) return [];
+    return data.map((row) => normalizeProduct(row as ProductRow));
+  },
+  ["similar-products-v1"],
+  { revalidate: 300, tags: ["products"] },
+);
 
 export async function getSellerProfile(sellerId: string) {
   const supabase = createAnonServerClient();
@@ -361,19 +401,28 @@ export async function getSellerProfile(sellerId: string) {
 /** Catalogue d'une boutique, sur le même contrat public que Flutter.
  *  La vue applique les statuts, suppressions et règles de précommande. */
 export async function getSellerPublicProducts(sellerId: string, countryId?: string) {
-  const supabase = createAnonServerClient();
-  let query = supabase
-    .from("visible_products")
-    .select("*")
-    .eq("seller_id", sellerId)
-    .order("created_at", { ascending: false });
-
-  if (countryId) query = query.eq("country_id", countryId);
-
-  const { data, error } = await query;
-  if (error || !data) return [];
-  return data.map((row) => normalizeProduct(row as ProductRow));
+  return getSellerPublicProductsCached(sellerId, countryId ?? null);
 }
+
+// Catalogue d'une boutique mis en cache 5 min (audit 21, WEBCOMMERCE-26).
+const getSellerPublicProductsCached = unstable_cache(
+  async (sellerId: string, countryId: string | null) => {
+    const supabase = createAnonServerClient();
+    let query = supabase
+      .from("visible_products")
+      .select("*")
+      .eq("seller_id", sellerId)
+      .order("created_at", { ascending: false });
+
+    if (countryId) query = query.eq("country_id", countryId);
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data.map((row) => normalizeProduct(row as ProductRow));
+  },
+  ["seller-public-products-v1"],
+  { revalidate: 300, tags: ["products"] },
+);
 
 /**
  * Vitrine d'un vendeur : articles d'UN marché, et ce marché.
