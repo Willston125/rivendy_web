@@ -525,11 +525,25 @@ export function usefulRubrics(c: { hitTracks: number; releases: number; artists:
   return out;
 }
 
-/** Entrées récentes de la bibliothèque à ajouter (0 à 2) pour des rangées pleines : 2, 3, 4, 6 ou 8 raccourcis. */
-export function shortcutFill(base: number, available: number): number {
-  const full = [2, 3, 4, 6, 8];
-  for (const k of [2, 1]) if (k <= available && full.includes(base + k)) return k;
-  return 0;
+// ── Refonte de l'accueil (2026-10-28, maquette « Monte le son. ») ─────────
+
+/**
+ * Pochettes d'une rangée de l'accueil : 2 × 2 sur téléphone, une rangée de 4
+ * sur grand panneau ; au-delà, « Tout voir ».
+ */
+export const HOME_GRID = 4;
+
+/**
+ * Bannière « À la une » : la première sortie de la sélection (ordre du
+ * dashboard), sinon la plus récente — jamais une sortie inventée. Elle sort
+ * des rangées qui suivent : on ne la voit pas deux fois.
+ */
+export function homeSpotlight<R extends Pick<MusicRelease, "id">>(featured: R[], fresh: R[]):
+  { release: R | null; source: "featured" | "latest" | null; featured: R[]; fresh: R[] } {
+  const release = featured[0] ?? fresh[0] ?? null;
+  if (!release) return { release: null, source: null, featured, fresh };
+  const other = (r: R) => r.id !== release.id;
+  return { release, source: featured[0] ? "featured" : "latest", featured: featured.filter(other), fresh: fresh.filter(other) };
 }
 
 export type InstallHint = "ios" | "android" | null;

@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  AudioLines, Clapperboard, Clock, Compass, Heart, Lock, MicVocal, Search, Share2, Smartphone, Trophy, X,
-} from "lucide-react";
+import { AudioLines, Lock, MicVocal, Search, Share2, Smartphone, Trophy, X } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
 import { fetchCatalog } from "@/features/play/play-api";
@@ -18,18 +16,18 @@ import {
 } from "./music-api";
 import { CollectionPage, IconTile, MetaLine, useCoverTint } from "./music-collection";
 import { useMusicLibrary } from "./music-library";
-import { EntryCover } from "./music-library-panel";
+import { HomeHero } from "./music-home-hero";
 import {
-  artistName, availableGenres, distinctArtistIds, filterByGenre, hitMovement, homeShelves, recentIsUseful,
-  releaseKindLabel, releaseYear, searchable, shortcutFill, totalDurationLabel, uniqueReleases, usefulRubrics,
-  type HomeRubric, type MusicRelease, type MusicTrack,
+  HOME_GRID, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, heroHitBadge, hitMovement,
+  homeShelves, homeSpotlight, recentIsUseful, releaseKindLabel, releaseYear, searchable, totalDurationLabel,
+  uniqueReleases, usefulRubrics, type HomeRubric, type MusicRelease, type MusicTrack,
 } from "./music-logic";
 import { MusicInstallHint } from "./music-install-hint";
 import { loginHref } from "./music-pending";
 import {
-  ArtistCard, CardRow, CardRowSkeleton, Cover, EmptyState, ErrorState, ExplicitTag, FollowArtistButton, ListSkeleton,
-  PageTitle, PlayAllButton, PremiumTag, ReleaseGrid, ReleaseShelf, SaveReleaseButton, Section, ShuffleButton, TrackList,
-  iconButton, primaryButton, toQueue, useLoad, useSearchDraft,
+  ArtistCard, ArtistFollowCard, CardRow, CardRowSkeleton, Cover, CoverGridSkeleton, EmptyState, ErrorState, ExplicitTag,
+  FollowArtistButton, ListSkeleton, PageTitle, PlayAllButton, PremiumTag, ReleaseCoverGrid, ReleaseGrid, ReleaseShelf,
+  SaveReleaseButton, Section, ShuffleButton, TrackList, iconButton, primaryButton, toQueue, useLoad, useSearchDraft,
 } from "./music-ui";
 import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
 
@@ -46,39 +44,22 @@ function fold(s: string): string {
 /** Teinte du Rivendy Hit : un vert profond dérivé de --rv-primary (texte blanc lisible). */
 const HIT_TINT: [number, number, number] = [10, 74, 66];
 
-/** true dès que l'élément repère est passé sous le haut du panneau central. */
-function useScrolledPast() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [past, setPast] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setPast(!e.isIntersecting && e.boundingClientRect.top < (e.rootBounds?.top ?? 0) + 1),
-      { root: document.getElementById("rvm-center"), threshold: 0 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return [ref, past] as const;
-}
-
 // ── Accueil ────────────────────────────────────────────────────────────────
 
 /**
- * Accueil de la Musique (mise en page application du 2026-10-22, d'après
- * la vidéo de référence) : filtres de genre collés en haut du panneau,
- * raccourcis compacts (rubriques, puis ce que le compte a écouté ou
- * enregistré), la sélection et les nouveautés (jamais deux fois les mêmes
- * sorties), les titres populaires, les artistes. Tout suit le catalogue
- * réel : rien n'est inventé pour remplir. Petit catalogue (lot « Musique
- * web », 2026-10-23) : l'accueil montre tout d'un coup, et un raccourci
- * n'apparaît que s'il mène à plus que ce que l'accueil montre déjà.
+ * Accueil de la Musique (refonte du 2026-10-28, maquette « Monte le son. »,
+ * dans la coque application du 2026-10-22) : l'accroche et les filtres de
+ * genre, la sortie à la une, les nouveautés en grandes pochettes, le Rivendy
+ * Hit et les artistes à découvrir côte à côte, puis les écoutes récentes.
+ * Tout suit le catalogue réel : rien n'est inventé pour remplir, et une
+ * sortie n'apparaît jamais deux fois. « Ma bibliothèque » (favoris,
+ * historique, playlists) reste dans son panneau, et dans la navigation du
+ * bas sur téléphone : plus de raccourcis en tête de page.
  */
 export function MusicHomeView() {
   const market = useMusicMarket();
   const { user, loading: authLoading } = useAuth();
-  const library = useMusicLibrary();
   const [genre, setGenre] = useState<string | null>(null);
-  const [sentinel, stuck] = useScrolledPast();
 
   const home = useLoad(`home:${market ?? ""}`, async () => {
     const [featured, fresh, hit, genres, clips] = await Promise.all([
@@ -98,100 +79,77 @@ export function MusicHomeView() {
   const hit = useMemo(() => {
     const rows = (data?.hit ?? []).filter((h) => !genre || h.music_tracks?.music_releases?.genre_id === genre);
     const items = toQueue(rows.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)).slice(0, 5);
-    const ranks = new Map(rows.map((h) => [h.music_tracks?.id ?? "", { rank: h.rank, move: hitMovement(h.rank, h.previous_rank) }]));
+    // L'accueil montre le rang seul ; l'évolution reste sur la page du Hit.
+    const ranks = new Map(rows.map((h) => [h.music_tracks?.id ?? "", { rank: h.rank, move: "" }]));
     return { items, ranks };
   }, [data, genre]);
-
-  // Raccourcis : le compte, les rubriques UTILES (petit catalogue : aucune),
-  // puis de quoi remplir la rangée avec les entrées récentes de la bibliothèque.
-  const tile = "h-full rounded-none shadow-none";
+  const spot = useMemo(
+    () => (data ? homeSpotlight(filterByGenre(data.featured, genre), filterByGenre(data.fresh, genre)) : null),
+    [data, genre],
+  );
+  // « Tout voir » seulement vers une page qui montre plus que l'accueil (petit catalogue : aucune).
   const rubrics = data
     ? usefulRubrics({ hitTracks: data.hit.length, releases: data.all.length, artists: data.artists.length, clips: data.clips })
     : [];
-  const RUBRICS: Record<HomeRubric, Shortcut> = {
-    hit: { href: "/music/hit", label: "Rivendy Hit", tile: <IconTile icon={Trophy} className={tile} /> },
-    explore: { href: "/music/explore", label: "Explorer les genres", tile: <IconTile icon={Compass} tone="night" className={tile} /> },
-    artists: { href: "/music/artists", label: "Artistes", tile: <IconTile icon={MicVocal} tone="night" className={tile} /> },
-    clips: { href: "/play/clips", label: "Clips · Rivendy Play", tile: <IconTile icon={Clapperboard} tone="night" className={tile} />, outside: true },
-  };
-  const base: Shortcut[] = [
-    ...(user ? [
-      { href: "/music/favorites", label: "Titres likés", tile: <IconTile icon={Heart} className={tile} /> },
-      { href: "/music/history", label: "Écoutés récemment", tile: <IconTile icon={Clock} tone="night" className={tile} /> },
-    ] : []),
-    ...rubrics.map((r) => RUBRICS[r]),
-  ];
-  const latest = (library.entries ?? []).filter((e) => e.kind !== "liked")
-    .sort((a, b) => (b.usedAt ?? "").localeCompare(a.usedAt ?? "")).slice(0, 2);
-  const shortcuts: Shortcut[] = [
-    ...base,
-    ...latest.slice(0, shortcutFill(base.length, latest.length)).map((e) => ({
-      href: e.href, label: e.title,
-      tile: <EntryCover entry={e} className={cn("h-full w-full", e.kind !== "artist" && "rounded-none")} />,
-    })),
-  ];
+  const top = data?.hit[0];
+  const hitBadge = !!spot?.release
+    && heroHitBadge(top ? { rank: top.rank, releaseId: top.music_tracks?.release_id ?? null } : null, spot.release.id).kind === "same";
 
-  return (
-    <div className="relative">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-rvm-brand/35 via-rvm-brand/10 to-transparent" />
-      <h1 className="sr-only">Rivendy Musique — Accueil</h1>
-      <div ref={sentinel} aria-hidden className="h-px" />
+  const intro = (
+    <div>
+      <p className="text-sm text-rvm-soft">Votre prochaine découverte est ici.</p>
+      <h1 className="mt-1 font-rvm-display text-[clamp(2.125rem,6cqw,3.5rem)] font-black leading-none tracking-tight">Monte le son.</h1>
       {genres.length > 0 ? (
         <div role="group" aria-label="Filtrer par genre"
-          className={cn("no-scrollbar sticky top-0 z-10 flex gap-2 overflow-x-auto px-4 py-3 transition-colors @2xl:px-6",
-            stuck ? "bg-rvm-surface shadow-lg shadow-black/30" : "bg-transparent")}>
+          className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 @2xl:mx-0 @2xl:flex-wrap @2xl:px-0">
           {[{ id: null as string | null, name: "Tout" }, ...genres].map((g) => {
             const active = genre === g.id;
             return (
               <button key={g.id ?? "all"} type="button" onClick={() => setGenre(g.id)} aria-pressed={active}
-                className={cn("h-8 shrink-0 rounded-full px-3.5 text-sm font-semibold transition-colors",
+                className={cn("h-9 shrink-0 rounded-full px-4 text-sm font-bold transition-colors",
                   active ? "bg-rvm-accent text-rvm-on-accent" : "bg-white/10 text-rvm-text hover:bg-white/20")}>
                 {g.name}
               </button>
             );
           })}
         </div>
-      ) : <div className="h-3" />}
+      ) : null}
+    </div>
+  );
 
-      <div className="relative px-4 pb-2 @2xl:px-6">
-        <MusicInstallHint />
-        {!user && !authLoading ? <VisitorWelcome /> : null}
-        {/* 2 colonnes, puis 3 (3 ou 6 raccourcis) ou 4 (4 ou 8) : jamais de rangée à moitié vide. */}
-        {shortcuts.length > 0 ? (
-        <ul className={cn("grid grid-cols-2 gap-2", shortcuts.length % 3 === 0 ? "@2xl:grid-cols-3" : shortcuts.length >= 4 && "@4xl:grid-cols-4")}
-          aria-label="Raccourcis">
-          {shortcuts.map((s) => (
-            <li key={s.href} className="min-w-0">
-              <Link href={s.href} prefetch={s.outside ? false : undefined} className="flex h-14 items-center gap-3 overflow-hidden rounded-md bg-white/[0.08] pr-3 transition-colors hover:bg-white/[0.16] @3xl:h-16">
-                <span className="aspect-square h-full shrink-0 overflow-hidden">{s.tile}</span>
-                <span className="line-clamp-2 min-w-0 break-words text-[13px] font-bold leading-tight @md:text-[14px] @3xl:text-[15px]">{s.label}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-        ) : null}
-
-        {home.error ? <div className="mt-6"><ErrorState onRetry={home.reload} /></div>
-          : !data ? (
-            <>
-              <div className="mt-8"><CardRowSkeleton /></div>
-              <div className="mt-8"><ListSkeleton /></div>
-            </>
-          ) : data.all.length === 0 && data.hit.length === 0 ? (
-            <div className="mt-6">
-              <EmptyState title="Les premiers titres arrivent bientôt"
-                text="Singles, EP et albums des artistes de l’archipel et d’ailleurs. Chaque sortie est validée par Rivendy avant d’être publiée." />
-            </div>
-          ) : (
-            <HomeSections data={data} genre={genre} genreName={genres.find((g) => g.id === genre)?.name}
-              hitItems={hit.items} ranks={hit.ranks} recent={recent.data} rubrics={rubrics} />
-          )}
-      </div>
+  return (
+    <div className="px-4 pb-2 pt-4 @2xl:px-6 @2xl:pt-6 @5xl:px-8">
+      <MusicInstallHint />
+      {home.error ? (
+        <>
+          {intro}
+          <div className="mt-6"><ErrorState onRetry={home.reload} /></div>
+        </>
+      ) : !data || !spot ? (
+        <>
+          <HomeHero intro={intro} release={null} loading />
+          <div className="mt-8"><CoverGridSkeleton /></div>
+          <div className="mt-8"><ListSkeleton /></div>
+        </>
+      ) : data.all.length === 0 && data.hit.length === 0 ? (
+        <>
+          {intro}
+          <div className="mt-6">
+            <EmptyState title="Les premiers titres arrivent bientôt"
+              text="Singles, EP et albums des artistes de l’archipel et d’ailleurs. Chaque sortie est validée par Rivendy avant d’être publiée." />
+          </div>
+        </>
+      ) : (
+        <>
+          <HomeHero intro={intro} release={spot.release} kicker={spot.source === "featured" ? "À la une" : "Nouveauté"} hitBadge={hitBadge} />
+          {!user && !authLoading ? <div className="mt-6"><VisitorWelcome /></div> : null}
+          <HomeSections artists={data.artists} all={data.all} spot={spot} genre={genre} genreName={genres.find((g) => g.id === genre)?.name}
+            hitItems={hit.items} ranks={hit.ranks} recent={recent.data} rubrics={rubrics} />
+        </>
+      )}
     </div>
   );
 }
-
-type Shortcut = { href: string; label: string; tile: ReactNode; outside?: boolean };
 
 /**
  * Visiteur : ce qu'est l'espace, et pourquoi se connecter (écouter, liker,
@@ -200,9 +158,9 @@ type Shortcut = { href: string; label: string; tile: ReactNode; outside?: boolea
 function VisitorWelcome() {
   const pathname = usePathname() || "/music";
   return (
-    <section aria-labelledby="rvm-welcome" className="mb-3 flex flex-col gap-3 rounded-lg bg-white/[0.06] p-4 @xl:flex-row @xl:items-center @xl:gap-6">
+    <section aria-labelledby="rvm-welcome" className="flex flex-col gap-3 rounded-lg bg-white/[0.06] p-4 @xl:flex-row @xl:items-center @xl:gap-6">
       <div className="min-w-0 flex-1">
-        <h2 id="rvm-welcome" className="text-lg font-black">Bienvenue sur Rivendy Musique</h2>
+        <h2 id="rvm-welcome" className="font-rvm-display text-lg font-black">Bienvenue sur Rivendy Musique</h2>
         <p className="mt-1 text-sm leading-relaxed text-rvm-soft">
           Les sorties validées par Rivendy et le Rivendy Hit de la semaine. Connectez-vous pour écouter, liker des titres
           et créer vos playlists : le compte est gratuit.
@@ -213,8 +171,11 @@ function VisitorWelcome() {
   );
 }
 
-function HomeSections({ data, genre, genreName, hitItems, ranks, recent, rubrics }: {
-  data: { featured: MusicRelease[]; fresh: MusicRelease[]; artists: MusicArtist[]; all: MusicRelease[] };
+function HomeSections({ artists: allArtists, all, spot, genre, genreName, hitItems, ranks, recent, rubrics }: {
+  artists: MusicArtist[];
+  all: MusicRelease[];
+  /** Sortie à la une, et la sélection et les nouveautés SANS elle (homeSpotlight). */
+  spot: { release: MusicRelease | null; featured: MusicRelease[]; fresh: MusicRelease[] };
   genre: string | null;
   genreName?: string;
   hitItems: QueueItem[];
@@ -223,43 +184,60 @@ function HomeSections({ data, genre, genreName, hitItems, ranks, recent, rubrics
   /** Rubriques qui montrent plus que l'accueil : sinon, pas de « Tout voir ». */
   rubrics: HomeRubric[];
 }) {
-  const shelves = homeShelves(filterByGenre(data.featured, genre), filterByGenre(data.fresh, genre));
-  const artists = genre ? data.artists.filter((a) => data.all.some((r) => r.genre_id === genre && r.artist_id === a.id)) : data.artists;
-  const shown = new Set((shelves.mode === "one" ? shelves.releases : [...shelves.selection, ...shelves.news]).map((r) => r.id));
+  const shelves = homeShelves(spot.featured, spot.fresh);
+  const artists = genre ? allArtists.filter((a) => all.some((r) => r.genre_id === genre && r.artist_id === a.id)) : allArtists;
+  const shownReleases = shelves.mode === "one" ? shelves.releases.slice(0, HOME_GRID)
+    : [...shelves.selection.slice(0, HOME_GRID), ...shelves.news.slice(0, HOME_GRID)];
+  const shown = new Set([...(spot.release ? [spot.release.id] : []), ...shownReleases.map((r) => r.id)]);
   const showRecent = !!recent && recentIsUseful(recent.map((r) => r.track.release_id), shown);
-  const moreHref = !rubrics.includes("explore") ? undefined : genre ? `/music/explore?genre=${genre}` : "/music/explore";
+  const explore = genre ? `/music/explore?genre=${genre}` : "/music/explore";
+  const moreHref = (list: MusicRelease[]) => (list.length > HOME_GRID || rubrics.includes("explore") ? explore : undefined);
+  const oneTitle = shelves.mode === "one" && shelves.title === "Nouveautés" ? "Les nouveautés" : shelves.mode === "one" ? shelves.title : "";
+  // Le Hit et les artistes côte à côte quand le panneau le permet ; à côté du
+  // Hit, quatre artistes (au-delà, « Tout voir »).
+  const side = hitItems.length > 0 && artists.length > 0;
+  const artistsShown = side ? 4 : HOME_SHOWS.artists;
   return (
     <>
       {shelves.mode === "one" ? (
-        <Section title={shelves.title} href={moreHref}
-          subtitle={shelves.title === "Nouveautés" ? "Les dernières sorties validées par Rivendy."
-            : shelves.title === "La sélection Rivendy" ? "Les sorties choisies par l’équipe."
-            : "Choisies par l’équipe et dernières sorties validées par Rivendy."}>
-          {shelves.releases.length > 0
-            ? <ReleaseShelf releases={shelves.releases} label={shelves.title} />
-            : <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />}
-        </Section>
+        shelves.releases.length > 0 ? (
+          <Section title={oneTitle} href={moreHref(shelves.releases)}>
+            <ReleaseCoverGrid releases={shelves.releases} label={oneTitle} />
+          </Section>
+        ) : !spot.release ? (
+          <Section title="Les nouveautés">
+            <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />
+          </Section>
+        ) : null
       ) : (
         <>
-          <Section title="La sélection Rivendy" subtitle="Les sorties choisies par l’équipe.">
-            <ReleaseShelf releases={shelves.selection} label="La sélection Rivendy" />
+          <Section title="La sélection Rivendy" href={moreHref(shelves.selection)}>
+            <ReleaseCoverGrid releases={shelves.selection} label="La sélection Rivendy" />
           </Section>
-          <Section title="Nouveautés" subtitle="Les dernières sorties validées par Rivendy." href={moreHref}>
-            <ReleaseShelf releases={shelves.news} label="Nouveautés" />
+          <Section title="Les nouveautés" href={moreHref(shelves.news)}>
+            <ReleaseCoverGrid releases={shelves.news} label="Les nouveautés" />
           </Section>
         </>
       )}
 
-      {hitItems.length > 0 ? (
-        <Section title="Titres populaires" subtitle="Le Rivendy Hit de la semaine, selon le nombre d’auditeurs." href="/music/hit" hrefLabel="Voir le Hit">
-          <TrackList items={hitItems} ranks={ranks} label="Titres populaires" source={{ label: "Rivendy Hit", href: "/music/hit" }} />
-        </Section>
-      ) : null}
-
-      {artists.length > 0 ? (
-        <Section title="Artistes à découvrir" href={rubrics.includes("artists") ? "/music/artists" : undefined}>
-          <CardRow label="Artistes à découvrir">{artists.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
-        </Section>
+      {hitItems.length > 0 || artists.length > 0 ? (
+        <div className={cn("mt-8 grid gap-8", side && "@4xl:grid-cols-[minmax(0,1fr)_19rem] @6xl:grid-cols-[minmax(0,1fr)_21rem]")}>
+          {hitItems.length > 0 ? (
+            <Section className="mt-0 min-w-0 @container" title="Le Hit Rivendy" subtitle="Les plus écoutés de la semaine."
+              href="/music/hit" hrefLabel="Voir le Hit">
+              <TrackList items={hitItems} ranks={ranks} label="Le Hit Rivendy" source={{ label: "Rivendy Hit", href: "/music/hit" }} showHeader={false} />
+            </Section>
+          ) : null}
+          {artists.length > 0 ? (
+            <Section className={cn("mt-0 min-w-0", side && "@4xl:border-l @4xl:border-white/10 @4xl:pl-8")} title="À découvrir"
+              href={rubrics.includes("artists") || artists.length > artistsShown ? "/music/artists" : undefined}>
+              <ul aria-label="Artistes à découvrir"
+                className={cn("grid grid-cols-2 gap-x-4 gap-y-6", side ? "@xl:grid-cols-4 @4xl:grid-cols-2" : "@xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6")}>
+                {artists.slice(0, artistsShown).map((a) => <li key={a.id} className="min-w-0"><ArtistFollowCard artist={a} /></li>)}
+              </ul>
+            </Section>
+          ) : null}
+        </div>
       ) : null}
 
       {showRecent && recent ? (

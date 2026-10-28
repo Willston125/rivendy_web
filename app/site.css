@@ -146,6 +146,11 @@
   --color-rvm-brand: var(--rv-primary);
   --color-rvm-premium: var(--rvm-premium);
 
+  /* Polices de la Musique (font-rvm-display, font-rvm-body) : celles de Play,
+     chargées par app/(musique)/layout.tsx (lib/app-fonts.ts). */
+  --font-rvm-display: var(--font-urbanist), "Urbanist", ui-sans-serif, system-ui, sans-serif;
+  --font-rvm-body: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
   /* Rivendy Play « Emerald Cinema » (bg-rvp-ground, text-rvp-accent,
      rounded-rvp-card, shadow-rvp-glow, ease-rvp, font-rvp-display…) :
      couleurs, rayons, ombres, courbe et polices — jamais une valeur écrite
@@ -303,6 +308,46 @@ body {
   @media (prefers-reduced-motion: reduce) {
     .rvm-eq > span { animation: none; transform: scaleY(0.7); }
     .rvm-range::-webkit-slider-thumb { transition: none; }
+  }
+
+  /* Bannière « À la une » de l'accueil (2026-10-28) : lumières de scène en
+     dégradés seulement — aucune image de plus que la pochette, pour les
+     connexions lentes. --hero = teinte de la pochette (« r g b »), assombrie
+     pour le texte blanc. .rvm-stage : scène large (texte à gauche, pochette
+     à droite) ; .rvm-stage-stacked : carte empilée du téléphone. */
+  .rvm-stage {
+    background:
+      radial-gradient(circle at 57% 84%, rgb(44 207 184 / 0.6) 0 2px, transparent 3px),
+      radial-gradient(circle at 64% 72%, rgb(44 207 184 / 0.45) 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 93% 88%, rgb(255 255 255 / 0.4) 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 51% 66%, rgb(0 191 165 / 0.5) 0 2px, transparent 3px),
+      radial-gradient(circle at 97% 58%, rgb(0 191 165 / 0.45) 0 2px, transparent 3px),
+      radial-gradient(circle at 86% 20%, rgb(255 255 255 / 0.3) 0 1px, transparent 2px),
+      linear-gradient(90deg, var(--rvm-ground) 0%, rgb(11 20 26 / 0.94) 36%, rgb(11 20 26 / 0.4) 58%, transparent 78%),
+      linear-gradient(112deg, transparent 0 53%, rgb(0 191 165 / 0.12) 57%, transparent 62%),
+      linear-gradient(66deg, transparent 0 62%, rgb(44 207 184 / 0.09) 66%, transparent 71%),
+      linear-gradient(96deg, transparent 0 77%, rgb(0 191 165 / 0.08) 80%, transparent 84%),
+      radial-gradient(55% 80% at 80% 45%, rgb(var(--hero) / 0.6), transparent 70%),
+      radial-gradient(45% 70% at 70% 0%, rgb(0 191 165 / 0.36), transparent 70%),
+      radial-gradient(70% 45% at 76% 100%, rgb(0 191 165 / 0.24), transparent 70%),
+      var(--rvm-panel);
+  }
+  .rvm-stage-stacked {
+    background:
+      radial-gradient(circle at 80% 40%, rgb(44 207 184 / 0.6) 0 2px, transparent 3px),
+      radial-gradient(circle at 92% 22%, rgb(255 255 255 / 0.4) 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 8% 30%, rgb(0 191 165 / 0.5) 0 2px, transparent 3px),
+      linear-gradient(180deg, transparent 0%, transparent 42%, rgb(11 20 26 / 0.85) 62%, var(--rvm-ground) 100%),
+      linear-gradient(118deg, transparent 0 30%, rgb(0 191 165 / 0.12) 36%, transparent 42%),
+      radial-gradient(80% 50% at 45% 25%, rgb(var(--hero) / 0.6), transparent 70%),
+      radial-gradient(70% 40% at 60% 0%, rgb(0 191 165 / 0.38), transparent 70%),
+      var(--rvm-panel);
+  }
+  /* Disque qui dépasse derrière la pochette (décor). */
+  .rvm-vinyl {
+    border-radius: 999px;
+    background: repeating-radial-gradient(circle at center, #0c0d0f 0 2px, #17191c 2.5px 4px);
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.6);
   }
 
   /* ── Rivendy Play « Emerald Cinema » ───────────────────────────────────── */

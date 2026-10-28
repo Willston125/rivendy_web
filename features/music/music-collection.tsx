@@ -163,7 +163,7 @@ export function CollectionPage({ tint, kicker, title, cover, meta, description, 
           <div className={cn("w-40 shrink-0 @xl:w-48 @4xl:w-56", roundCover && "overflow-hidden rounded-full")}>{cover}</div>
           <div className="min-w-0 text-white">
             <p className="text-sm font-semibold">{kicker}</p>
-            <h1 className="mt-1 line-clamp-3 break-words text-[clamp(2rem,7cqw,5.5rem)] font-black leading-[0.98] tracking-tight">{title}</h1>
+            <h1 className="mt-1 line-clamp-3 break-words font-rvm-display text-[clamp(2rem,7cqw,5.5rem)] font-black leading-[0.98] tracking-tight">{title}</h1>
             {description ? <p className="mt-3 line-clamp-2 max-w-2xl text-sm text-white/80">{description}</p> : null}
             {meta ? <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-white/90">{meta}</div> : null}
           </div>

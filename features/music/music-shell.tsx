@@ -31,16 +31,16 @@ import { useMusicPlayer } from "./player/music-player-provider";
  * au-dessus. L'en-tête et le pied de page de la marketplace sont masqués
  * ici (HideInMusic) : leurs liens utiles restent en bas du panneau central.
  */
-export function MusicShell({ children }: { children: ReactNode }) {
+export function MusicShell({ fontClassName, children }: { fontClassName?: string; children: ReactNode }) {
   const player = useMusicPlayer();
   return (
     <MusicLayoutProvider hasCurrent={!!player.current}>
-      <ShellFrame>{children}</ShellFrame>
+      <ShellFrame fontClassName={fontClassName}>{children}</ShellFrame>
     </MusicLayoutProvider>
   );
 }
 
-function ShellFrame({ children }: { children: ReactNode }) {
+function ShellFrame({ fontClassName, children }: { fontClassName?: string; children: ReactNode }) {
   const layout = useMusicLayout();
   const player = useMusicPlayer();
   const { user } = useAuth();
@@ -65,7 +65,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
 
   const docked = layout.wide && layout.rightOpen && !!player.current;
   return (
-    <div className="rvm-scope flex h-dvh flex-col overflow-hidden bg-rvm-ground text-rvm-text">
+    <div className={cn("rvm-scope flex h-dvh flex-col overflow-hidden bg-rvm-ground font-rvm-body text-rvm-text", fontClassName)}>
       <MusicTopBar />
       <div className="relative flex min-h-0 flex-1 md:gap-2 md:px-2">
         <aside aria-label="Bibliothèque"
@@ -160,8 +160,9 @@ function ResizeHandle({ label, side, value, min, max, onChange }: {
 }
 
 function Wordmark({ className }: { className?: string }) {
-  // Logo officiel, proportions d'origine, passé en blanc sur le fond sombre (comme Play).
-  return <Image src="/brand/rivendy-wordmark.png" alt="" width={1214} height={428} priority className={cn("w-auto brightness-0 invert", className)} />;
+  // Logo officiel, formes et vert d'origine (refonte de l'accueil, 2026-10-28) :
+  // 4:1 sur le fond nuit, au-dessus des 3:1 demandés pour un logo.
+  return <Image src="/brand/rivendy-wordmark.png" alt="" width={1214} height={428} priority className={cn("w-auto", className)} />;
 }
 
 /** Barre du haut : logo, accueil, recherche musicale, application, notifications, compte. */
@@ -181,10 +182,10 @@ function MusicTopBar() {
         <Link href={homeHref} prefetch={false} aria-label="Rivendy, retour à la marketplace" className="rounded-md">
           <Wordmark className="h-7" />
         </Link>
-        <span aria-hidden className="hidden h-6 w-px bg-white/15 sm:block" />
+        <span aria-hidden className="h-5 w-px bg-white/15 sm:h-6" />
         <Link href="/music" aria-label="Rivendy Musique, accueil"
-          className="hidden items-center gap-1.5 rounded-md text-[13px] font-extrabold uppercase tracking-[0.24em] text-rvm-accent sm:flex">
-          Musique <AudioLines className="h-3.5 w-3.5" aria-hidden />
+          className="flex items-center gap-1.5 rounded-md text-[11px] font-extrabold uppercase tracking-[0.2em] text-rvm-accent sm:text-[13px] sm:tracking-[0.24em]">
+          Musique <AudioLines className="hidden h-3.5 w-3.5 sm:block" aria-hidden />
         </Link>
       </div>
 

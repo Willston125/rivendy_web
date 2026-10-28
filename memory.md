@@ -271,6 +271,27 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     `MusicInstallHint` : iPhone « Partager → Sur l'écran d'accueil », Android
     l'appli ; jamais dans une appli intégrée ni une fois installée ; « Plus
     tard » = 30 jours (`installHint`). Essai sur un vrai iPhone : propriétaire.
+- **Accueil « Monte le son. » (2026-10-28, branche `feat/musique-accueil`)** —
+  maquette verte du propriétaire, corrigée puis validée sur un visuel :
+  - Haut de page : accroche + filtres de genre (vrais genres seulement, plus
+    collés en haut) + bannière À LA UNE (`music-home-hero.tsx`) : la 1re
+    sortie de la sélection, sinon la plus récente (`homeSpotlight`, qui la
+    retire des rangées suivantes) ; « N° 1 du Rivendy Hit » par `heroHitBadge`.
+    Lumières de scène = dégradés CSS (`.rvm-stage`, `.rvm-stage-stacked`,
+    `.rvm-vinyl` dans site.css), --hero = teinte de la pochette : aucune image
+    de plus que la pochette 480.
+  - Rangées : grandes pochettes 2 × 2 / 1 × 4 (`ReleaseCoverGrid`,
+    `HOME_GRID` = 4), tuiles larges pour 1-2 sorties ; Hit (rang seul, sans
+    en-tête de colonnes : `showHeader={false}`) et « À découvrir »
+    (`ArtistFollowCard`, « Suivre ») côte à côte dès `@4xl`.
+  - Raccourcis de tête RETIRÉS (`shortcutFill` supprimé) : la bibliothèque
+    reste dans son panneau et dans la navigation du bas.
+  - Polices de Play pour la Musique : `lib/app-fonts.ts` (Urbanist titres,
+    Inter interface) partagé avec `app/play/layout.tsx` ; `font-rvm-display`,
+    `font-rvm-body`. Logo vert d'origine dans la barre du haut (plus inversé
+    en blanc), « MUSIQUE » visible aussi sur téléphone.
+  - Restent hors lot : navigation gauche Découvrir / Rechercher / Hit / Play
+    et carte « Espace artiste » (destination à choisir), puis l'app.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 

@@ -265,7 +265,7 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
   assert.deepEqual(headerTint([30, 30, 60]), [30, 30, 60]);
 });
 
-import { HOME_SHOWS, usefulRubrics, shortcutFill, installHint, INSTALL_HINT_SNOOZE_MS } from "./music-logic.ts";
+import { HOME_SHOWS, usefulRubrics, homeSpotlight, installHint, INSTALL_HINT_SNOOZE_MS } from "./music-logic.ts";
 
 test("accueil, petit catalogue : pas de raccourci vers une page qui répète l'accueil ou une page vide", () => {
   // Le catalogue d'aujourd'hui : 2 sorties, 2 titres au Hit, 1 artiste, aucun clip.
@@ -278,16 +278,11 @@ test("accueil, petit catalogue : pas de raccourci vers une page qui répète l'a
   assert.deepEqual(usefulRubrics({ hitTracks: HOME_SHOWS.hit, releases: HOME_SHOWS.releases, artists: HOME_SHOWS.artists, clips: 0 }), []);
 });
 
-test("raccourcis : des rangées pleines (2, 3, 4, 6 ou 8)", () => {
-  assert.equal(shortcutFill(2, 5), 2); // titres likés + historique + 2 entrées = 4
-  assert.equal(shortcutFill(2, 1), 1); // 3
-  assert.equal(shortcutFill(3, 5), 1); // 4, pas 5
-  assert.equal(shortcutFill(4, 5), 2); // 6
-  assert.equal(shortcutFill(5, 5), 1); // 6
-  assert.equal(shortcutFill(6, 5), 2); // 8
-  assert.equal(shortcutFill(0, 0), 0); // visiteur : rien à ajouter
-  assert.equal(shortcutFill(7, 5), 1); // 8
-  assert.equal(shortcutFill(8, 5), 0);
+test("bannière à la une : la sélection d'abord, sinon la plus récente, jamais répétée dessous", () => {
+  const A = { id: "a" }, B = { id: "b" }, C = { id: "c" };
+  assert.deepEqual(homeSpotlight([B, A], [A, C, B]), { release: B, source: "featured", featured: [A], fresh: [A, C] });
+  assert.deepEqual(homeSpotlight([], [C, A]), { release: C, source: "latest", featured: [], fresh: [A] });
+  assert.deepEqual(homeSpotlight([], []), { release: null, source: null, featured: [], fresh: [] });
 });
 
 test("écran d'accueil : iPhone, appli Android, jamais dans une appli ni après « Plus tard »", () => {

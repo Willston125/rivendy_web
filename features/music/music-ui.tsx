@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils/cn";
 import { fetchRelease, isFollowing, isReleaseSaved, setFollowing, setReleaseSaved, type MusicArtist } from "./music-api";
 import { MUSIC_LIBRARY_EVENT, emitLibraryChange, useMusicLibrary, type LibraryEventDetail } from "./music-library";
 import {
-  addedAtLabel, artistName, formatDuration, isPlayable, releaseKindLabel, thumbUrl, trackSubtitle,
+  HOME_GRID, addedAtLabel, artistName, formatDuration, isPlayable, releaseKindLabel, thumbUrl, trackSubtitle,
   type MusicRelease, type MusicTrack,
 } from "./music-logic";
 import { useMusicPlayer, type PlaySource, type QueueItem } from "./player/music-player-provider";
@@ -149,7 +149,7 @@ export function PageTitle({ title, subtitle, aside }: { title: string; subtitle?
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-2xl font-black tracking-tight text-rvm-text sm:text-3xl">{title}</h1>
+        <h1 className="font-rvm-display text-2xl font-black tracking-tight text-rvm-text sm:text-3xl">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-rvm-muted">{subtitle}</p> : null}
       </div>
       {aside}
@@ -164,7 +164,7 @@ export function Section({ title, subtitle, href, hrefLabel = "Tout voir", childr
     <section className={cn("mt-8", className)}>
       <div className="mb-3.5 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-bold text-rvm-text sm:text-xl">{title}</h2>
+          <h2 className="font-rvm-display text-xl font-extrabold tracking-tight text-rvm-text sm:text-2xl">{title}</h2>
           {subtitle ? <p className="mt-0.5 text-sm text-rvm-muted">{subtitle}</p> : null}
         </div>
         {href ? (
@@ -219,6 +219,21 @@ export function CardRow({ label, children }: { label: string; children: ReactNod
           <ChevronRight className="h-5 w-5" aria-hidden />
         </button>
       ) : null}
+    </div>
+  );
+}
+
+/** Grille de pochettes de l'accueil en attente (mêmes colonnes que ReleaseCoverGrid). */
+export function CoverGridSkeleton() {
+  return (
+    <div aria-hidden className="grid grid-cols-2 gap-x-4 gap-y-6 @2xl:grid-cols-4 @3xl:gap-x-6">
+      {Array.from({ length: HOME_GRID }, (_, i) => (
+        <div key={i}>
+          <div className="aspect-square rounded-xl bg-rvm-raised motion-safe:animate-pulse" />
+          <div className="mt-3 h-3 w-3/4 rounded bg-rvm-raised motion-safe:animate-pulse" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-rvm-raised/70 motion-safe:animate-pulse" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -360,10 +375,10 @@ function useReleasePlay(release: MusicRelease) {
 }
 
 /** « Écouter » d'une sortie mise en avant (bannière). */
-export function PlayReleaseLabelButton({ release, label = "Écouter" }: { release: MusicRelease; label?: string }) {
+export function PlayReleaseLabelButton({ release, label = "Écouter", className }: { release: MusicRelease; label?: string; className?: string }) {
   const { isThis, busy, playing, play } = useReleasePlay(release);
   return (
-    <button type="button" onClick={play} className={primaryButton}>
+    <button type="button" onClick={play} className={cn(primaryButton, className)}>
       {busy ? <LoaderCircle className="h-4 w-4 motion-safe:animate-spin" aria-hidden />
         : playing ? <Pause className="h-4 w-4 fill-current" aria-hidden /> : <Play className="h-4 w-4 fill-current" aria-hidden />}
       {isThis ? (playing ? "Pause" : "Reprendre") : label}
@@ -519,6 +534,44 @@ export function ReleaseShelf({ releases, label }: { releases: MusicRelease[]; la
   return <CardRow label={label}>{releases.map((r, i) => <ReleaseCard key={r.id} release={r} priority={i < 2} />)}</CardRow>;
 }
 
+/**
+ * Accueil (refonte du 2026-10-28) : grandes pochettes, 2 × 2 sur téléphone,
+ * une rangée de 4 sur grand panneau (HOME_GRID) ; une ou deux sorties
+ * seulement : tuiles larges, jamais une rangée presque vide.
+ */
+export function ReleaseCoverGrid({ releases, label }: { releases: MusicRelease[]; label: string }) {
+  if (releases.length <= 2) return <ReleaseShelf releases={releases} label={label} />;
+  return (
+    <div role="list" aria-label={label} className="grid grid-cols-2 gap-x-4 gap-y-6 @2xl:grid-cols-4 @3xl:gap-x-6">
+      {releases.slice(0, HOME_GRID).map((r, i) => (
+        <div key={r.id} role="listitem" className="min-w-0"><ReleaseCard release={r} priority={i < 2} /></div>
+      ))}
+    </div>
+  );
+}
+
+/** Artiste à découvrir : portrait rond (ou initiale), nom, « Suivre ». */
+export function ArtistFollowCard({ artist }: { artist: MusicArtist }) {
+  return (
+    <div className="flex min-w-0 flex-col items-center text-center">
+      <Link href={`/artist/${artist.id}`} className="group flex max-w-full flex-col items-center rounded-xl p-1">
+        <span className="block w-28 overflow-hidden rounded-full shadow-lg shadow-black/30 ring-1 ring-white/5">
+          {artist.avatar_url ? (
+            <Cover url={artist.avatar_url} size={320} alt="" rounded="rounded-full"
+              className="w-full transition duration-300 motion-safe:group-hover:scale-[1.04]" />
+          ) : (
+            <span className="flex aspect-square items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/40 to-rvm-raised text-3xl font-black text-rvm-text">
+              {artist.name.trim().charAt(0).toUpperCase() || <UserRound className="h-1/3 w-1/3" aria-hidden />}
+            </span>
+          )}
+        </span>
+        <span className="mt-2.5 block max-w-full truncate text-[15px] font-bold text-rvm-text group-hover:text-rvm-accent">{artist.name}</span>
+      </Link>
+      <FollowArtistButton artist={artist} compact className="mt-1.5" />
+    </div>
+  );
+}
+
 /** Artistes en liste compacte (colonne secondaire) : avatar ou initiale, nom, genre. */
 export function ArtistList({ artists }: { artists: MusicArtist[] }) {
   return (
@@ -593,9 +646,11 @@ export function toQueue(tracks: MusicTrack[], release?: MusicRelease | null): Qu
  */
 export function TrackList({
   items, showAlbum = true, showCover = true, numbered = false, ranks, menuExtra, hideRelease = false, label = "Titres",
-  highlight = null, source, dateLabel, stickyHeader = false,
+  highlight = null, source, dateLabel, stickyHeader = false, showHeader = true,
 }: {
   items: QueueItem[];
+  /** En-tête des colonnes (#, Titre, durée) ; l'accueil s'en passe. */
+  showHeader?: boolean;
   /** Titre ouvert par un lien partagé : mis en évidence. */
   highlight?: string | null;
   showAlbum?: boolean;
@@ -624,8 +679,8 @@ export function TrackList({
 
   return (
     <div>
-      <div aria-hidden className={cn("mb-1 hidden items-center gap-3 border-b border-rvm-line px-2 py-2 text-xs font-semibold uppercase tracking-wider text-rvm-soft @md:flex",
-        stickyHeader && "sticky top-16 z-10 bg-rvm-surface")}>
+      <div aria-hidden className={cn("mb-1 hidden items-center gap-3 border-b border-rvm-line px-2 py-2 text-xs font-semibold uppercase tracking-wider text-rvm-soft",
+        showHeader && "@md:flex", stickyHeader && "sticky top-16 z-10 bg-rvm-surface")}>
         <span className="w-8 text-center">#</span>
         <span className="min-w-0 flex-1">Titre</span>
         {showAlbum ? <span className="hidden w-[24%] @3xl:block">Album</span> : null}
@@ -651,7 +706,7 @@ export function TrackList({
                   : rank ? (
                     <span className="flex flex-col items-center leading-none group-hover:invisible group-focus-within:invisible">
                       <span className={cn("text-sm font-black tabular-nums", rank.rank <= 3 ? "text-rvm-accent" : "text-rvm-text")}>{rank.rank}</span>
-                      <span className="mt-0.5 text-[10px] text-rvm-muted">{rank.move}</span>
+                      {rank.move ? <span className="mt-0.5 text-[10px] text-rvm-muted">{rank.move}</span> : null}
                     </span>
                   ) : (
                     <span className="text-[15px] tabular-nums text-rvm-soft group-hover:invisible group-focus-within:invisible">{numbered ? t.position : i + 1}</span>
