@@ -31,6 +31,7 @@ export interface PlusAgency {
   name: string;
   address?: string;
   opening_hours?: string;
+  contact_phone?: string;
 }
 
 export interface PlusChannel {

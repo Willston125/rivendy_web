@@ -234,7 +234,7 @@ function PendingRequest({
           {(channel?.agencies ?? []).length ? (
             <ul className="mt-2 space-y-1">
               {channel!.agencies!.map((a) => (
-                <li key={a.id}><strong>{a.name}</strong>{a.address ? ` — ${a.address}` : ""}{a.opening_hours ? ` · ${a.opening_hours}` : ""}</li>
+                <li key={a.id}><strong>{a.name}</strong>{a.address ? ` — ${a.address}` : ""}{a.opening_hours ? ` · ${a.opening_hours}` : ""}{a.contact_phone ? ` · ☎ ${a.contact_phone}` : ""}</li>
               ))}
             </ul>
           ) : null}
