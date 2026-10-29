@@ -243,7 +243,7 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
 });
 
 import {
-  HOME_SHOWS, HOME_GRID, HOME_HIT, usefulRubrics, genreTone, GENRE_TONES, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
+  HOME_SHOWS, HOME_GRID, HOME_HIT, usefulRubrics, genreTone, rythmeTagline, GENRE_TONES, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
 } from "./music-logic.ts";
 
 test("navigation : Découvrir, Rechercher, Hit ; jamais ailleurs", () => {
@@ -302,9 +302,17 @@ test("écran d'accueil : iPhone, appli Android, jamais dans une appli ni après 
 });
 
 test("accueil « fraîcheur » : 5 nouveautés, 3 titres du Hit, une couleur par genre qui revient au début", () => {
-  assert.equal(HOME_GRID, 5);
+  assert.equal(HOME_GRID, 4);
   assert.equal(HOME_HIT, 3);
   assert.equal(genreTone(0), GENRE_TONES[0]);
   assert.equal(genreTone(GENRE_TONES.length + 1), GENRE_TONES[1]);
   assert.equal(genreTone(-1), GENRE_TONES[GENRE_TONES.length - 1]);
+});
+
+test("rythmeTagline : une phrase d’envie par genre, jamais un nombre", () => {
+  assert.equal(rythmeTagline("Afro"), "Des sons pour se laisser aller.");
+  assert.equal(rythmeTagline(" RAP "), "Les flows qui font bouger.");
+  assert.equal(rythmeTagline("Hip-Hop"), "Les flows qui font bouger.");
+  assert.equal(rythmeTagline("Zoùk"), "Pour danser à deux.");
+  assert.equal(rythmeTagline("Salegy"), "Les sorties Salegy du moment.");
 });

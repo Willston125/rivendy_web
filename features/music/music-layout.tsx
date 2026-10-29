@@ -7,15 +7,16 @@ import { clampPanel, fitPanels, type LibraryKind, type LibrarySort } from "./mus
 
 /**
  * Disposition de l'espace Musique (mise en page « application » du
- * 2026-10-22) : largeur de la bibliothèque et du panneau « En cours de
- * lecture », bibliothèque repliée ou agrandie, panneau droit ouvert ou
- * fermé, tri et vue de la bibliothèque. Un confort du navigateur : gardé
- * dans localStorage, jamais envoyé au serveur.
+ * 2026-10-22, réglages du 2026-10-29) : colonne de gauche à largeur fixe
+ * (la maquette du propriétaire), panneau « En cours de lecture » ouvert ou
+ * fermé et sa largeur, tri et vue de la page Bibliothèque. Un confort du
+ * navigateur : gardé dans localStorage, jamais envoyé au serveur.
  */
 
+/** Colonne de gauche de la tablette (768-1023 px). */
 export const LIB_MIN = 240;
-export const LIB_MAX = 440;
-export const LIB_COLLAPSED = 72;
+/** Colonne de gauche de l'ordinateur : navigation, trois entrées de bibliothèque, espace artiste. */
+export const LIB_WIDTH = 280;
 export const RIGHT_MIN = 280;
 export const RIGHT_MAX = 440;
 /** Le panneau central ne descend jamais en dessous (lisibilité des listes). */
@@ -23,21 +24,20 @@ export const CENTER_MIN = 420;
 /** Marges et espaces entre panneaux : aucun depuis le style « fraîcheur » (colonnes jointives). */
 const CHROME = 0;
 
-export type LibraryMode = "list" | "collapsed" | "expanded";
 export type LibraryView = "list" | "compact" | "grid";
 export type RightMode = "now" | "queue";
 
 type Saved = {
-  libWidth: number;
-  libMode: LibraryMode;
   libView: LibraryView;
   libSort: LibrarySort;
   rightWidth: number;
   rightOpen: boolean;
 };
 
-const DEFAULTS: Saved = { libWidth: 300, libMode: "list", libView: "list", libSort: "recent", rightWidth: 340, rightOpen: true };
-const KEY = "rivendy_music_layout_v1";
+const DEFAULTS: Saved = { libView: "list", libSort: "recent", rightWidth: 340, rightOpen: false };
+/** v2 (réglages du 2026-10-29) : le panneau « En cours de lecture » repart fermé pour tout le monde. */
+const KEY = "rivendy_music_layout_v2";
+const OLD_KEY = "rivendy_music_layout_v1";
 
 type LayoutContext = Saved & {
   /** Largeurs réellement affichées (le centre garde sa largeur minimale). */
@@ -47,13 +47,11 @@ type LayoutContext = Saved & {
   rightMode: RightMode;
   /** Panneau droit en tiroir (écrans intermédiaires) : ouvert ? */
   drawerOpen: boolean;
-  /** ≥ 1280 px : panneau droit dans la page ; en dessous, en tiroir. */
+  /** ≥ 1600 px : panneau droit dans la page ; en dessous, en tiroir par-dessus l'accueil (qui garde sa largeur). */
   wide: boolean;
-  /** ≥ 768 px : bibliothèque à gauche ; en dessous, navigation du bas. */
+  /** ≥ 768 px : colonne de gauche ; en dessous, navigation du bas. */
   tablet: boolean;
-  setLibWidth: (w: number) => void;
   setRightWidth: (w: number) => void;
-  setLibMode: (m: LibraryMode) => void;
   setLibView: (v: LibraryView) => void;
   setLibSort: (s: LibrarySort) => void;
   setLibKind: (k: LibraryKind | null) => void;
@@ -92,15 +90,15 @@ function useViewportWidth(): number {
 function load(): Saved {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return DEFAULTS;
-    const v = JSON.parse(raw) as Partial<Saved>;
+    // Disposition d'avant (v1) : vue, tri et largeur gardés ; le panneau droit repart fermé.
+    const old = raw ? null : localStorage.getItem(OLD_KEY);
+    if (!raw && !old) return DEFAULTS;
+    const v = JSON.parse(raw ?? old ?? "{}") as Partial<Saved>;
     return {
-      libWidth: clampPanel(Number(v.libWidth ?? DEFAULTS.libWidth), LIB_MIN, LIB_MAX),
-      libMode: v.libMode === "collapsed" || v.libMode === "expanded" ? v.libMode : "list",
       libView: v.libView === "compact" || v.libView === "grid" ? v.libView : "list",
       libSort: v.libSort === "added" || v.libSort === "alpha" ? v.libSort : "recent",
       rightWidth: clampPanel(Number(v.rightWidth ?? DEFAULTS.rightWidth), RIGHT_MIN, RIGHT_MAX),
-      rightOpen: v.rightOpen !== false,
+      rightOpen: raw ? v.rightOpen === true : false,
     };
   } catch {
     return DEFAULTS;
@@ -108,7 +106,10 @@ function load(): Saved {
 }
 
 function persist(s: Saved) {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* stockage indisponible */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.removeItem(OLD_KEY);
+  } catch { /* stockage indisponible */ }
 }
 
 /**
@@ -123,7 +124,7 @@ export function MusicLayoutProvider({ children, hasCurrent }: { children: ReactN
   const [libKind, setLibKind] = useState<LibraryKind | null>(null);
   const [rightMode, setRightMode] = useState<RightMode>("now");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const wide = useMedia("(min-width: 1280px)", true);
+  const wide = useMedia("(min-width: 1600px)", true);
   const tablet = useMedia("(min-width: 768px)", true);
   const vw = useViewportWidth();
 
@@ -147,14 +148,13 @@ export function MusicLayoutProvider({ children, hasCurrent }: { children: ReactN
 
   const rightDocked = wide && saved.rightOpen && hasCurrent;
   const rightVisible = hasCurrent && (wide ? saved.rightOpen : drawerOpen);
-  // Tablette (768-1023 px) : navigation compacte, la colonne de gauche à sa
-  // largeur minimale (sans poignée) ; la largeur choisie sur ordinateur est gardée.
+  // Tablette (768-1023 px) : colonne de gauche compacte ; ordinateur : la largeur de la maquette.
   const compactLeft = vw < 1024;
   const fitted = fitPanels({
     available: vw - CHROME,
-    left: saved.libMode === "collapsed" ? LIB_COLLAPSED : compactLeft ? LIB_MIN : saved.libWidth,
+    left: compactLeft ? LIB_MIN : LIB_WIDTH,
     right: rightDocked ? saved.rightWidth : 0,
-    leftMin: saved.libMode === "collapsed" ? LIB_COLLAPSED : LIB_MIN,
+    leftMin: LIB_MIN,
     rightMin: rightDocked ? RIGHT_MIN : 0,
     centerMin: CENTER_MIN,
   });
@@ -181,9 +181,7 @@ export function MusicLayoutProvider({ children, hasCurrent }: { children: ReactN
     shownLib: fitted.left,
     shownRight: fitted.right,
     libKind, rightMode, drawerOpen, wide, tablet, rightVisible,
-    setLibWidth: (w) => patch({ libWidth: clampPanel(w, LIB_MIN, LIB_MAX), libMode: "list" }),
     setRightWidth: (w) => patch({ rightWidth: clampPanel(w, RIGHT_MIN, RIGHT_MAX) }),
-    setLibMode: (m) => patch({ libMode: m, ...(m === "expanded" ? { libView: "grid" as const } : {}) }),
     setLibView: (v) => patch({ libView: v }),
     setLibSort: (s) => patch({ libSort: s }),
     setLibKind,

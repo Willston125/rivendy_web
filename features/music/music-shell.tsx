@@ -1,34 +1,34 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Bell, ChartColumn, Compass, Download, House, Library, Music, Search, Smartphone, UserRound } from "lucide-react";
+import {
+  Bell, ChartColumn, ChevronDown, Download, House, Library, LogOut, Music, Search, Smartphone, Sparkles, UserRound,
+} from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { useNotifications } from "@/features/notifications/use-notifications";
 import { PLAY_STORE_URL } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
 import { marketHomePath } from "@/lib/seo";
-import { LibraryPanel } from "./music-library-panel";
 import { useSearchDraft } from "./music-ui";
-import {
-  LIB_COLLAPSED, LIB_MAX, LIB_MIN, MusicLayoutProvider, RIGHT_MAX, RIGHT_MIN, useMusicLayout,
-} from "./music-layout";
-import { AppSwitcher, ARTIST_SPACE_PATH, MusicNav } from "./music-nav";
+import { MusicLayoutProvider, RIGHT_MAX, RIGHT_MIN, useMusicLayout } from "./music-layout";
+import { AppSwitcher, ARTIST_SPACE_PATH, ArtistSpaceCard, LibraryLinks, MusicNav } from "./music-nav";
 import { NowPlayingPanel } from "./music-now-playing";
 import { MobileMiniPlayer, MusicPlayerBar } from "./player/mini-player";
 import { useMusicPlayer } from "./player/music-player-provider";
 
 /**
  * Coque de l'espace Musique — mise en page « application » du 2026-10-22
- * (vidéo de référence) : la fenêtre entière, une barre du haut, « Ma
- * bibliothèque » à gauche, le panneau central (toutes les pages /music et
- * /artist), « En cours de lecture » à droite, le lecteur permanent en bas.
- * Chaque panneau défile seul ; la page, elle, ne défile pas. Sur écran
- * intermédiaire, le panneau droit devient un tiroir ; sur téléphone, la
- * bibliothèque passe dans la navigation du bas et le mini-lecteur se pose
+ * (vidéo de référence), réglages du 2026-10-29 : la fenêtre entière, une
+ * barre du haut, la colonne vert lagon à gauche, le panneau central (toutes
+ * les pages /music et /artist), « En cours de lecture » à droite sur très
+ * grand écran, le lecteur permanent en bas. Chaque panneau défile seul ; la
+ * page, elle, ne défile pas. En dessous de 1600 px, le panneau droit est un
+ * tiroir posé sur le panneau central (qui garde sa largeur) ; sur téléphone,
+ * la bibliothèque passe dans la navigation du bas et le mini-lecteur se pose
  * au-dessus. L'en-tête et le pied de page de la marketplace sont masqués
  * ici (HideInMusic) : leurs liens utiles restent en bas du panneau central.
  */
@@ -44,14 +44,8 @@ export function MusicShell({ fontClassName, children }: { fontClassName?: string
 function ShellFrame({ fontClassName, children }: { fontClassName?: string; children: ReactNode }) {
   const layout = useMusicLayout();
   const player = useMusicPlayer();
-  const { user } = useAuth();
   const pathname = usePathname() || "/music";
   const center = useRef<HTMLDivElement>(null);
-  // Style « fraîcheur » (2026-10-29) : la colonne de gauche est la même pour
-  // un visiteur (navigation, invitation à se connecter) ; le rail n'est plus
-  // que la bibliothèque repliée. Agrandie (grille), elle demande un compte.
-  const rail = layout.libMode === "collapsed";
-  const expanded = layout.libMode === "expanded" && !!user;
 
   // La page ne défile pas : seuls les panneaux défilent (fond de la Musique au rebond).
   useEffect(() => {
@@ -70,30 +64,25 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
     <div className={cn("rvm-scope flex h-dvh flex-col overflow-hidden bg-rvm-ground font-rvm-body text-rvm-text", fontClassName)}>
       <MusicTopBar />
       <div className="relative flex min-h-0 flex-1">
-        {/* Colonne vert lagon (style « fraîcheur », 2026-10-29) : navigation, bibliothèque, espace artiste, espaces Rivendy. */}
-        <aside aria-label="Navigation et bibliothèque"
-          style={{ width: rail ? LIB_COLLAPSED : expanded ? undefined : layout.shownLib }}
-          className={cn("rvm-deep relative hidden min-h-0 shrink-0 flex-col md:flex", expanded && "md:flex-1")}>
-          <MusicNav compact={rail} />
-          <span aria-hidden className={cn("block h-px shrink-0 bg-rvm-line", rail ? "mx-3 my-2" : "mx-5 my-3")} />
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <LibraryPanel />
-          </div>
-          <AppSwitcher compact={rail} />
-          {layout.libMode === "list" ? (
-            <ResizeHandle label="Redimensionner la bibliothèque" side="right" value={layout.libWidth} min={LIB_MIN} max={LIB_MAX}
-              onChange={layout.setLibWidth} />
-          ) : null}
+        {/* Colonne vert lagon, comme la maquette du propriétaire (réglages du 2026-10-29) :
+            navigation, « Ma bibliothèque » en trois entrées, espace artiste, espaces Rivendy.
+            Fenêtre trop basse : la colonne entière défile, jamais une liste écrasée. */}
+        <aside aria-label="Navigation et bibliothèque" style={{ width: layout.shownLib }}
+          className="rvm-deep @container relative hidden min-h-0 shrink-0 flex-col overflow-y-auto overscroll-contain [scrollbar-width:thin] md:flex">
+          <MusicNav />
+          <span aria-hidden className="mx-5 my-3 block h-px shrink-0 bg-rvm-line [@media(max-height:760px)]:my-2" />
+          <LibraryLinks />
+          <ArtistSpaceCard className="mx-3 mt-3 shrink-0" />
+          <AppSwitcher />
         </aside>
 
-        <div ref={center} id="rvm-center"
-          className={cn("@container relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-rvm-ground", expanded && "md:hidden")}>
+        <div ref={center} id="rvm-center" className="@container relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-rvm-ground">
           {children}
           <MusicFooter />
         </div>
 
         {docked ? (
-          <div style={{ width: layout.shownRight }} className="relative hidden min-h-0 shrink-0 border-l border-rvm-line xl:flex">
+          <div style={{ width: layout.shownRight }} className="relative hidden min-h-0 shrink-0 border-l border-rvm-line min-[1600px]:flex">
             <ResizeHandle label="Redimensionner le panneau En cours de lecture" side="left" value={layout.rightWidth} min={RIGHT_MIN} max={RIGHT_MAX}
               onChange={layout.setRightWidth} />
             <NowPlayingPanel className="w-full" />
@@ -108,7 +97,11 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
   );
 }
 
-/** Écran intermédiaire : « En cours de lecture » en tiroir par-dessus le panneau central. */
+/**
+ * Sous 1600 px : « En cours de lecture » en tiroir, posé sur le panneau
+ * central seulement (la colonne de gauche reste utilisable) ; l'accueil
+ * garde sa largeur, rien ne se tasse. Échap ou un clic à côté le referme.
+ */
 function RightDrawer() {
   const layout = useMusicLayout();
   const { closeRight } = layout;
@@ -118,12 +111,12 @@ function RightDrawer() {
     return () => document.removeEventListener("keydown", onKey);
   }, [closeRight]);
   return (
-    <>
-      <div aria-hidden className="absolute inset-0 z-30 bg-black/40 md:rounded-lg" onClick={closeRight} />
-      <div className="absolute bottom-0 right-0 top-0 z-40 flex w-[min(360px,calc(100%-16px))] md:right-2">
-        <NowPlayingPanel className="w-full shadow-2xl shadow-rvm-deep/60 ring-1 ring-rvm-line" />
+    <div className="absolute inset-y-0 right-0 z-30" style={{ left: layout.tablet ? layout.shownLib : 0 }}>
+      <div aria-hidden className="absolute inset-0 bg-rvm-deep/30" onClick={closeRight} />
+      <div className="absolute inset-y-2 right-2 flex w-[min(360px,calc(100%-16px))]">
+        <NowPlayingPanel className="w-full rounded-2xl shadow-2xl shadow-rvm-deep/40 ring-1 ring-rvm-line" />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -223,10 +216,7 @@ function MusicTopBar() {
         ) : null}
         {user ? <span aria-hidden className="mx-1 hidden h-6 w-px bg-rvm-line sm:block" /> : null}
         {user ? (
-          <Link href="/profile" prefetch={false} aria-label="Mon profil" title="Mon profil"
-            className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-rvm-raised text-sm font-bold text-rvm-text ring-2 ring-rvm-line transition hover:scale-105 motion-reduce:hover:scale-100">
-            {profile?.avatar_url ? <Image src={profile.avatar_url} alt="" fill sizes="40px" className="object-cover" /> : <span aria-hidden>{initial}</span>}
-          </Link>
+          <AccountMenu avatarUrl={profile?.avatar_url} initial={initial} />
         ) : loading ? (
           <span aria-hidden className="ml-1 h-10 w-10 rounded-full bg-rvm-raised" />
         ) : (
@@ -237,6 +227,69 @@ function MusicTopBar() {
         )}
       </div>
     </header>
+  );
+}
+
+/**
+ * Compte (maquette : l'avatar et une petite flèche) : Mon profil, Rivendy+,
+ * Se déconnecter — comme le menu de Rivendy Play. Échap, un clic à côté ou
+ * la tabulation hors du menu le referment.
+ */
+function AccountMenu({ avatarUrl, initial }: { avatarUrl?: string | null; initial: string }) {
+  const { signOut } = useAuth();
+  const pathname = usePathname() || "/music";
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      button.current?.focus();
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const item = "flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-rvm-text transition-colors hover:bg-rvm-raised";
+  return (
+    <div ref={root} className="relative"
+      onBlur={(e) => { if (open && e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) setOpen(false); }}>
+      <button ref={button} type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={menuId} aria-label="Mon compte"
+        className="flex items-center gap-1 rounded-full p-0.5 text-rvm-text transition-colors hover:bg-rvm-raised sm:pr-1.5">
+        <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-rvm-raised text-sm font-bold ring-2 ring-rvm-line">
+          {avatarUrl ? <Image src={avatarUrl} alt="" fill sizes="40px" className="object-cover" /> : <span aria-hidden>{initial}</span>}
+        </span>
+        <ChevronDown className={cn("hidden h-4 w-4 transition-transform motion-reduce:transition-none sm:block", open && "rotate-180")} aria-hidden />
+      </button>
+      {open ? (
+        <div id={menuId} className="absolute right-0 top-full z-[60] mt-2 w-60 rounded-2xl border border-rvm-line bg-rvm-surface p-2 shadow-[0_20px_44px_rgb(6_63_59/0.18)]">
+          <ul>
+            <li>
+              <Link href="/profile" prefetch={false} className={item}>
+                <UserRound className="h-[18px] w-[18px] text-rvm-ink-accent" aria-hidden /> Mon profil
+              </Link>
+            </li>
+            <li>
+              <Link href="/plus" prefetch={false} className={item}>
+                <Sparkles className="h-[18px] w-[18px] text-rvm-ink-accent" aria-hidden /> Rivendy+
+              </Link>
+            </li>
+          </ul>
+          <div className="mt-1.5 border-t border-rvm-line pt-1.5">
+            <button type="button" onClick={() => { setOpen(false); void signOut(); }} className={item}>
+              <LogOut className="h-[18px] w-[18px] text-rvm-ink-accent" aria-hidden /> Se déconnecter
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -267,14 +320,10 @@ function SearchBox() {
       onSubmit={(e) => { e.preventDefault(); const v = q.trim(); router.push(v ? `/music/explore?q=${encodeURIComponent(v)}` : "/music/explore"); }}
       className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-full bg-rvm-field pl-4 pr-1.5 ring-rvm-ink-accent transition hover:bg-rvm-field-hover focus-within:ring-2">
       <Search className="h-5 w-5 shrink-0 text-rvm-text" aria-hidden />
+      {/* Pas de boussole (maquette) : « Rechercher », dans la colonne, ouvre déjà les genres. */}
       <input value={q} onChange={(e) => setQ(e.target.value)}
         placeholder="Que souhaitez-vous écouter ?" aria-label="Que souhaitez-vous écouter ?" enterKeyHint="search"
-        className="min-w-0 flex-1 bg-transparent text-[15px] text-rvm-text placeholder:text-rvm-soft focus:outline-none focus-visible:outline-none" />
-      <span aria-hidden className="h-6 w-px bg-rvm-text/15" />
-      <Link href="/music/explore" aria-label="Parcourir les genres" title="Parcourir"
-        className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full hover:text-rvm-text", onExplore && !urlQ ? "text-rvm-text" : "text-rvm-soft")}>
-        <Compass className="h-5 w-5" aria-hidden />
-      </Link>
+        className="min-w-0 flex-1 bg-transparent pr-3 text-[15px] text-rvm-text placeholder:text-rvm-soft focus:outline-none focus-visible:outline-none" />
     </form>
   );
 }

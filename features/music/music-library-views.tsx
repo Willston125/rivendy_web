@@ -12,7 +12,7 @@ import {
 } from "./music-api";
 import { CollectionPage, IconTile, LIKED_TINT, MetaLine, PlaylistCover, useCoverTint } from "./music-collection";
 import { playlistMessage, useMusicLibrary } from "./music-library";
-import { LibraryPanel } from "./music-library-panel";
+import { LibraryPage } from "./music-library-panel";
 import { isValidPlaylistName, totalDurationLabel, type MusicTrack } from "./music-logic";
 import { loginHref } from "./music-pending";
 import {
@@ -49,7 +49,7 @@ function AccountOnly({ icon, title, text, children }: { icon: LucideIcon; title:
 // ── Ma bibliothèque (téléphone ; sur ordinateur elle est à gauche) ─────────
 
 export function LibraryView() {
-  return <LibraryPanel variant="page" />;
+  return <LibraryPage />;
 }
 
 // ── Titres likés ───────────────────────────────────────────────────────────

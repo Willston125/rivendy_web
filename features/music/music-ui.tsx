@@ -226,10 +226,10 @@ export function CardRow({ label, children }: { label: string; children: ReactNod
 /** Nouveautés de l'accueil en attente (mêmes colonnes que la rangée de l'accueil). */
 export function CoverGridSkeleton() {
   return (
-    <div aria-hidden className="grid grid-cols-2 gap-x-4 gap-y-6 @md:grid-cols-3 @2xl:grid-cols-5 @2xl:gap-x-5">
+    <div aria-hidden className="grid grid-cols-2 gap-x-4 gap-y-6 @md:grid-cols-3 @2xl:grid-cols-4 @2xl:gap-x-5">
       {Array.from({ length: HOME_GRID }, (_, i) => (
         <div key={i}>
-          <div className="aspect-square rounded-xl bg-rvm-raised motion-safe:animate-pulse" />
+          <div className="aspect-[16/10] rounded-2xl bg-rvm-raised motion-safe:animate-pulse" />
           <div className="mt-3 h-3 w-3/4 rounded bg-rvm-raised motion-safe:animate-pulse" />
           <div className="mt-2 h-3 w-1/2 rounded bg-rvm-raised/70 motion-safe:animate-pulse" />
         </div>
@@ -491,6 +491,37 @@ export function ReleaseCard({ release, priority = false }: { release: MusicRelea
 }
 
 /**
+ * Nouveauté de l'accueil (réglages du 2026-10-29, maquette du propriétaire) :
+ * carte paysage, la pochette ENTIÈRE posée sur un fond flouté d'elle-même —
+ * le titre écrit sur la pochette n'est jamais coupé —, lecture au survol.
+ */
+export function ReleaseWideCard({ release, priority = false }: { release: MusicRelease; priority?: boolean }) {
+  const player = useMusicPlayer();
+  const isThis = player.current?.release.id === release.id;
+  return (
+    <div className="group relative min-w-0">
+      <Link href={`/music/album/${release.id}`} className="block rounded-2xl">
+        <div className={cn("relative aspect-[16/10] overflow-hidden rounded-2xl bg-rvm-deep shadow-lg shadow-rvm-deep/20 transition duration-300 motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:shadow-xl",
+          isThis && "ring-2 ring-rvm-ink-accent ring-offset-2 ring-offset-rvm-ground")}>
+          <Cover url={release.cover_url} size={160} alt="" rounded="rounded-none"
+            className="absolute inset-0 h-full w-full scale-125 blur-xl brightness-75 saturate-150" />
+          <Cover url={release.cover_url} size={320} alt="" rounded="rounded-lg" priority={priority}
+            className="absolute left-1/2 top-[8%] h-[84%] w-auto -translate-x-1/2 shadow-xl shadow-black/40" />
+          {release.is_premium ? <PremiumTag className="absolute left-2 top-2" /> : null}
+        </div>
+        <p className={cn("mt-2.5 truncate text-[15px] font-semibold", isThis ? "text-rvm-ink-accent" : "text-rvm-text")}>{release.title}</p>
+        <p className="truncate text-[13px] text-rvm-soft">{artistName(release)} · {releaseKindLabel(release.kind)}</p>
+      </Link>
+      <div className="pointer-events-none absolute inset-x-0 top-0 aspect-[16/10]">
+        <PlayReleaseButton release={release}
+          className={cn("pointer-events-auto absolute bottom-2.5 right-2.5",
+            isThis ? "opacity-100" : "opacity-100 sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 sm:group-focus-within:translate-y-0 sm:group-focus-within:opacity-100")} />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Sortie en tuile large (petit catalogue) : pochette nette, titre, artiste,
  * type et année, lecture directe. Remplit la largeur sans grand vide.
  */
@@ -630,9 +661,11 @@ export function toQueue(tracks: MusicTrack[], release?: MusicRelease | null): Qu
  */
 export function TrackList({
   items, showAlbum = true, showCover = true, numbered = false, ranks, menuExtra, hideRelease = false, label = "Titres",
-  highlight = null, source, dateLabel, stickyHeader = false, showHeader = true,
+  highlight = null, source, dateLabel, stickyHeader = false, showHeader = true, quietMenu = false,
 }: {
   items: QueueItem[];
+  /** Menu « … » visible au survol ou au clavier seulement (Hit de l'accueil, maquette) ; toujours au toucher. */
+  quietMenu?: boolean;
   /** En-tête des colonnes (#, Titre, durée) ; l'accueil s'en passe. */
   showHeader?: boolean;
   /** Titre ouvert par un lien partagé : mis en évidence. */
@@ -724,7 +757,8 @@ export function TrackList({
                 <span className="hidden w-12 text-right text-[13px] tabular-nums text-rvm-soft @md:block">{formatDuration(t.duration_seconds)}</span>
               </span>
               <LikeButton track={t} size="h-[18px] w-[18px]" className="hidden @md:inline-flex" />
-              <TrackMenuButton item={item} extra={menuExtra?.(item, i)} hideRelease={hideRelease} />
+              <TrackMenuButton item={item} extra={menuExtra?.(item, i)} hideRelease={hideRelease}
+                className={quietMenu ? "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:aria-expanded:opacity-100" : undefined} />
             </li>
           );
         })}

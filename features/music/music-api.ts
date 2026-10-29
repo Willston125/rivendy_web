@@ -336,12 +336,12 @@ export async function removeFromPlaylist(playlistId: string, trackId: string): P
 }
 
 /** Historique d'écoute du compte (rempli par le serveur à chaque écoute comptée). */
-export async function fetchHistory(): Promise<Array<{ track: MusicTrack; last_played_at: string; play_count: number }>> {
+export async function fetchHistory(limit = 200): Promise<Array<{ track: MusicTrack; last_played_at: string; play_count: number }>> {
   const u = await uid();
   if (!u) return [];
   const data = must(await supabase.from("music_play_history")
     .select(`last_played_at, play_count, music_tracks(${TRACK_WITH_RELEASE})`)
-    .eq("user_id", u).order("last_played_at", { ascending: false }).limit(200));
+    .eq("user_id", u).order("last_played_at", { ascending: false }).limit(limit));
   return ((data ?? []) as unknown as Array<{ last_played_at: string; play_count: number; music_tracks: MusicTrack | null }>)
     .filter((r) => r.music_tracks && r.music_tracks.music_releases)
     .map((r) => ({ track: r.music_tracks as MusicTrack, last_played_at: r.last_played_at, play_count: r.play_count }));

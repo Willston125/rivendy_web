@@ -382,6 +382,46 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     (création, ajout, page), recherche, filtres, panneau « En cours de lecture »,
     mini-lecteur au-dessus de la navigation du téléphone, lecteur plein écran,
     affiche « Sponsorisé », focus clavier. Un compte réel reste à essayer.
+  - **Réglages UX (même jour, branche `feat/musique-reglages`)**, d'après une
+    vidéo du propriétaire (portable ≈ 1520 × 740) et sa maquette, visuel validé
+    (canevas, page « Réglages ») :
+    - Colonne de gauche = la maquette : `MusicNav`, `LibraryLinks` (« Ma
+      bibliothèque + », Titres likés / Écoutés récemment / Mes playlists),
+      `ArtistSpaceCard` (en ligne sous 860 px de haut, plus jamais masquée),
+      `AppSwitcher` Market · Musique · Clips · Play. Largeur fixe (`LIB_WIDTH`
+      280, tablette `LIB_MIN` 240), plus de poignée, de rail ni de mode
+      « Agrandir » ; fenêtre trop basse : toute la colonne défile. AVANT : la
+      bibliothèque complète tenait dans la colonne et n'avait plus que ~30 px.
+      La bibliothèque complète (recherche, filtres, tri, 3 vues) = `LibraryPage`
+      sur /music/library, ouverte par « Mes playlists ».
+    - « En cours de lecture » : fermé par défaut (clé `rivendy_music_layout_v2`,
+      la v1 est lue pour la vue et le tri puis effacée) ; dans la page dès
+      1600 px seulement, en dessous un tiroir posé sur le panneau central (qui
+      garde sa largeur).
+    - Messages (`[data-toast-region]` de `features/ui/dialogs.tsx`) posés
+      au-dessus du lecteur dans la Musique : règle HORS couche de site.css
+      (`html[data-world="music"]`), 84 px ordinateur, 126 px téléphone.
+    - Accueil : 4 grandes cartes paysage (`ReleaseWideCard` : pochette entière
+      sur fond flouté, jamais rognée) ; rangée incomplète → `FillerCard` (genre
+      « La sélection Rivendy » dans sa couleur, puis le Hit), jamais un vide ;
+      « Tout voir » toujours vers l'Explorer. Les 5 puces filtrent SUR PLACE
+      (« Nouveautés » = les sorties seules, « Ambiances » = les cartes de
+      rythme seules). Cartes de rythme = vrais genres + « Nouveautés », phrase
+      d'envie (`rythmeTagline`, testée) au lieu d'un nombre de sorties. Hit :
+      titre-lien avec chevron, « … » au survol seulement (`TrackList quietMenu`).
+    - Pages collection : en-tête `.rvm-collection-header` vert lagon, la
+      pochette n'y met qu'une lueur (`--hdr`) ; barre collante `bg-rvm-deep`.
+    - Recherche sans boussole ; menu du compte (avatar + flèche : Mon profil,
+      Rivendy+, Se déconnecter), comme celui de Play.
+    - Lecteur jamais vide : `prepare()` du lecteur (file posée SANS lecture, si
+      aucune n'est chargée) depuis l'accueil — 20 derniers titres écoutés
+      (« Reprendre l'écoute »), sinon le Hit (« N° 1 du Rivendy Hit »). Une file
+      préparée n'est ni gardée dans le navigateur ni montrée par le lecteur
+      flottant hors Musique ; un visiteur qui appuie sur lecture reçoit
+      l'invitation sans appel au serveur. Le moteur audio n'a pas changé.
+    - Vérifié au banc d'essai local (retiré, grep « ESSAI LOCAL » vide) et en
+      visiteur : 1520×740, 1440×900, 1680×900 (panneau dans la page), 900×768,
+      375×812, 0 requête en échec en visiteur.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 

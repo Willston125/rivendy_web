@@ -488,11 +488,36 @@ export function usefulRubrics(c: { hitTracks: number; releases: number; artists:
 // ── Accueil « fraîcheur » (2026-10-29, référence du propriétaire) ─────────
 
 /**
- * Nouveautés de l'accueil : une rangée de 5 pochettes carrées sur grand
- * panneau (jamais rognées), qui défile au doigt sur téléphone ; au-delà,
- * « Tout voir ».
+ * Nouveautés de l'accueil (réglages du 2026-10-29, maquette du
+ * propriétaire) : quatre grandes cartes paysage qui remplissent la rangée
+ * (la pochette entière, jamais rognée), qui défilent au doigt sur
+ * téléphone ; s'il y a moins de sorties, de vraies cartes (un genre, le
+ * Hit) complètent la rangée, jamais un vide.
  */
-export const HOME_GRID = 5;
+export const HOME_GRID = 4;
+
+/** Phrases d'envie des cartes « rythme », par genre (nom sans accent ni majuscule). */
+const RYTHME_TAGLINES: Record<string, string> = {
+  afro: "Des sons pour se laisser aller.",
+  afrobeat: "Des sons pour se laisser aller.",
+  afrobeats: "Des sons pour se laisser aller.",
+  rap: "Les flows qui font bouger.",
+  "hip-hop": "Les flows qui font bouger.",
+  zouk: "Pour danser à deux.",
+  twarab: "Les mélodies de l’archipel.",
+  reggae: "Le soleil en musique.",
+  gospel: "Des voix qui élèvent.",
+};
+
+/**
+ * Sous-titre d'une carte « À chaque envie, son rythme » : une phrase qui
+ * donne envie (maquette) plutôt qu'un nombre de sorties, qui fait paraître
+ * le catalogue vide. Genre inconnu : une phrase neutre, toujours vraie.
+ */
+export function rythmeTagline(genreName: string): string {
+  const key = genreName.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+  return RYTHME_TAGLINES[key] ?? `Les sorties ${genreName.trim()} du moment.`;
+}
 
 /** Le Rivendy Hit de l'accueil : les trois premiers titres (« Les titres du moment »). */
 export const HOME_HIT = 3;

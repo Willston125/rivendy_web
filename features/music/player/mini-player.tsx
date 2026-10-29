@@ -34,7 +34,8 @@ export function MiniPlayer() {
   const bar = useRef<HTMLElement>(null);
   const cur = p.current;
   const inMusic = isMusicPath(pathname);
-  const shown = !!cur && !inMusic;
+  // Un titre seulement préparé par l'accueil de la Musique ne suit pas l'auditeur ailleurs.
+  const shown = !!cur && !inMusic && !p.hint;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -49,7 +50,7 @@ export function MiniPlayer() {
 
   // Dans la Musique, la coque affiche son propre lecteur.
   if (inMusic) return null;
-  if (!cur) return null;
+  if (!cur || p.hint) return null;
 
   return (
     <>
@@ -155,7 +156,9 @@ export function MobileMiniPlayer() {
           <Cover url={r.cover_url} size={160} alt="" className="h-10 w-10 shrink-0" rounded="rounded" />
           <span className="min-w-0">
             <span className="block truncate text-[14px] font-semibold">{t.title}</span>
-            <span className="block truncate text-[13px] text-rvm-soft">{artistName(r)}</span>
+            <span className="block truncate text-[13px] text-rvm-soft">
+              {p.hint ? <span className="font-semibold text-rvm-ink-accent">{p.hint} · </span> : null}{artistName(r)}
+            </span>
           </span>
         </button>
         <LikeButton track={t} className="h-11 w-11" />
@@ -181,9 +184,13 @@ function NowPlaying({ item }: { item: QueueItem }) {
           <button type="button" onClick={() => p.setExpanded(true)} className="min-h-7 truncate text-left text-[15px] font-semibold md:hidden">{t.title}</button>
           {p.preview ? <span className="shrink-0 rounded bg-rvm-premium/20 px-1.5 text-[10px] font-bold text-rvm-premium">Extrait</span> : null}
         </div>
-        {r.artist_id
-          ? <Link href={`/artist/${r.artist_id}`} className="block truncate text-[13px] text-rvm-soft hover:text-rvm-text hover:underline">{artistName(r)}</Link>
-          : <span className="block truncate text-[13px] text-rvm-soft">{artistName(r)}</span>}
+        <p className="truncate text-[13px] text-rvm-soft">
+          {/* Titre prêt, pas encore lancé : « Reprendre l’écoute », « N° 1 du Rivendy Hit ». */}
+          {p.hint ? <span className="font-semibold text-rvm-ink-accent">{p.hint} · </span> : null}
+          {r.artist_id
+            ? <Link href={`/artist/${r.artist_id}`} className="hover:text-rvm-text hover:underline">{artistName(r)}</Link>
+            : artistName(r)}
+        </p>
       </div>
       <LikeButton track={t} className="hidden md:inline-flex" />
     </div>

@@ -121,6 +121,7 @@ function ToastRegion({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: n
   return (
     <div
       aria-live="polite"
+      data-toast-region
       className="pointer-events-none fixed inset-x-0 bottom-0 z-[110] flex flex-col items-center gap-2 px-4"
       style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
     >

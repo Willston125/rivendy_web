@@ -9,10 +9,10 @@ import { Cover } from "./music-ui";
 /**
  * Page « collection » de la Musique (mise en page application du
  * 2026-10-22) : sortie, playlist, favoris, historique, Rivendy Hit, artiste.
- * Grand en-tête en dégradé (la couleur de la pochette quand elle se lit,
- * sinon un vert dérivé de Rivendy), commandes de lecture juste dessous,
- * puis la liste. Au défilement, une barre compacte garde le titre et le
- * bouton de lecture.
+ * Grand en-tête vert lagon (réglages du 2026-10-29 : la couleur de la
+ * pochette n'y met plus qu'une lueur, une pochette sombre ne le rend plus
+ * gris), commandes de lecture juste dessous, puis la liste. Au défilement,
+ * une barre compacte garde le titre et le bouton de lecture.
  */
 
 /** Teinte des favoris : un vert profond dérivé de --rv-primary (texte blanc lisible). */
@@ -151,18 +151,17 @@ export function CollectionPage({ tint, kicker, title, cover, meta, description, 
   return (
     <div style={style}>
       <div aria-hidden={!compact}
-        className={cn("sticky top-0 z-20 -mb-16 flex h-16 items-center gap-3 bg-[rgb(var(--hdr))] px-4 shadow-lg shadow-rvm-deep/20 transition-opacity duration-200 motion-reduce:transition-none @2xl:px-6",
+        className={cn("sticky top-0 z-20 -mb-16 flex h-16 items-center gap-3 bg-rvm-deep px-4 shadow-lg shadow-rvm-deep/20 transition-opacity duration-200 motion-reduce:transition-none @2xl:px-6",
           compact ? "opacity-100" : "pointer-events-none opacity-0")}>
         {compactActions}
         <p className="min-w-0 truncate text-xl font-black tracking-tight text-white">{title}</p>
       </div>
 
-      <header className="px-4 pb-6 pt-20 @2xl:px-6 @2xl:pt-24"
-        style={{ background: "linear-gradient(180deg, rgb(var(--hdr)) 0%, color-mix(in srgb, rgb(var(--hdr)) 84%, black) 100%)" }}>
+      <header className="rvm-collection-header px-4 pb-6 pt-20 @2xl:px-6 @2xl:pt-24">
         <div className="flex flex-col gap-5 @xl:flex-row @xl:items-end">
           <div className={cn("w-40 shrink-0 @xl:w-48 @4xl:w-56", roundCover && "overflow-hidden rounded-full")}>{cover}</div>
           <div className="min-w-0 text-white">
-            <p className="text-sm font-semibold">{kicker}</p>
+            <p className="text-sm font-bold text-rvm-accent">{kicker}</p>
             <h1 className="mt-1 line-clamp-3 break-words font-rvm-display text-[clamp(2rem,7cqw,5.5rem)] font-black leading-[0.98] tracking-tight">{title}</h1>
             {description ? <p className="mt-3 line-clamp-2 max-w-2xl text-sm text-white/80">{description}</p> : null}
             {meta ? <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-white/90">{meta}</div> : null}
@@ -170,8 +169,7 @@ export function CollectionPage({ tint, kicker, title, cover, meta, description, 
         </div>
       </header>
 
-      <div ref={actionsRef} className="flex flex-wrap items-center gap-3 px-4 py-5 @2xl:gap-5 @2xl:px-6"
-        style={{ background: "linear-gradient(180deg, color-mix(in srgb, rgb(var(--hdr)) 22%, var(--rvm-ground)) 0%, var(--rvm-ground) 100%)" }}>
+      <div ref={actionsRef} className="rvm-collection-actions flex flex-wrap items-center gap-3 px-4 py-5 @2xl:gap-5 @2xl:px-6">
         {actions}
       </div>
 

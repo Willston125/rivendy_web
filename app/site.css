@@ -386,6 +386,18 @@ body {
       radial-gradient(70% 140% at 88% 0%, rgb(214 255 54 / 0.2), transparent 60%),
       linear-gradient(160deg, var(--rvm-deep-2), var(--rvm-deep));
   }
+  /* Pages collection (album, playlist, Hit, artiste…), réglages du 2026-10-29 :
+     toujours le vert lagon de la Musique, à peine teinté par la pochette
+     (--hdr, couleur moyenne lue dans la pochette) — plus d'en-tête gris-noir. */
+  .rvm-collection-header {
+    background:
+      radial-gradient(55% 140% at 12% 0%, rgb(var(--hdr) / 0.45), transparent 62%),
+      radial-gradient(60% 140% at 92% 0%, rgb(214 255 54 / 0.18), transparent 60%),
+      linear-gradient(160deg, var(--rvm-deep-2), var(--rvm-deep) 60%, color-mix(in srgb, var(--rvm-deep) 82%, black));
+  }
+  .rvm-collection-actions {
+    background: linear-gradient(180deg, var(--rvm-raised) 0%, var(--rvm-ground) 100%);
+  }
 
   /* ── Rivendy Play « Emerald Cinema » ───────────────────────────────────── */
   /* Focus clavier visible et vert sur tout l'espace Play (cartes, bannière,
@@ -610,6 +622,17 @@ html[data-world="play"][data-clips] body {
   /* Hauteur de la fenêtre : 100vh d'abord pour un navigateur qui ignore dvh
      (sinon la coque grandirait avec la page, qui ne défile plus). */
   html[data-world="play"] .rvp-scope { height: 100vh; height: 100dvh; }
+}
+
+/* Rivendy Musique (réglages du 2026-10-29) : les messages (« Ajouté à vos
+   favoris »…) se posent au-dessus du lecteur, jamais sur ses boutons. Hors
+   couche : l'emporte sur le `bottom-0` de la zone des messages. Téléphone :
+   navigation du bas (64 px) et mini-lecteur (56 + 6 px). */
+html[data-world="music"] [data-toast-region] {
+  bottom: calc(126px + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  html[data-world="music"] [data-toast-region] { bottom: 84px; }
 }
 
 /* Hauteur de la bannière en grand format (accueil et fiches) : elle domine

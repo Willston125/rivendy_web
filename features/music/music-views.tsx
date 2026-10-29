@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, AudioLines, Headphones, Lock, MicVocal, Search, Share2, Smartphone, Sun, Trophy, X } from "lucide-react";
+import {
+  ArrowRight, AudioLines, ChartColumn, ChevronRight, Headphones, Lock, MicVocal, Search, Share2, Smartphone, Sparkles, Sun, Trophy, X,
+} from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
 import { appIntentUrl } from "@/features/play/play-link-page";
@@ -12,7 +14,7 @@ import type { Advertisement } from "@/types/rivendy";
 import { fetchMusicBanners, useMusicPlus } from "./music-ads";
 import {
   fetchArtistTopTracks, fetchArtistsByIds, fetchArtistsWithMusic, fetchFeatured, fetchFollowedArtists, fetchGenres,
-  fetchHit, fetchNewReleases, fetchRelease, fetchReleasesByArtist, fetchTracksByIds, searchMusic,
+  fetchHistory, fetchHit, fetchNewReleases, fetchRelease, fetchReleasesByArtist, fetchTracksByIds, searchMusic,
   type MusicArtist, type MusicGenre, type SearchRow,
 } from "./music-api";
 import { CollectionPage, IconTile, MetaLine, useCoverTint } from "./music-collection";
@@ -20,17 +22,17 @@ import { useMusicLibrary } from "./music-library";
 import { MusicAdBanner, SelectionHero, SelectionHeroSkeleton } from "./music-home-hero";
 import {
   HOME_GRID, HOME_HIT, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, genreTone, hitMovement,
-  releaseKindLabel, releaseYear, searchable, totalDurationLabel, uniqueReleases, usefulRubrics,
+  releaseKindLabel, releaseYear, rythmeTagline, searchable, totalDurationLabel, uniqueReleases, usefulRubrics,
   type HomeRubric, type MusicRelease, type MusicTrack,
 } from "./music-logic";
 import { MusicInstallHint } from "./music-install-hint";
 import { loginHref } from "./music-pending";
 import {
   ArtistCard, ArtistFollowCard, CardRow, CardRowSkeleton, Cover, CoverGridSkeleton, EmptyState, ErrorState, ExplicitTag,
-  FollowArtistButton, ListSkeleton, PageTitle, PlayAllButton, PremiumTag, ReleaseCard, ReleaseGrid, ReleaseShelf,
+  FollowArtistButton, ListSkeleton, PageTitle, PlayAllButton, PremiumTag, ReleaseGrid, ReleaseShelf, ReleaseWideCard,
   SaveReleaseButton, Section, ShuffleButton, TrackList, iconButton, primaryButton, toQueue, useLoad, useSearchDraft,
 } from "./music-ui";
-import type { QueueItem } from "./player/music-player-provider";
+import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
 
 export { FavoritesView, HistoryView, LibraryView, PlaylistView } from "./music-library-views";
 
@@ -47,19 +49,31 @@ const HIT_TINT: [number, number, number] = [10, 74, 66];
 
 // ── Accueil ────────────────────────────────────────────────────────────────
 
+/** Filtres « Nouveautés » et « Ambiances » de l'accueil : une seule rubrique, sur place. */
+type HomeFocus = "new" | "moods" | null;
+/** Carte « À chaque envie, son rythme » : un vrai genre, ou les nouveautés. */
+type RythmeTile = { key: string; name: string; href: string; tagline: string; fresh?: boolean };
+/** Carte qui complète la rangée des nouveautés : un genre ou le Hit, de vraies pages. */
+type HomeFiller = { kind: "genre"; id: string; name: string; tone: string } | { kind: "hit" };
+
 /**
  * Accueil de la Musique, style « fraîcheur » (2026-10-29, 2e référence du
- * propriétaire) : « Bonjour » et un soleil, la bannière « La sélection
- * Rivendy », les filtres, les nouveautés en pochettes, le Rivendy Hit et
- * « À chaque envie, son rythme » côte à côte, puis l'affiche sponsorisée
- * (jamais pour un abonné Rivendy+) et les artistes à découvrir. Tout suit
- * le catalogue réel : rien n'est inventé pour remplir.
+ * propriétaire) puis réglages du même jour (sa maquette et sa vidéo) :
+ * « Bonjour » et un soleil, la bannière « La sélection Rivendy », les
+ * filtres (tous restent sur la page), quatre grandes nouveautés, le
+ * Rivendy Hit et « À chaque envie, son rythme » côte à côte, puis l'affiche
+ * sponsorisée (jamais pour un abonné Rivendy+) et les artistes à
+ * découvrir. Le lecteur n'est jamais vide : le dernier titre écouté (ou le
+ * n° 1 du Hit) y est prêt, sans démarrer seul. Tout suit le catalogue
+ * réel : rien n'est inventé pour remplir.
  */
 export function MusicHomeView() {
   const market = useMusicMarket();
   const { user, profile, loading: authLoading } = useAuth();
   const plus = useMusicPlus();
+  const player = useMusicPlayer();
   const [genre, setGenre] = useState<string | null>(null);
+  const [focus, setFocus] = useState<HomeFocus>(null);
 
   const home = useLoad(`home:${market ?? ""}`, async () => {
     const [featured, fresh, hit, genres] = await Promise.all([
@@ -92,10 +106,56 @@ export function MusicHomeView() {
     : data.artists), [data, genre]);
   // La sélection du dashboard ; sans sélection, les dernières sorties.
   const selection = data ? (data.featured.length > 0 ? data.featured : data.fresh.slice(0, 3)) : [];
-  const rythmes = genres.slice(0, 3).map((g) => ({ ...g, releases: (data?.all ?? []).filter((r) => r.genre_id === g.id).length }));
-  // « Tout voir » seulement vers une page qui montre plus que l'accueil (petit catalogue : aucune).
+  // Cartes « rythme » : les vrais genres et une phrase d'envie (pas un nombre, qui fait paraître
+  // le catalogue vide) ; moins de trois genres : les nouveautés complètent.
+  const allTiles = useMemo<RythmeTile[]>(() => {
+    const list: RythmeTile[] = genres.map((g) => ({
+      key: g.id, name: g.name, href: `/music/explore?genre=${encodeURIComponent(g.id)}`, tagline: rythmeTagline(g.name),
+    }));
+    if (list.length < 3 && (data?.all.length ?? 0) > 0) {
+      list.push({ key: "new", name: "Nouveautés", href: "/music/explore", tagline: "Les dernières sorties à écouter.", fresh: true });
+    }
+    return list;
+  }, [data, genres]);
+  // Rangée des nouveautés incomplète : un genre (« La sélection Rivendy »), puis le Hit.
+  const fillers = useMemo<HomeFiller[]>(() => [
+    ...(genre ? [] : genres.map((g, k) => ({ kind: "genre" as const, id: g.id, name: g.name, tone: genreTone(k) }))),
+    ...((data?.hit.length ?? 0) > 0 ? [{ kind: "hit" as const }] : []),
+  ], [data, genre, genres]);
+  // « Tout voir » des artistes seulement vers une page qui montre plus que l'accueil.
   const rubrics = data ? usefulRubrics({ hitTracks: data.hit.length, releases: data.all.length, artists: data.artists.length, clips: 0 }) : [];
   const firstName = (profile?.full_name || "").trim().split(/\s+/)[0] || "";
+
+  // Les cinq filtres se comportent pareil : ils trient l'accueil sur place, aucun ne quitte la page.
+  const chips = [
+    { key: "all", label: "Pour toi", on: !genre && !focus, pick: () => { setGenre(null); setFocus(null); } },
+    ...genres.map((g) => ({ key: g.id, label: g.name, on: genre === g.id, pick: () => { setGenre(g.id); setFocus(null); } })),
+    ...((data?.all.length ?? 0) > 0 ? [{ key: "new", label: "Nouveautés", on: focus === "new", pick: () => { setGenre(null); setFocus("new"); } }] : []),
+    ...(allTiles.length >= 2 ? [{ key: "moods", label: "Ambiances", on: focus === "moods", pick: () => { setGenre(null); setFocus("moods"); } }] : []),
+  ];
+
+  // Lecteur jamais vide (réglages du 2026-10-29) : sans file chargée, le dernier titre écouté
+  // (compte) ou le n° 1 du Hit y est prêt. Rien ne démarre seul : un clic sur lecture.
+  const { prepare } = player;
+  const hasCurrent = !!player.current;
+  useEffect(() => {
+    if (!data || authLoading || hasCurrent) return;
+    let alive = true;
+    void (async () => {
+      if (user) {
+        const recent = await fetchHistory(20).catch(() => []);
+        if (!alive) return;
+        const items = toQueue(recent.map((h) => h.track));
+        if (items.length > 0) {
+          prepare(items, { source: { label: "Écoutés récemment", href: "/music/history" }, hint: "Reprendre l’écoute" });
+          return;
+        }
+      }
+      const top = toQueue(data.hit.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t));
+      if (alive && top.length > 0) prepare(top, { source: { label: "Rivendy Hit", href: "/music/hit" }, hint: "N° 1 du Rivendy Hit" });
+    })();
+    return () => { alive = false; };
+  }, [authLoading, data, hasCurrent, prepare, user]);
 
   return (
     <div className="px-4 pb-4 pt-4 @2xl:px-8 @2xl:pt-5">
@@ -121,28 +181,18 @@ export function MusicHomeView() {
         <>
           <div className="mt-3"><SelectionHero releases={selection} /></div>
           <div role="group" aria-label="Filtrer l’accueil" className="no-scrollbar -mx-4 mt-4 flex gap-2.5 overflow-x-auto px-4 @2xl:mx-0 @2xl:flex-wrap @2xl:px-0">
-            {[{ id: null as string | null, name: "Pour toi" }, ...genres].map((g) => {
-              const active = genre === g.id;
-              return (
-                <button key={g.id ?? "all"} type="button" onClick={() => setGenre(g.id)} aria-pressed={active}
-                  className={cn("h-9 shrink-0 rounded-full px-5 text-sm font-semibold transition-colors",
-                    active ? "bg-rvm-deep text-white" : "bg-rvm-raised text-rvm-on-accent hover:bg-rvm-raised-hover")}>
-                  {g.name}
-                </button>
-              );
-            })}
-            <Link href="/music/explore" className="inline-flex h-9 shrink-0 items-center rounded-full bg-rvm-raised px-5 text-sm font-semibold text-rvm-on-accent transition-colors hover:bg-rvm-raised-hover">
-              Nouveautés
-            </Link>
-            {rythmes.length >= 2 ? (
-              <a href="#rvm-rythmes" className="inline-flex h-9 shrink-0 items-center rounded-full bg-rvm-raised px-5 text-sm font-semibold text-rvm-on-accent transition-colors hover:bg-rvm-raised-hover">
-                Ambiances
-              </a>
-            ) : null}
+            {chips.map((c) => (
+              <button key={c.key} type="button" onClick={c.pick} aria-pressed={c.on}
+                className={cn("h-9 shrink-0 rounded-full px-5 text-sm font-semibold transition-colors",
+                  c.on ? "bg-rvm-deep text-white" : "bg-rvm-raised text-rvm-on-accent hover:bg-rvm-raised-hover")}>
+                {c.label}
+              </button>
+            ))}
           </div>
           {!user && !authLoading ? <div className="mt-6"><VisitorWelcome /></div> : null}
-          <HomeSections fresh={fresh} genreName={genres.find((g) => g.id === genre)?.name} hit={hit} rythmes={genre ? [] : rythmes}
-            artists={artists} rubrics={rubrics} genre={genre} ad={ad} />
+          <HomeSections fresh={fresh} genreName={genres.find((g) => g.id === genre)?.name} hit={hit}
+            tiles={genre ? [] : focus === "moods" ? allTiles : allTiles.slice(0, 3)} fillers={fillers}
+            artists={artists} rubrics={rubrics} genre={genre} focus={focus} ad={ad} />
         </>
       )}
     </div>
@@ -172,65 +222,76 @@ function VisitorWelcome() {
 /** Pastels des « rythmes » (référence) : jetons --rvm-rythme-* de site.css. */
 const RYTHME_TONES = [1, 2, 3].map((n) => ({ bg: `var(--rvm-rythme-${n}-bg)`, fg: `var(--rvm-rythme-${n}-fg)` }));
 
-function HomeSections({ fresh, genreName, hit, rythmes, artists, rubrics, genre, ad }: {
+function HomeSections({ fresh, genreName, hit, tiles, fillers, artists, rubrics, genre, focus, ad }: {
   /** Nouveautés (filtrées par le genre choisi). */
   fresh: MusicRelease[];
   genreName?: string;
   hit: { items: QueueItem[]; ranks: Map<string, { rank: number; move: string }> };
-  /** Genres en cartes pastel : pas quand un genre est déjà choisi. */
-  rythmes: Array<{ id: string; name: string; releases: number }>;
+  /** Cartes « rythme » : pas quand un genre est déjà choisi. */
+  tiles: RythmeTile[];
+  /** De quoi compléter la rangée des nouveautés si elle a moins de quatre sorties. */
+  fillers: HomeFiller[];
   artists: MusicArtist[];
-  /** Rubriques qui montrent plus que l'accueil : sinon, pas de « Tout voir ». */
+  /** Rubriques qui montrent plus que l'accueil : sinon, pas de « Tout voir » des artistes. */
   rubrics: HomeRubric[];
   genre: string | null;
+  /** « Nouveautés » ou « Ambiances » : cette rubrique seule. */
+  focus: HomeFocus;
   ad: Advertisement | null;
 }) {
   const explore = genre ? `/music/explore?genre=${genre}` : "/music/explore";
-  const shown = fresh.slice(0, HOME_GRID);
-  const pair = hit.items.length > 0 && rythmes.length >= 2;
+  const shown = fresh.slice(0, focus === "new" ? HOME_SHOWS.releases : HOME_GRID);
+  const fill = focus || shown.length === 0 ? [] : fillers.slice(0, Math.max(0, HOME_GRID - shown.length));
+  const showHit = !focus && hit.items.length > 0;
+  const showTiles = focus !== "new" && tiles.length >= 2;
+  const pair = showHit && showTiles;
+  const cell = "w-[44%] shrink-0 snap-start @md:w-[30%] @2xl:w-auto";
   return (
     <>
-      <Section title="Les nouveautés" href={fresh.length > HOME_GRID || rubrics.includes("explore") ? explore : undefined}>
-        {shown.length > 0 ? (
-          <ul aria-label="Les nouveautés"
-            className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 @2xl:mx-0 @2xl:grid @2xl:grid-cols-5 @2xl:gap-5 @2xl:overflow-visible @2xl:px-0">
-            {shown.map((r, i) => (
-              <li key={r.id} className="w-[44%] shrink-0 snap-start @md:w-[30%] @2xl:w-auto"><ReleaseCard release={r} priority={i < 2} /></li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />
-        )}
-      </Section>
+      {focus !== "moods" ? (
+        <Section title="Les nouveautés" href={explore}>
+          {shown.length > 0 ? (
+            <ul aria-label="Les nouveautés"
+              className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 @2xl:mx-0 @2xl:grid @2xl:grid-cols-4 @2xl:gap-5 @2xl:overflow-visible @2xl:px-0">
+              {shown.map((r, i) => <li key={r.id} className={cell}><ReleaseWideCard release={r} priority={i < 2} /></li>)}
+              {fill.map((f) => <li key={f.kind === "hit" ? "hit" : f.id} className={cell}><FillerCard filler={f} /></li>)}
+            </ul>
+          ) : (
+            <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />
+          )}
+        </Section>
+      ) : null}
 
-      {hit.items.length > 0 || rythmes.length >= 2 ? (
-        <div className={cn("mt-8 grid gap-6", pair && "@4xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]")}>
-          {hit.items.length > 0 ? (
+      {showHit || showTiles ? (
+        <div className={cn("mt-8 grid gap-6", pair && "@4xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]")}>
+          {showHit ? (
             <section aria-labelledby="rvm-hit" className="min-w-0 rounded-3xl bg-rvm-surface p-3 shadow-[0_10px_30px_rgb(10_74_68/0.08)] @2xl:p-4">
-              <div className="mb-1 flex items-start justify-between gap-3 px-2 pt-1">
-                <div>
-                  <h2 id="rvm-hit" className="font-rvm-display text-xl font-extrabold tracking-tight">Le Hit Rivendy</h2>
-                  <p className="text-[13px] text-rvm-muted">Les titres du moment</p>
-                </div>
-                <Link href="/music/hit" className="mt-1 text-sm font-bold text-rvm-ink-accent hover:underline">Voir le Hit</Link>
+              <div className="mb-1 px-2 pt-1">
+                <h2 id="rvm-hit" className="font-rvm-display text-xl font-extrabold tracking-tight">
+                  <Link href="/music/hit" className="inline-flex items-center gap-1 rounded-md hover:underline">
+                    Le Hit Rivendy <ChevronRight className="h-5 w-5" aria-hidden />
+                  </Link>
+                </h2>
+                <p className="text-[13px] text-rvm-muted">Les titres du moment</p>
               </div>
               <TrackList items={hit.items} ranks={hit.ranks} label="Le Hit Rivendy" source={{ label: "Rivendy Hit", href: "/music/hit" }}
-                showHeader={false} showAlbum={false} />
+                showHeader={false} showAlbum={false} quietMenu />
             </section>
           ) : null}
-          {rythmes.length >= 2 ? (
-            <section id="rvm-rythmes" aria-labelledby="rvm-rythmes-title" className="min-w-0 scroll-mt-4 rounded-3xl bg-rvm-surface p-4 shadow-[0_10px_30px_rgb(10_74_68/0.08)]">
+          {showTiles ? (
+            <section aria-labelledby="rvm-rythmes-title" className="min-w-0 rounded-3xl bg-rvm-surface p-4 shadow-[0_10px_30px_rgb(10_74_68/0.08)]">
               <h2 id="rvm-rythmes-title" className="mb-3 px-1 font-rvm-display text-xl font-extrabold tracking-tight">À chaque envie, son rythme</h2>
-              <ul className={cn("grid gap-3", rythmes.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
-                {rythmes.map((g, k) => {
+              <ul className={cn("grid gap-3", tiles.length === 2 ? "grid-cols-2" : tiles.length === 3 ? "grid-cols-3" : "grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4")}>
+                {tiles.map((g, k) => {
                   const tone = RYTHME_TONES[k % RYTHME_TONES.length];
                   return (
-                    <li key={g.id}>
-                      <Link href={`/music/explore?genre=${encodeURIComponent(g.id)}`} style={{ backgroundColor: tone.bg }}
+                    <li key={g.key}>
+                      <Link href={g.href} style={{ backgroundColor: tone.bg }}
                         className="flex h-full flex-col items-center rounded-2xl px-2 pb-3 pt-4 text-center text-rvm-text transition hover:brightness-[0.97]">
-                        <RythmeIcon index={k} color={tone.fg} />
+                        <RythmeIcon index={k} fresh={g.fresh} color={tone.fg} />
                         <span className="mt-2 max-w-full truncate font-rvm-display text-lg font-extrabold">{g.name}</span>
-                        <span className="mt-0.5 text-[12.5px] leading-snug text-rvm-soft">{g.releases} sortie{g.releases > 1 ? "s" : ""} à écouter</span>
+                        {/* La phrase prend la place libre : les flèches restent alignées d'une carte à l'autre. */}
+                        <span className="mt-0.5 flex-1 text-[12.5px] leading-snug text-rvm-soft">{g.tagline}</span>
                         <span aria-hidden className="mt-3 grid h-8 w-8 place-items-center rounded-full bg-rvm-deep text-white">
                           <ArrowRight className="h-4 w-4" />
                         </span>
@@ -244,9 +305,9 @@ function HomeSections({ fresh, genreName, hit, rythmes, artists, rubrics, genre,
         </div>
       ) : null}
 
-      {ad ? <div className="mt-8"><MusicAdBanner ad={ad} className="max-w-4xl" /></div> : null}
+      {!focus && ad ? <div className="mt-8"><MusicAdBanner ad={ad} className="max-w-4xl" /></div> : null}
 
-      {artists.length > 0 ? (
+      {!focus && artists.length > 0 ? (
         <Section title="Artistes à découvrir" href={rubrics.includes("artists") || artists.length > HOME_SHOWS.artists ? "/music/artists" : undefined}>
           <ul aria-label="Artistes à découvrir" className="grid grid-cols-2 gap-x-4 gap-y-6 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
             {artists.slice(0, HOME_SHOWS.artists).map((a) => <li key={a.id} className="min-w-0"><ArtistFollowCard artist={a} /></li>)}
@@ -257,8 +318,39 @@ function HomeSections({ fresh, genreName, hit, rythmes, artists, rubrics, genre,
   );
 }
 
-/** Icônes des cartes de rythme : barres qui dansent, soleil, casque (décor). */
-function RythmeIcon({ index, color }: { index: number; color: string }) {
+/**
+ * Carte qui complète la rangée des nouveautés (moins de quatre sorties) :
+ * un genre, « La sélection Rivendy », dans sa couleur de l'Explorer, ou le
+ * Rivendy Hit en vert lagon — de vraies pages, jamais un vide.
+ */
+function FillerCard({ filler }: { filler: HomeFiller }) {
+  const isHit = filler.kind === "hit";
+  const href = isHit ? "/music/hit" : `/music/explore?genre=${encodeURIComponent(filler.id)}`;
+  const title = isHit ? "Le Hit Rivendy" : filler.name;
+  return (
+    <Link href={href} className="group block min-w-0 rounded-2xl">
+      <span style={isHit ? undefined : { backgroundColor: filler.tone }}
+        className={cn("relative flex aspect-[16/10] flex-col justify-end overflow-hidden rounded-2xl p-4 text-white shadow-lg shadow-rvm-deep/20 transition duration-300 motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:shadow-xl",
+          isHit && "bg-gradient-to-br from-rvm-deep-2 to-rvm-deep")}>
+        <span aria-hidden className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
+        {isHit
+          ? <ChartColumn className="absolute right-4 top-4 h-8 w-8 text-rvm-accent" aria-hidden />
+          : <AudioLines className="absolute right-4 top-4 h-8 w-8 text-white/85" aria-hidden />}
+        <span className="relative text-[11px] font-extrabold uppercase tracking-[0.2em] text-white/90">{isHit ? "Classement" : "La sélection Rivendy"}</span>
+        <span className="relative mt-1 max-w-[80%] truncate font-rvm-display text-2xl font-black leading-tight">{title}</span>
+        <span aria-hidden className="absolute bottom-3 right-3 grid h-11 w-11 place-items-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-black/30">
+          <ArrowRight className="h-5 w-5" />
+        </span>
+      </span>
+      <span className="mt-2.5 block truncate text-[15px] font-semibold text-rvm-text">{title}</span>
+      <span className="block truncate text-[13px] text-rvm-soft">{isHit ? "Les titres du moment" : "La sélection Rivendy"}</span>
+    </Link>
+  );
+}
+
+/** Icônes des cartes de rythme : barres qui dansent, micro, casque ; étincelles pour les nouveautés (décor). */
+function RythmeIcon({ index, fresh = false, color }: { index: number; fresh?: boolean; color: string }) {
+  if (fresh) return <Sparkles aria-hidden className="h-9 w-9" style={{ color }} strokeWidth={2.2} />;
   if (index % 3 === 0) {
     return (
       <svg aria-hidden width="38" height="32" viewBox="0 0 40 34" style={{ color }}>
@@ -270,7 +362,7 @@ function RythmeIcon({ index, color }: { index: number; color: string }) {
       </svg>
     );
   }
-  const Icon = index % 3 === 1 ? Sun : Headphones;
+  const Icon = index % 3 === 1 ? MicVocal : Headphones;
   return <Icon aria-hidden className="h-9 w-9" style={{ color }} strokeWidth={2.2} />;
 }
 

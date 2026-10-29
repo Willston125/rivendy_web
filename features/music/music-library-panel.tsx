@@ -5,8 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ArrowDownAZ, Check, Clock, Heart, LayoutGrid, Library, List, LoaderCircle, Maximize2, Minimize2, PanelLeftClose, Pin,
-  Play, Plus, Rows3, Search, Volume2, X,
+  ArrowDownAZ, Check, Clock, Heart, LayoutGrid, List, LoaderCircle, Pin, Play, Plus, Rows3, Search, Volume2, X,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
@@ -15,19 +14,18 @@ import { fetchArtistTopTracks, fetchLikedTracks, fetchPlaylist, fetchRelease } f
 import { IconTile, PlaylistCover } from "./music-collection";
 import { useMusicLayout, type LibraryView } from "./music-layout";
 import { useMusicLibrary } from "./music-library";
-import { inviteLogin } from "./music-login-invite";
-import { ArtistSpaceCard, ArtistSpaceIcon } from "./music-nav";
+import { ArtistSpaceCard } from "./music-nav";
 import { filterLibrary, libraryKinds, sortLibrary, type LibraryEntry, type LibraryKind, type LibrarySort } from "./music-logic";
 import { loginHref } from "./music-pending";
-import { Cover, iconButton, toQueue } from "./music-ui";
+import { Cover, toQueue } from "./music-ui";
 import { useMusicPlayer } from "./player/music-player-provider";
 
 /**
- * « Ma bibliothèque » (mise en page application du 2026-10-22) : à gauche
- * de l'espace Musique, repliable (pochettes seules) ou agrandie (grille à
- * la place du panneau central) ; page entière sur téléphone
- * (/music/library). Uniquement les données du compte : titres likés,
- * playlists, albums enregistrés, artistes suivis.
+ * Page « Ma bibliothèque » (/music/library), ouverte par « Mes playlists »
+ * dans la colonne de gauche ou par la navigation du téléphone (réglages du
+ * 2026-10-29 : la colonne garde trois entrées, la bibliothèque complète vit
+ * ici). Uniquement les données du compte : titres likés, playlists, albums
+ * enregistrés, artistes suivis ; recherche, filtres, tri et trois vues.
  */
 
 const KIND_LABEL: Record<"playlist" | "album" | "artist", string> = { playlist: "Playlists", album: "Albums", artist: "Artistes" };
@@ -36,16 +34,13 @@ const HISTORY_HREF = "/music/history";
 const SORT_LABEL: Record<LibrarySort, string> = { recent: "Récents", added: "Ajoutés récemment", alpha: "Ordre alphabétique" };
 const VIEW_LABEL: Record<LibraryView, string> = { compact: "Compacte", list: "Liste", grid: "Grille" };
 
-export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page" }) {
+export function LibraryPage() {
   const layout = useMusicLayout();
   const library = useMusicLibrary();
   const { user, loading } = useAuth();
   const pathname = usePathname() || "/music";
   const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const page = variant === "page";
-  const mode = page ? "list" : layout.libMode;
-  const view: LibraryView = page ? (layout.libView === "compact" ? "compact" : layout.libView) : mode === "expanded" ? "grid" : layout.libView;
+  const view = layout.libView;
   const kind = layout.libKind;
 
   const all = library.entries ?? [];
@@ -62,79 +57,27 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
     return out;
   }
 
-  // Un filtre qui ne correspond plus à rien (album retiré…) s'efface.
+  // Un filtre qui ne correspond plus à rien (album retiré…) s’efface.
   const { setLibKind } = layout;
   useEffect(() => {
     if (kind && kind !== "liked" && !kinds.includes(kind as "playlist" | "album" | "artist")) setLibKind(null);
   }, [kind, kinds, setLibKind]);
 
-  // Visiteur, bibliothèque repliée : un rail ; ses boutons expliquent le compte.
-  // Dépliée (par défaut), la colonne lui montre l'invitation à se connecter.
-  if (!page && !user && mode === "collapsed") return <VisitorRail busy={loading} />;
-
-  if (mode === "collapsed") {
-    return (
-      <nav aria-label="Ma bibliothèque (repliée)" className="flex h-full flex-col items-center gap-2 py-3">
-        <button type="button" onClick={() => layout.setLibMode("list")} aria-label="Ouvrir la bibliothèque" title="Ouvrir la bibliothèque"
-          className={cn(iconButton, "h-11 w-11 text-rvm-soft")}>
-          <Library className="h-6 w-6" aria-hidden />
-        </button>
-        <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist" title="Créer une playlist"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-rvm-text/15">
-          <Plus className="h-5 w-5" aria-hidden />
-        </button>
-        <ul className="mt-1 flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pb-2">
-          {withHistory(shown.map((e) => (
-            <li key={e.key}>
-              <Link href={e.href} aria-label={`${e.title} — ${e.subtitle}`} title={e.title}
-                aria-current={pathname === e.href ? "page" : undefined}
-                className={cn("block rounded-md p-1.5 hover:bg-rvm-text/[0.07]", pathname === e.href && "bg-rvm-text/10")}>
-                <EntryCover entry={e} className="h-12 w-12" />
-              </Link>
-            </li>
-          )), <li key="history"><HistoryItem variant="rail" active={historyActive} /></li>)}
-        </ul>
-        <ArtistSpaceIcon />
-      </nav>
-    );
-  }
-
   return (
-    // Page (téléphone) : c'est le panneau central qui défile, pas la liste.
-    <nav aria-label="Ma bibliothèque" className={cn("@container flex min-h-0 flex-col", !page && "h-full")}>
-      <div className={cn("flex shrink-0 items-center gap-2 px-4 pb-2", page ? "pt-5 @2xl:px-6" : "pt-3 @max-[18rem]:gap-1 @max-[18rem]:px-3")}>
-        {!page ? (
-          <button type="button" onClick={() => layout.setLibMode("collapsed")} aria-label="Replier la bibliothèque" title="Replier la bibliothèque"
-            className={cn(iconButton, "-ml-2 h-9 w-9 text-rvm-soft")}>
-            <PanelLeftClose className="h-5 w-5" aria-hidden />
-          </button>
-        ) : null}
-        {page
-          ? <h1 className="min-w-0 flex-1 truncate text-2xl font-black">Ma bibliothèque</h1>
-          : (
-            // Colonne étroite (tablette) : le libellé court de la navigation du téléphone.
-            <h2 className="min-w-0 flex-1 truncate text-base font-bold">
-              <span className="@max-[18rem]:hidden">Ma bibliothèque</span>
-              <span className="hidden @max-[18rem]:inline">Bibliothèque</span>
-            </h2>
-          )}
+    // C’est le panneau central qui défile, pas la liste. Pas un second repère « Ma bibliothèque »
+    // (la colonne en a déjà un) : le titre de la page la nomme.
+    <div className="@container flex min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-5 @2xl:px-6">
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-black">Ma bibliothèque</h1>
         <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist"
           title="Créer une playlist"
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-rvm-raised text-sm font-bold text-rvm-text transition-colors hover:bg-rvm-text/15 @xs:w-auto @xs:px-3.5">
           <Plus className="h-4 w-4" aria-hidden /> <span className="hidden @xs:inline">Créer</span>
         </button>
-        {!page && user ? (
-          <button type="button" onClick={() => layout.setLibMode(mode === "expanded" ? "list" : "expanded")}
-            aria-label={mode === "expanded" ? "Réduire la bibliothèque" : "Agrandir la bibliothèque"}
-            title={mode === "expanded" ? "Réduire la bibliothèque" : "Agrandir la bibliothèque"}
-            className={cn(iconButton, "h-9 w-9 text-rvm-soft")}>
-            {mode === "expanded" ? <Minimize2 className="h-[18px] w-[18px]" aria-hidden /> : <Maximize2 className="h-[18px] w-[18px]" aria-hidden />}
-          </button>
-        ) : null}
       </div>
 
       {user && kinds.length > 0 ? (
-        <div role="group" aria-label="Filtrer la bibliothèque" className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto px-4 pb-2">
+        <div role="group" aria-label="Filtrer la bibliothèque" className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto px-4 pb-2 @2xl:px-6">
           {kind ? (
             <button type="button" onClick={() => setLibKind(null)} aria-label="Retirer le filtre"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rvm-raised text-rvm-soft hover:text-rvm-text">
@@ -152,31 +95,24 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
       ) : null}
 
       {user && all.length > 0 ? (
-        <div className="flex shrink-0 items-center gap-2 px-3 pb-1">
-          {searching || mode === "expanded" || page ? (
-            <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md bg-rvm-raised px-2.5 focus-within:ring-2 focus-within:ring-rvm-ink-accent">
-              <Search className="h-4 w-4 shrink-0 text-rvm-soft" aria-hidden />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus={searching}
-                onKeyDown={(e) => { if (e.key === "Escape") { setQuery(""); setSearching(false); } }}
-                placeholder="Rechercher dans la bibliothèque" aria-label="Rechercher dans la bibliothèque"
-                className="min-w-0 flex-1 bg-transparent text-sm text-rvm-text placeholder:text-rvm-soft focus:outline-none focus-visible:outline-none" />
-              {query ? (
-                <button type="button" onClick={() => setQuery("")} aria-label="Effacer la recherche" className="text-rvm-soft hover:text-rvm-text">
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              ) : null}
-            </label>
-          ) : (
-            <button type="button" onClick={() => setSearching(true)} aria-label="Rechercher dans la bibliothèque" title="Rechercher dans la bibliothèque"
-              className={cn(iconButton, "h-9 w-9 text-rvm-soft")}>
-              <Search className="h-[18px] w-[18px]" aria-hidden />
-            </button>
-          )}
+        <div className="flex shrink-0 items-center gap-2 px-3 pb-1 @2xl:px-5">
+          <label className="flex h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md bg-rvm-raised px-2.5 focus-within:ring-2 focus-within:ring-rvm-ink-accent">
+            <Search className="h-4 w-4 shrink-0 text-rvm-soft" aria-hidden />
+            <input value={query} onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }}
+              placeholder="Rechercher dans la bibliothèque" aria-label="Rechercher dans la bibliothèque"
+              className="min-w-0 flex-1 bg-transparent text-sm text-rvm-text placeholder:text-rvm-soft focus:outline-none focus-visible:outline-none" />
+            {query ? (
+              <button type="button" onClick={() => setQuery("")} aria-label="Effacer la recherche" className="text-rvm-soft hover:text-rvm-text">
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            ) : null}
+          </label>
           <SortMenu />
         </div>
       ) : null}
 
-      <div className={cn("pb-3", !page && "min-h-0 flex-1 overflow-y-auto overscroll-contain", view === "grid" ? "px-3" : "px-2")}>
+      <div className={cn("pb-3", view === "grid" ? "px-3 @2xl:px-5" : "px-2 @2xl:px-4")}>
         {!user ? (
           loading ? <RowsSkeleton /> : <SignedOut path={pathname} />
         ) : library.libraryError && !library.entries ? (
@@ -187,7 +123,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
         ) : !library.entries ? <RowsSkeleton /> : shown.length === 0 ? (
           <p className="px-3 py-4 text-sm text-rvm-soft">{query ? `Rien ne correspond à « ${query} ».` : "Rien pour ce filtre."}</p>
         ) : view === "grid" ? (
-          <ul className={cn("grid gap-2", page ? "grid-cols-2 @lg:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6" : "grid-cols-[repeat(auto-fill,minmax(118px,1fr))]")}>
+          <ul className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
             {withHistory(shown.map((e) => <li key={e.key}><EntryCard entry={e} active={pathname === e.href} /></li>),
               <li key="history"><HistoryItem variant="card" active={historyActive} /></li>)}
           </ul>
@@ -198,34 +134,10 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           </ul>
         )}
         {user && library.entries && all.length <= 2 && !query && !kind ? <Starter hasPlaylist={all.some((e) => e.kind === "playlist")} /> : null}
-        {/* Téléphone : l'« Espace artiste » suit la liste (pas de colonne de gauche). */}
-        {page ? <ArtistSpaceCard variant="row" className="mx-1 mt-6" /> : null}
+        {/* Téléphone : l’« Espace artiste » suit la liste (pas de colonne de gauche). */}
+        <ArtistSpaceCard variant="row" className="mx-1 mt-6 md:hidden" />
       </div>
-      {/* Panneau : la carte reste en bas, hors de la liste qui défile (lot 2, 2026-10-29). */}
-      {!page && mode === "list" ? <div className="shrink-0 px-3 pb-2 pt-2"><ArtistSpaceCard /></div> : null}
-    </nav>
-  );
-}
-
-/** Pochette d'une entrée : favoris (dégradé vert), playlist (mosaïque), album, artiste (rond). */
-/**
- * Rail du visiteur (lot « Musique web », 2026-10-23) : la bibliothèque et
- * « Créer » ouvrent une invitation qui explique le compte, sans quitter la page.
- */
-function VisitorRail({ busy }: { busy: boolean }) {
-  return (
-    <nav aria-label="Ma bibliothèque" className="flex h-full flex-col items-center gap-2 py-3">
-      <button type="button" disabled={busy} onClick={() => inviteLogin({ kind: "library" })}
-        aria-label="Ma bibliothèque" title="Ma bibliothèque" className={cn(iconButton, "h-11 w-11 text-rvm-soft")}>
-        <Library className="h-6 w-6" aria-hidden />
-      </button>
-      <button type="button" disabled={busy} onClick={() => inviteLogin({ kind: "create" })}
-        aria-label="Créer une playlist" title="Créer une playlist"
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-rvm-text/15 disabled:opacity-40">
-        <Plus className="h-5 w-5" aria-hidden />
-      </button>
-      <ArtistSpaceIcon className="mt-auto" />
-    </nav>
+    </div>
   );
 }
 
@@ -331,20 +243,12 @@ function EntryCard({ entry: e, active }: { entry: LibraryEntry; active: boolean 
 
 /**
  * « Écoutés récemment » : un lien vers l'historique du compte, dans chaque vue de
- * la bibliothèque (liste, compacte, grille, rail). La page existe déjà ; seul
- * son accès vit ici depuis que l'accueil « fraîcheur » n'a plus cette rangée.
+ * la bibliothèque (liste, compacte, grille), en plus de son entrée dans la
+ * colonne de gauche.
  */
-function HistoryItem({ variant, active }: { variant: "row" | "compact" | "card" | "rail"; active: boolean }) {
+function HistoryItem({ variant, active }: { variant: "row" | "compact" | "card"; active: boolean }) {
   const label = "Écoutés récemment";
   const current = active ? "page" : undefined;
-  if (variant === "rail") {
-    return (
-      <Link href={HISTORY_HREF} aria-label={`${label} — Historique`} title={label} aria-current={current}
-        className={cn("block rounded-md p-1.5 hover:bg-rvm-text/[0.07]", active && "bg-rvm-text/10")}>
-        <IconTile icon={Clock} className="h-12 w-12 rounded shadow-none" />
-      </Link>
-    );
-  }
   if (variant === "card") {
     return (
       <Link href={HISTORY_HREF} aria-current={current}
