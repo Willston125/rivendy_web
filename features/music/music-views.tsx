@@ -3,33 +3,34 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AudioLines, Lock, MicVocal, Search, Share2, Smartphone, Trophy, X } from "lucide-react";
+import { ArrowRight, AudioLines, Headphones, Lock, MicVocal, Search, Share2, Smartphone, Sun, Trophy, X } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
-import { fetchCatalog } from "@/features/play/play-api";
 import { appIntentUrl } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
+import type { Advertisement } from "@/types/rivendy";
+import { fetchMusicBanners, useMusicPlus } from "./music-ads";
 import {
   fetchArtistTopTracks, fetchArtistsByIds, fetchArtistsWithMusic, fetchFeatured, fetchFollowedArtists, fetchGenres,
-  fetchHistory, fetchHit, fetchNewReleases, fetchRelease, fetchReleasesByArtist, fetchTracksByIds, searchMusic,
+  fetchHit, fetchNewReleases, fetchRelease, fetchReleasesByArtist, fetchTracksByIds, searchMusic,
   type MusicArtist, type MusicGenre, type SearchRow,
 } from "./music-api";
 import { CollectionPage, IconTile, MetaLine, useCoverTint } from "./music-collection";
 import { useMusicLibrary } from "./music-library";
-import { HomeHero } from "./music-home-hero";
+import { MusicAdBanner, SelectionHero, SelectionHeroSkeleton } from "./music-home-hero";
 import {
-  HOME_GRID, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, heroHitBadge, hitMovement,
-  homeShelves, homeSpotlight, recentIsUseful, releaseKindLabel, releaseYear, searchable, totalDurationLabel,
-  uniqueReleases, usefulRubrics, type HomeRubric, type MusicRelease, type MusicTrack,
+  HOME_GRID, HOME_HIT, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, genreTone, hitMovement,
+  releaseKindLabel, releaseYear, searchable, totalDurationLabel, uniqueReleases, usefulRubrics,
+  type HomeRubric, type MusicRelease, type MusicTrack,
 } from "./music-logic";
 import { MusicInstallHint } from "./music-install-hint";
 import { loginHref } from "./music-pending";
 import {
   ArtistCard, ArtistFollowCard, CardRow, CardRowSkeleton, Cover, CoverGridSkeleton, EmptyState, ErrorState, ExplicitTag,
-  FollowArtistButton, ListSkeleton, PageTitle, PlayAllButton, PremiumTag, ReleaseCoverGrid, ReleaseGrid, ReleaseShelf,
+  FollowArtistButton, ListSkeleton, PageTitle, PlayAllButton, PremiumTag, ReleaseCard, ReleaseGrid, ReleaseShelf,
   SaveReleaseButton, Section, ShuffleButton, TrackList, iconButton, primaryButton, toQueue, useLoad, useSearchDraft,
 } from "./music-ui";
-import { useMusicPlayer, type QueueItem } from "./player/music-player-provider";
+import type { QueueItem } from "./player/music-player-provider";
 
 export { FavoritesView, HistoryView, LibraryView, PlaylistView } from "./music-library-views";
 
@@ -47,104 +48,101 @@ const HIT_TINT: [number, number, number] = [10, 74, 66];
 // ── Accueil ────────────────────────────────────────────────────────────────
 
 /**
- * Accueil de la Musique (refonte du 2026-10-28, maquette « Monte le son. »,
- * dans la coque application du 2026-10-22) : l'accroche et les filtres de
- * genre, la sortie à la une, les nouveautés en grandes pochettes, le Rivendy
- * Hit et les artistes à découvrir côte à côte, puis les écoutes récentes.
- * Tout suit le catalogue réel : rien n'est inventé pour remplir, et une
- * sortie n'apparaît jamais deux fois. « Ma bibliothèque » (favoris,
- * historique, playlists) reste dans son panneau, et dans la navigation du
- * bas sur téléphone : plus de raccourcis en tête de page.
+ * Accueil de la Musique, style « fraîcheur » (2026-10-29, 2e référence du
+ * propriétaire) : « Bonjour » et un soleil, la bannière « La sélection
+ * Rivendy », les filtres, les nouveautés en pochettes, le Rivendy Hit et
+ * « À chaque envie, son rythme » côte à côte, puis l'affiche sponsorisée
+ * (jamais pour un abonné Rivendy+) et les artistes à découvrir. Tout suit
+ * le catalogue réel : rien n'est inventé pour remplir.
  */
 export function MusicHomeView() {
   const market = useMusicMarket();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
+  const plus = useMusicPlus();
   const [genre, setGenre] = useState<string | null>(null);
 
   const home = useLoad(`home:${market ?? ""}`, async () => {
-    const [featured, fresh, hit, genres, clips] = await Promise.all([
+    const [featured, fresh, hit, genres] = await Promise.all([
       fetchFeatured(market), fetchNewReleases(market, 48), fetchHit("all", "", market),
       fetchGenres().catch(() => [] as MusicGenre[]),
-      // Un seul clip suffit à savoir si le raccourci vers Rivendy Play mène quelque part.
-      fetchCatalog(market, "clip", 1).catch(() => []),
     ]);
     const all = uniqueReleases([featured, fresh]);
     const artists = await fetchArtistsByIds(distinctArtistIds(all).slice(0, 18)).catch(() => [] as MusicArtist[]);
-    return { featured, fresh, hit, genres, artists, all, clips: clips.length };
+    return { featured, fresh, hit, genres, artists, all };
   });
-  const recent = useLoad(user ? `recent:${user.id}` : null, () => fetchHistory().then((rows) => rows.slice(0, 12)));
+  // Une affiche au hasard parmi celles en ligne, et seulement sans Rivendy+ (statut lu, jamais deviné).
+  const banner = useLoad(plus.ready && !plus.active && market ? `music-ad:${market}` : null, async () => {
+    const ads = await fetchMusicBanners(market);
+    return ads.length ? ads[Math.floor(Math.random() * ads.length)] : null;
+  });
+  const ad = plus.ready && !plus.active ? banner.data : null;
 
   const data = home.data;
   const genres = useMemo(() => (data ? availableGenres(data.all, data.genres) : []), [data]);
+  const fresh = useMemo(() => (data ? filterByGenre(data.fresh, genre) : []), [data, genre]);
   const hit = useMemo(() => {
     const rows = (data?.hit ?? []).filter((h) => !genre || h.music_tracks?.music_releases?.genre_id === genre);
-    const items = toQueue(rows.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)).slice(0, 5);
+    const items = toQueue(rows.map((h) => h.music_tracks).filter((t): t is MusicTrack => !!t)).slice(0, HOME_HIT);
     // L'accueil montre le rang seul ; l'évolution reste sur la page du Hit.
     const ranks = new Map(rows.map((h) => [h.music_tracks?.id ?? "", { rank: h.rank, move: "" }]));
     return { items, ranks };
   }, [data, genre]);
-  const spot = useMemo(
-    () => (data ? homeSpotlight(filterByGenre(data.featured, genre), filterByGenre(data.fresh, genre)) : null),
-    [data, genre],
-  );
+  const artists = useMemo(() => (!data ? [] : genre
+    ? data.artists.filter((a) => data.all.some((r) => r.genre_id === genre && r.artist_id === a.id))
+    : data.artists), [data, genre]);
+  // La sélection du dashboard ; sans sélection, les dernières sorties.
+  const selection = data ? (data.featured.length > 0 ? data.featured : data.fresh.slice(0, 3)) : [];
+  const rythmes = genres.slice(0, 3).map((g) => ({ ...g, releases: (data?.all ?? []).filter((r) => r.genre_id === g.id).length }));
   // « Tout voir » seulement vers une page qui montre plus que l'accueil (petit catalogue : aucune).
-  const rubrics = data
-    ? usefulRubrics({ hitTracks: data.hit.length, releases: data.all.length, artists: data.artists.length, clips: data.clips })
-    : [];
-  const top = data?.hit[0];
-  const hitBadge = !!spot?.release
-    && heroHitBadge(top ? { rank: top.rank, releaseId: top.music_tracks?.release_id ?? null } : null, spot.release.id).kind === "same";
-
-  const intro = (
-    <div>
-      <p className="text-sm text-rvm-soft">Votre prochaine découverte est ici.</p>
-      <h1 className="mt-1 font-rvm-display text-[clamp(2.125rem,6cqw,3.5rem)] font-black leading-none tracking-tight">Monte le son.</h1>
-      {genres.length > 0 ? (
-        <div role="group" aria-label="Filtrer par genre"
-          className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 @2xl:mx-0 @2xl:flex-wrap @2xl:px-0">
-          {[{ id: null as string | null, name: "Tout" }, ...genres].map((g) => {
-            const active = genre === g.id;
-            return (
-              <button key={g.id ?? "all"} type="button" onClick={() => setGenre(g.id)} aria-pressed={active}
-                className={cn("h-9 shrink-0 rounded-full px-4 text-sm font-bold transition-colors",
-                  active ? "bg-rvm-accent text-rvm-on-accent" : "bg-white/10 text-rvm-text hover:bg-white/20")}>
-                {g.name}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
+  const rubrics = data ? usefulRubrics({ hitTracks: data.hit.length, releases: data.all.length, artists: data.artists.length, clips: 0 }) : [];
+  const firstName = (profile?.full_name || "").trim().split(/\s+/)[0] || "";
 
   return (
-    <div className="px-4 pb-2 pt-4 @2xl:px-6 @2xl:pt-6 @5xl:px-8">
+    <div className="px-4 pb-4 pt-4 @2xl:px-8 @2xl:pt-5">
+      <h1 className="sr-only">Rivendy Musique</h1>
       <MusicInstallHint />
+      <p className="flex items-center gap-2 font-rvm-display text-xl font-extrabold text-rvm-text @2xl:text-[22px]">
+        {firstName ? `Bonjour ${firstName}` : "Bonjour"}
+        <Sun className="h-6 w-6 text-rvm-sun @2xl:h-7 @2xl:w-7" aria-hidden />
+      </p>
       {home.error ? (
+        <div className="mt-5"><ErrorState onRetry={home.reload} /></div>
+      ) : !data ? (
         <>
-          {intro}
-          <div className="mt-6"><ErrorState onRetry={home.reload} /></div>
-        </>
-      ) : !data || !spot ? (
-        <>
-          <HomeHero intro={intro} release={null} loading />
+          <div className="mt-3"><SelectionHeroSkeleton /></div>
           <div className="mt-8"><CoverGridSkeleton /></div>
-          <div className="mt-8"><ListSkeleton /></div>
         </>
       ) : data.all.length === 0 && data.hit.length === 0 ? (
-        <>
-          {intro}
-          <div className="mt-6">
-            <EmptyState title="Les premiers titres arrivent bientôt"
-              text="Singles, EP et albums des artistes de l’archipel et d’ailleurs. Chaque sortie est validée par Rivendy avant d’être publiée." />
-          </div>
-        </>
+        <div className="mt-5">
+          <EmptyState title="Les premiers titres arrivent bientôt"
+            text="Singles, EP et albums des artistes de l’archipel et d’ailleurs. Chaque sortie est validée par Rivendy avant d’être publiée." />
+        </div>
       ) : (
         <>
-          <HomeHero intro={intro} release={spot.release} kicker={spot.source === "featured" ? "À la une" : "Nouveauté"} hitBadge={hitBadge} />
+          <div className="mt-3"><SelectionHero releases={selection} /></div>
+          <div role="group" aria-label="Filtrer l’accueil" className="no-scrollbar -mx-4 mt-4 flex gap-2.5 overflow-x-auto px-4 @2xl:mx-0 @2xl:flex-wrap @2xl:px-0">
+            {[{ id: null as string | null, name: "Pour toi" }, ...genres].map((g) => {
+              const active = genre === g.id;
+              return (
+                <button key={g.id ?? "all"} type="button" onClick={() => setGenre(g.id)} aria-pressed={active}
+                  className={cn("h-9 shrink-0 rounded-full px-5 text-sm font-semibold transition-colors",
+                    active ? "bg-rvm-deep text-white" : "bg-rvm-raised text-rvm-on-accent hover:bg-rvm-raised-hover")}>
+                  {g.name}
+                </button>
+              );
+            })}
+            <Link href="/music/explore" className="inline-flex h-9 shrink-0 items-center rounded-full bg-rvm-raised px-5 text-sm font-semibold text-rvm-on-accent transition-colors hover:bg-rvm-raised-hover">
+              Nouveautés
+            </Link>
+            {rythmes.length >= 2 ? (
+              <a href="#rvm-rythmes" className="inline-flex h-9 shrink-0 items-center rounded-full bg-rvm-raised px-5 text-sm font-semibold text-rvm-on-accent transition-colors hover:bg-rvm-raised-hover">
+                Ambiances
+              </a>
+            ) : null}
+          </div>
           {!user && !authLoading ? <div className="mt-6"><VisitorWelcome /></div> : null}
-          <HomeSections artists={data.artists} all={data.all} spot={spot} genre={genre} genreName={genres.find((g) => g.id === genre)?.name}
-            hitItems={hit.items} ranks={hit.ranks} recent={recent.data} rubrics={rubrics} />
+          <HomeSections fresh={fresh} genreName={genres.find((g) => g.id === genre)?.name} hit={hit} rythmes={genre ? [] : rythmes}
+            artists={artists} rubrics={rubrics} genre={genre} ad={ad} />
         </>
       )}
     </div>
@@ -158,7 +156,7 @@ export function MusicHomeView() {
 function VisitorWelcome() {
   const pathname = usePathname() || "/music";
   return (
-    <section aria-labelledby="rvm-welcome" className="flex flex-col gap-3 rounded-lg bg-white/[0.06] p-4 @xl:flex-row @xl:items-center @xl:gap-6">
+    <section aria-labelledby="rvm-welcome" className="flex flex-col gap-3 rounded-2xl bg-rvm-surface p-4 shadow-[0_10px_30px_rgb(10_74_68/0.07)] @xl:flex-row @xl:items-center @xl:gap-6">
       <div className="min-w-0 flex-1">
         <h2 id="rvm-welcome" className="font-rvm-display text-lg font-black">Bienvenue sur Rivendy Musique</h2>
         <p className="mt-1 text-sm leading-relaxed text-rvm-soft">
@@ -171,106 +169,109 @@ function VisitorWelcome() {
   );
 }
 
-function HomeSections({ artists: allArtists, all, spot, genre, genreName, hitItems, ranks, recent, rubrics }: {
-  artists: MusicArtist[];
-  all: MusicRelease[];
-  /** Sortie à la une, et la sélection et les nouveautés SANS elle (homeSpotlight). */
-  spot: { release: MusicRelease | null; featured: MusicRelease[]; fresh: MusicRelease[] };
-  genre: string | null;
+/** Pastels des « rythmes » (référence) : jetons --rvm-rythme-* de site.css. */
+const RYTHME_TONES = [1, 2, 3].map((n) => ({ bg: `var(--rvm-rythme-${n}-bg)`, fg: `var(--rvm-rythme-${n}-fg)` }));
+
+function HomeSections({ fresh, genreName, hit, rythmes, artists, rubrics, genre, ad }: {
+  /** Nouveautés (filtrées par le genre choisi). */
+  fresh: MusicRelease[];
   genreName?: string;
-  hitItems: QueueItem[];
-  ranks: Map<string, { rank: number; move: string }>;
-  recent: Array<{ track: MusicTrack }> | null;
+  hit: { items: QueueItem[]; ranks: Map<string, { rank: number; move: string }> };
+  /** Genres en cartes pastel : pas quand un genre est déjà choisi. */
+  rythmes: Array<{ id: string; name: string; releases: number }>;
+  artists: MusicArtist[];
   /** Rubriques qui montrent plus que l'accueil : sinon, pas de « Tout voir ». */
   rubrics: HomeRubric[];
+  genre: string | null;
+  ad: Advertisement | null;
 }) {
-  const shelves = homeShelves(spot.featured, spot.fresh);
-  const artists = genre ? allArtists.filter((a) => all.some((r) => r.genre_id === genre && r.artist_id === a.id)) : allArtists;
-  const shownReleases = shelves.mode === "one" ? shelves.releases.slice(0, HOME_GRID)
-    : [...shelves.selection.slice(0, HOME_GRID), ...shelves.news.slice(0, HOME_GRID)];
-  const shown = new Set([...(spot.release ? [spot.release.id] : []), ...shownReleases.map((r) => r.id)]);
-  const showRecent = !!recent && recentIsUseful(recent.map((r) => r.track.release_id), shown);
   const explore = genre ? `/music/explore?genre=${genre}` : "/music/explore";
-  const moreHref = (list: MusicRelease[]) => (list.length > HOME_GRID || rubrics.includes("explore") ? explore : undefined);
-  const oneTitle = shelves.mode === "one" && shelves.title === "Nouveautés" ? "Les nouveautés" : shelves.mode === "one" ? shelves.title : "";
-  // Le Hit et les artistes côte à côte quand le panneau le permet ; à côté du
-  // Hit, quatre artistes (au-delà, « Tout voir »).
-  const side = hitItems.length > 0 && artists.length > 0;
-  const artistsShown = side ? 4 : HOME_SHOWS.artists;
+  const shown = fresh.slice(0, HOME_GRID);
+  const pair = hit.items.length > 0 && rythmes.length >= 2;
   return (
     <>
-      {shelves.mode === "one" ? (
-        shelves.releases.length > 0 ? (
-          <Section title={oneTitle} href={moreHref(shelves.releases)}>
-            <ReleaseCoverGrid releases={shelves.releases} label={oneTitle} />
-          </Section>
-        ) : !spot.release ? (
-          <Section title="Les nouveautés">
-            <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />
-          </Section>
-        ) : null
-      ) : (
-        <>
-          <Section title="La sélection Rivendy" href={moreHref(shelves.selection)}>
-            <ReleaseCoverGrid releases={shelves.selection} label="La sélection Rivendy" />
-          </Section>
-          <Section title="Les nouveautés" href={moreHref(shelves.news)}>
-            <ReleaseCoverGrid releases={shelves.news} label="Les nouveautés" />
-          </Section>
-        </>
-      )}
+      <Section title="Les nouveautés" href={fresh.length > HOME_GRID || rubrics.includes("explore") ? explore : undefined}>
+        {shown.length > 0 ? (
+          <ul aria-label="Les nouveautés"
+            className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 @2xl:mx-0 @2xl:grid @2xl:grid-cols-5 @2xl:gap-5 @2xl:overflow-visible @2xl:px-0">
+            {shown.map((r, i) => (
+              <li key={r.id} className="w-[44%] shrink-0 snap-start @md:w-[30%] @2xl:w-auto"><ReleaseCard release={r} priority={i < 2} /></li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState title={genreName ? `Pas encore de sortie ${genreName}` : "Pas encore de sortie"} text="Revenez bientôt : les sorties arrivent chaque semaine." />
+        )}
+      </Section>
 
-      {hitItems.length > 0 || artists.length > 0 ? (
-        <div className={cn("mt-8 grid gap-8", side && "@4xl:grid-cols-[minmax(0,1fr)_19rem] @6xl:grid-cols-[minmax(0,1fr)_21rem]")}>
-          {hitItems.length > 0 ? (
-            <Section className="mt-0 min-w-0 @container" title="Le Hit Rivendy" subtitle="Les plus écoutés de la semaine."
-              href="/music/hit" hrefLabel="Voir le Hit">
-              <TrackList items={hitItems} ranks={ranks} label="Le Hit Rivendy" source={{ label: "Rivendy Hit", href: "/music/hit" }} showHeader={false} />
-            </Section>
+      {hit.items.length > 0 || rythmes.length >= 2 ? (
+        <div className={cn("mt-8 grid gap-6", pair && "@4xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]")}>
+          {hit.items.length > 0 ? (
+            <section aria-labelledby="rvm-hit" className="min-w-0 rounded-3xl bg-rvm-surface p-3 shadow-[0_10px_30px_rgb(10_74_68/0.08)] @2xl:p-4">
+              <div className="mb-1 flex items-start justify-between gap-3 px-2 pt-1">
+                <div>
+                  <h2 id="rvm-hit" className="font-rvm-display text-xl font-extrabold tracking-tight">Le Hit Rivendy</h2>
+                  <p className="text-[13px] text-rvm-muted">Les titres du moment</p>
+                </div>
+                <Link href="/music/hit" className="mt-1 text-sm font-bold text-rvm-ink-accent hover:underline">Voir le Hit</Link>
+              </div>
+              <TrackList items={hit.items} ranks={hit.ranks} label="Le Hit Rivendy" source={{ label: "Rivendy Hit", href: "/music/hit" }}
+                showHeader={false} showAlbum={false} />
+            </section>
           ) : null}
-          {artists.length > 0 ? (
-            <Section className={cn("mt-0 min-w-0", side && "@4xl:border-l @4xl:border-white/10 @4xl:pl-8")} title="À découvrir"
-              href={rubrics.includes("artists") || artists.length > artistsShown ? "/music/artists" : undefined}>
-              <ul aria-label="Artistes à découvrir"
-                className={cn("grid grid-cols-2 gap-x-4 gap-y-6", side ? "@xl:grid-cols-4 @4xl:grid-cols-2" : "@xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6")}>
-                {artists.slice(0, artistsShown).map((a) => <li key={a.id} className="min-w-0"><ArtistFollowCard artist={a} /></li>)}
+          {rythmes.length >= 2 ? (
+            <section id="rvm-rythmes" aria-labelledby="rvm-rythmes-title" className="min-w-0 scroll-mt-4 rounded-3xl bg-rvm-surface p-4 shadow-[0_10px_30px_rgb(10_74_68/0.08)]">
+              <h2 id="rvm-rythmes-title" className="mb-3 px-1 font-rvm-display text-xl font-extrabold tracking-tight">À chaque envie, son rythme</h2>
+              <ul className={cn("grid gap-3", rythmes.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
+                {rythmes.map((g, k) => {
+                  const tone = RYTHME_TONES[k % RYTHME_TONES.length];
+                  return (
+                    <li key={g.id}>
+                      <Link href={`/music/explore?genre=${encodeURIComponent(g.id)}`} style={{ backgroundColor: tone.bg }}
+                        className="flex h-full flex-col items-center rounded-2xl px-2 pb-3 pt-4 text-center text-rvm-text transition hover:brightness-[0.97]">
+                        <RythmeIcon index={k} color={tone.fg} />
+                        <span className="mt-2 max-w-full truncate font-rvm-display text-lg font-extrabold">{g.name}</span>
+                        <span className="mt-0.5 text-[12.5px] leading-snug text-rvm-soft">{g.releases} sortie{g.releases > 1 ? "s" : ""} à écouter</span>
+                        <span aria-hidden className="mt-3 grid h-8 w-8 place-items-center rounded-full bg-rvm-deep text-white">
+                          <ArrowRight className="h-4 w-4" />
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
-            </Section>
+            </section>
           ) : null}
         </div>
       ) : null}
 
-      {showRecent && recent ? (
-        <Section title="Écoutés récemment" href="/music/history">
-          <RecentRow rows={recent} />
+      {ad ? <div className="mt-8"><MusicAdBanner ad={ad} className="max-w-4xl" /></div> : null}
+
+      {artists.length > 0 ? (
+        <Section title="Artistes à découvrir" href={rubrics.includes("artists") || artists.length > HOME_SHOWS.artists ? "/music/artists" : undefined}>
+          <ul aria-label="Artistes à découvrir" className="grid grid-cols-2 gap-x-4 gap-y-6 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
+            {artists.slice(0, HOME_SHOWS.artists).map((a) => <li key={a.id} className="min-w-0"><ArtistFollowCard artist={a} /></li>)}
+          </ul>
         </Section>
       ) : null}
     </>
   );
 }
 
-/** « Écoutés récemment » : cartes de titres, toucher relance la liste. */
-function RecentRow({ rows }: { rows: Array<{ track: MusicTrack }> }) {
-  const player = useMusicPlayer();
-  const items = toQueue(rows.map((r) => r.track));
-  return (
-    <CardRow label="Écoutés récemment">
-      {items.map((it, i) => {
-        const isCurrent = player.current?.track.id === it.track.id;
-        return (
-          <button key={`${it.track.id}-${i}`} type="button"
-            onClick={() => (isCurrent ? player.toggle() : player.playQueue(items, i, { source: { label: "Écoutés récemment", href: "/music/history" } }))}
-            aria-label={`Écouter ${it.track.title}`} className="group block w-full text-left">
-            <div className={cn("overflow-hidden rounded-xl shadow-lg shadow-black/30 ring-1 ring-white/5", isCurrent && "ring-2 ring-rvm-accent")}>
-              <Cover url={it.release.cover_url} size={320} alt="" className="w-full transition duration-300 motion-safe:group-hover:scale-[1.03]" />
-            </div>
-            <span className={cn("mt-2.5 block truncate text-[15px] font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>{it.track.title}</span>
-            <span className="block truncate text-[13px] text-rvm-soft">{artistName(it.release)}</span>
-          </button>
-        );
-      })}
-    </CardRow>
-  );
+/** Icônes des cartes de rythme : barres qui dansent, soleil, casque (décor). */
+function RythmeIcon({ index, color }: { index: number; color: string }) {
+  if (index % 3 === 0) {
+    return (
+      <svg aria-hidden width="38" height="32" viewBox="0 0 40 34" style={{ color }}>
+        <rect x="2" y="16" width="5" height="16" rx="2.5" fill="currentColor" />
+        <rect x="10" y="8" width="5" height="24" rx="2.5" fill="currentColor" fillOpacity={0.6} />
+        <rect x="18" y="2" width="5" height="30" rx="2.5" fill="currentColor" />
+        <rect x="26" y="10" width="5" height="22" rx="2.5" fill="currentColor" fillOpacity={0.45} />
+        <rect x="34" y="18" width="5" height="14" rx="2.5" fill="currentColor" />
+      </svg>
+    );
+  }
+  const Icon = index % 3 === 1 ? Sun : Headphones;
+  return <Icon aria-hidden className="h-9 w-9" style={{ color }} strokeWidth={2.2} />;
 }
 
 // ── Explorer : recherche, genres, toutes les sorties ───────────────────────
@@ -337,9 +338,9 @@ export function ExploreView() {
                     return (
                       <button key={g.id} type="button" aria-pressed={active} onClick={() => setGenre(active ? null : g.id)}
                         className={cn("relative h-24 overflow-hidden rounded-lg p-4 text-left transition",
-                          active ? "bg-rvm-accent/25 ring-2 ring-rvm-accent" : k % 2 ? "bg-[#0F3B3A] hover:brightness-125" : "bg-[#173444] hover:brightness-125")}>
+                          active ? "bg-rvm-deep ring-2 ring-rvm-ink-accent" : "hover:brightness-110")} style={active ? undefined : { backgroundColor: genreTone(k) }}>
                         <span className="relative block text-lg font-black text-white">{g.name}</span>
-                        <AudioLines className={cn("absolute bottom-3 right-3 h-6 w-6", active ? "text-rvm-accent" : "text-white/50")} aria-hidden />
+                        <AudioLines className={cn("absolute bottom-3 right-3 h-6 w-6", active ? "text-rvm-accent" : "text-white/60")} aria-hidden />
                       </button>
                     );
                   })}
@@ -389,7 +390,7 @@ function SearchResults({ rows, tracks, query }: { rows: SearchRow[]; tracks: Mus
   const queue = toQueue(tracks);
   const tile = (r: SearchRow, href: string, round = false) => (
     <li key={`${r.kind}-${r.id}`}>
-      <Link href={href} className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-white/[0.07]">
+      <Link href={href} className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-rvm-text/[0.07]">
         <Cover url={r.cover_url} size={160} alt="" className="h-14 w-14 shrink-0" rounded={round ? "rounded-full" : "rounded"} />
         <span className="min-w-0">
           <span className="block truncate text-[15px] font-semibold">{r.title}</span>
@@ -433,7 +434,7 @@ export function ArtistsView() {
     <div className="px-4 pb-4 pt-5 @2xl:px-6">
       <PageTitle title="Artistes" subtitle="Les artistes qui ont de la musique à écouter sur Rivendy."
         aside={(all.data?.length ?? 0) > 8 ? (
-          <label className="flex h-10 w-full max-w-xs items-center gap-2 rounded-full bg-rvm-raised px-3 focus-within:ring-2 focus-within:ring-rvm-accent @lg:w-64">
+          <label className="flex h-10 w-full max-w-xs items-center gap-2 rounded-full bg-rvm-raised px-3 focus-within:ring-2 focus-within:ring-rvm-ink-accent @lg:w-64">
             <Search className="h-4 w-4 text-rvm-soft" aria-hidden />
             <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer les artistes" aria-label="Filtrer les artistes"
               className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-rvm-soft focus:outline-none focus-visible:outline-none" />
@@ -490,7 +491,7 @@ export function HitView() {
             {([["all", "Général"], ["country", "Mon pays"]] as const).map(([v, l]) => (
               <button key={v} type="button" onClick={() => setScope(v)} aria-pressed={scope === v}
                 className={cn("h-8 rounded-full px-3.5 text-sm font-semibold transition-colors",
-                  scope === v ? "bg-rvm-accent text-rvm-on-accent" : "bg-white/10 text-rvm-text hover:bg-white/20")}>{l}</button>
+                  scope === v ? "bg-rvm-accent text-rvm-on-accent" : "bg-rvm-text/10 text-rvm-text hover:bg-rvm-text/20")}>{l}</button>
             ))}
           </div>
         </>
@@ -526,7 +527,7 @@ export function AlbumView({ release, tracks, highlight }: { release: MusicReleas
 
   return (
     <CollectionPage tint={tint} kicker={releaseKindLabel(release.kind)} title={release.title}
-      cover={<Cover url={release.cover_url} size={480} alt={`Pochette de ${release.title}`} priority className="w-full shadow-2xl shadow-black/50" rounded="rounded-md" />}
+      cover={<Cover url={release.cover_url} size={480} alt={`Pochette de ${release.title}`} priority className="w-full shadow-2xl shadow-rvm-deep/50" rounded="rounded-md" />}
       description={release.description}
       meta={<MetaLine parts={[
         release.artist_id
@@ -556,7 +557,7 @@ export function AlbumView({ release, tracks, highlight }: { release: MusicReleas
       {release.is_premium ? (
         <p className="mx-2 mb-4 flex flex-wrap items-center gap-1.5 text-[13px] text-rvm-soft">
           <Lock className="h-3.5 w-3.5 text-rvm-premium" aria-hidden /> Sortie Premium : écoute complète avec
-          <Link href="/plus" prefetch={false} className="font-semibold text-rvm-accent hover:underline">Rivendy+</Link>, extraits de 30 s sinon.
+          <Link href="/plus" prefetch={false} className="font-semibold text-rvm-ink-accent hover:underline">Rivendy+</Link>, extraits de 30 s sinon.
         </p>
       ) : null}
       {queue.length === 0 ? <EmptyState title="Les titres de cette sortie arrivent bientôt" />
@@ -606,7 +607,7 @@ export function ArtistView({ artist }: { artist: MusicArtist }) {
   return (
     <CollectionPage tint={tint} kicker="Artiste" title={artist.name} roundCover
       cover={artist.avatar_url
-        ? <Cover url={artist.avatar_url} size={480} alt={artist.name} rounded="rounded-full" className="w-full shadow-2xl shadow-black/50" priority />
+        ? <Cover url={artist.avatar_url} size={480} alt={artist.name} rounded="rounded-full" className="w-full shadow-2xl shadow-rvm-deep/50" priority />
         : <ArtistInitial name={artist.name} />}
       meta={<MetaLine parts={[
         artist.genre,
@@ -649,7 +650,7 @@ export function ArtistView({ artist }: { artist: MusicArtist }) {
 
 function ArtistInitial({ name }: { name: string }) {
   return (
-    <span aria-hidden className="flex aspect-square w-full items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/60 to-rvm-raised text-6xl font-black text-white shadow-2xl shadow-black/50">
+    <span aria-hidden className="flex aspect-square w-full items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/60 to-rvm-raised text-6xl font-black text-white shadow-2xl shadow-rvm-deep/50">
       {name.trim().charAt(0).toUpperCase() || "?"}
     </span>
   );

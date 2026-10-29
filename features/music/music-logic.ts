@@ -342,46 +342,6 @@ export function formatPlayerTime(seconds: number | null): string {
   return seconds === null ? "–:––" : formatDuration(seconds);
 }
 
-/**
- * Sélection et nouveautés : quand les nouveautés n'ajoutent presque rien à
- * la sélection (moins de 3 sorties à elles), UNE seule rangée regroupée —
- * jamais les mêmes cartes deux fois de suite. Sinon deux rangées, les
- * nouveautés sans les sorties déjà dans la sélection.
- */
-export type HomeShelves<R> =
-  | { mode: "one"; title: string; releases: R[] }
-  | { mode: "two"; selection: R[]; news: R[] };
-
-export function homeShelves<R extends Pick<MusicRelease, "id">>(featured: R[], fresh: R[]): HomeShelves<R> {
-  if (featured.length === 0) return { mode: "one", title: "Nouveautés", releases: fresh };
-  const inSelection = new Set(featured.map((r) => r.id));
-  const news = fresh.filter((r) => !inSelection.has(r.id));
-  if (news.length < 3) {
-    return { mode: "one", title: news.length > 0 ? "La sélection et les nouveautés" : "La sélection Rivendy", releases: uniqueReleases([featured, news]) };
-  }
-  return { mode: "two", selection: featured, news };
-}
-
-/**
- * « Écoutés récemment » sur l'accueil : seulement s'il apporte quelque
- * chose — au moins deux titres de sorties qui ne sont pas déjà affichées.
- * L'historique complet reste dans la bibliothèque.
- */
-export function recentIsUseful(recentReleaseIds: string[], shownReleaseIds: Set<string>): boolean {
-  return new Set(recentReleaseIds.filter((id) => !shownReleaseIds.has(id))).size >= 2;
-}
-
-/**
- * Mention du Rivendy Hit dans la bannière : « N° 1 » seulement si le titre
- * est VRAIMENT premier de la dernière semaine ; collée à la sortie mise en
- * avant si c'est la même, sinon une carte à part.
- */
-export function heroHitBadge(top: { rank: number; releaseId: string | null } | null, spotlightId: string):
-  | { kind: "none" } | { kind: "same" } | { kind: "other" } {
-  if (!top || top.rank !== 1 || !top.releaseId) return { kind: "none" };
-  return top.releaseId === spotlightId ? { kind: "same" } : { kind: "other" };
-}
-
 // ── Mise en page « application » du 2026-10-22 (bibliothèque, panneaux) ────
 
 export type LibraryKind = "liked" | "playlist" | "album" | "artist";
@@ -525,25 +485,24 @@ export function usefulRubrics(c: { hitTracks: number; releases: number; artists:
   return out;
 }
 
-// ── Refonte de l'accueil (2026-10-28, maquette « Monte le son. ») ─────────
+// ── Accueil « fraîcheur » (2026-10-29, référence du propriétaire) ─────────
 
 /**
- * Pochettes d'une rangée de l'accueil : 2 × 2 sur téléphone, une rangée de 4
- * sur grand panneau ; au-delà, « Tout voir ».
+ * Nouveautés de l'accueil : une rangée de 5 pochettes carrées sur grand
+ * panneau (jamais rognées), qui défile au doigt sur téléphone ; au-delà,
+ * « Tout voir ».
  */
-export const HOME_GRID = 4;
+export const HOME_GRID = 5;
 
-/**
- * Bannière « À la une » : la première sortie de la sélection (ordre du
- * dashboard), sinon la plus récente — jamais une sortie inventée. Elle sort
- * des rangées qui suivent : on ne la voit pas deux fois.
- */
-export function homeSpotlight<R extends Pick<MusicRelease, "id">>(featured: R[], fresh: R[]):
-  { release: R | null; source: "featured" | "latest" | null; featured: R[]; fresh: R[] } {
-  const release = featured[0] ?? fresh[0] ?? null;
-  if (!release) return { release: null, source: null, featured, fresh };
-  const other = (r: R) => r.id !== release.id;
-  return { release, source: featured[0] ? "featured" : "latest", featured: featured.filter(other), fresh: fresh.filter(other) };
+/** Le Rivendy Hit de l'accueil : les trois premiers titres (« Les titres du moment »). */
+export const HOME_HIT = 3;
+
+/** Tuiles de genre (page Explorer) : une couleur par position (jetons --rvm-genre-* de site.css), texte blanc lisible. */
+export const GENRE_TONES = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `var(--rvm-genre-${n})`);
+
+export function genreTone(index: number): string {
+  const n = GENRE_TONES.length;
+  return GENRE_TONES[((Math.trunc(index) % n) + n) % n];
 }
 
 // ── Navigation et espace artiste (lot 2, 2026-10-29) ───────────────────────

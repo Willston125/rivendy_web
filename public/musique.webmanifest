@@ -8,8 +8,8 @@
   "start_url": "/music",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0B141A",
-  "theme_color": "#0B141A",
+  "background_color": "#F3F9F6",
+  "theme_color": "#FFFFFF",
   "icons": [
     { "src": "/brand/rivendy-logo-mark-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/brand/rivendy-logo-mark.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

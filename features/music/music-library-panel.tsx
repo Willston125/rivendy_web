@@ -56,8 +56,9 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
     if (kind && kind !== "liked" && !kinds.includes(kind as "playlist" | "album" | "artist")) setLibKind(null);
   }, [kind, kinds, setLibKind]);
 
-  // Visiteur (ou session pas encore lue) : un rail ; ses boutons expliquent le compte.
-  if (!page && !user) return <VisitorRail busy={loading} />;
+  // Visiteur, bibliothèque repliée : un rail ; ses boutons expliquent le compte.
+  // Dépliée (par défaut), la colonne lui montre l'invitation à se connecter.
+  if (!page && !user && mode === "collapsed") return <VisitorRail busy={loading} />;
 
   if (mode === "collapsed") {
     return (
@@ -67,7 +68,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           <Library className="h-6 w-6" aria-hidden />
         </button>
         <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist" title="Créer une playlist"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-white/15">
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-rvm-text/15">
           <Plus className="h-5 w-5" aria-hidden />
         </button>
         <ul className="mt-1 flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pb-2">
@@ -75,7 +76,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
             <li key={e.key}>
               <Link href={e.href} aria-label={`${e.title} — ${e.subtitle}`} title={e.title}
                 aria-current={pathname === e.href ? "page" : undefined}
-                className={cn("block rounded-md p-1.5 hover:bg-white/[0.07]", pathname === e.href && "bg-white/10")}>
+                className={cn("block rounded-md p-1.5 hover:bg-rvm-text/[0.07]", pathname === e.href && "bg-rvm-text/10")}>
                 <EntryCover entry={e} className="h-12 w-12" />
               </Link>
             </li>
@@ -101,10 +102,10 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           : <h2 className="min-w-0 flex-1 truncate text-base font-bold">Ma bibliothèque</h2>}
         <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist"
           title="Créer une playlist"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-rvm-raised text-sm font-bold text-rvm-text transition-colors hover:bg-white/15 @xs:w-auto @xs:px-3.5">
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-rvm-raised text-sm font-bold text-rvm-text transition-colors hover:bg-rvm-text/15 @xs:w-auto @xs:px-3.5">
           <Plus className="h-4 w-4" aria-hidden /> <span className="hidden @xs:inline">Créer</span>
         </button>
-        {!page ? (
+        {!page && user ? (
           <button type="button" onClick={() => layout.setLibMode(mode === "expanded" ? "list" : "expanded")}
             aria-label={mode === "expanded" ? "Réduire la bibliothèque" : "Agrandir la bibliothèque"}
             title={mode === "expanded" ? "Réduire la bibliothèque" : "Agrandir la bibliothèque"}
@@ -125,7 +126,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           {kinds.map((k) => (
             <button key={k} type="button" aria-pressed={kind === k} onClick={() => setLibKind(kind === k ? null : (k as LibraryKind))}
               className={cn("h-8 shrink-0 rounded-full px-3.5 text-sm font-semibold transition-colors",
-                kind === k ? "bg-rvm-accent text-rvm-on-accent" : "bg-rvm-raised text-rvm-text hover:bg-white/15")}>
+                kind === k ? "bg-rvm-accent text-rvm-on-accent" : "bg-rvm-raised text-rvm-text hover:bg-rvm-text/15")}>
               {KIND_LABEL[k]}
             </button>
           ))}
@@ -135,7 +136,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
       {user && all.length > 0 ? (
         <div className="flex shrink-0 items-center gap-2 px-3 pb-1">
           {searching || mode === "expanded" || page ? (
-            <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md bg-rvm-raised px-2.5 focus-within:ring-2 focus-within:ring-rvm-accent">
+            <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md bg-rvm-raised px-2.5 focus-within:ring-2 focus-within:ring-rvm-ink-accent">
               <Search className="h-4 w-4 shrink-0 text-rvm-soft" aria-hidden />
               <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus={searching}
                 onKeyDown={(e) => { if (e.key === "Escape") { setQuery(""); setSearching(false); } }}
@@ -163,7 +164,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
         ) : library.libraryError && !library.entries ? (
           <div className="m-2 rounded-lg bg-rvm-raised p-4 text-sm">
             <p className="font-semibold">Impossible de charger votre bibliothèque.</p>
-            <button type="button" onClick={library.refreshLibrary} className="mt-3 h-9 rounded-full border border-white/25 px-4 font-semibold hover:border-white">Réessayer</button>
+            <button type="button" onClick={library.refreshLibrary} className="mt-3 h-9 rounded-full border border-rvm-text/25 px-4 font-semibold hover:border-rvm-text">Réessayer</button>
           </div>
         ) : !library.entries ? <RowsSkeleton /> : shown.length === 0 ? (
           <p className="px-3 py-4 text-sm text-rvm-soft">{query ? `Rien ne correspond à « ${query} ».` : "Rien pour ce filtre."}</p>
@@ -181,7 +182,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
         {page ? <ArtistSpaceCard variant="row" className="mx-1 mt-6" /> : null}
       </div>
       {/* Panneau : la carte reste en bas, hors de la liste qui défile (lot 2, 2026-10-29). */}
-      {!page && mode === "list" ? <div className="shrink-0 px-2 pb-2 pt-1"><ArtistSpaceCard /></div> : null}
+      {!page && mode === "list" ? <div className="shrink-0 px-3 pb-2 pt-2"><ArtistSpaceCard /></div> : null}
     </nav>
   );
 }
@@ -200,7 +201,7 @@ function VisitorRail({ busy }: { busy: boolean }) {
       </button>
       <button type="button" disabled={busy} onClick={() => inviteLogin({ kind: "create" })}
         aria-label="Créer une playlist" title="Créer une playlist"
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-white/15 disabled:opacity-40">
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-rvm-text/15 disabled:opacity-40">
         <Plus className="h-5 w-5" aria-hidden />
       </button>
       <ArtistSpaceIcon className="mt-auto" />
@@ -250,8 +251,8 @@ function usePlayEntry(entry: LibraryEntry) {
 function EntryRow({ entry: e, active, compact }: { entry: LibraryEntry; active: boolean; compact: boolean }) {
   const { isThis, playing, busy, play } = usePlayEntry(e);
   return (
-    <div className={cn("group relative flex items-center gap-3 rounded-md px-2 transition-colors hover:bg-white/[0.07]",
-      compact ? "h-9" : "py-1.5", active && "bg-white/10 hover:bg-white/[0.13]")}>
+    <div className={cn("group relative flex items-center gap-3 rounded-md px-2 transition-colors hover:bg-rvm-text/[0.07]",
+      compact ? "h-9" : "py-1.5", active && "bg-rvm-text/10 hover:bg-rvm-text/[0.13]")}>
       {!compact ? (
         <div className="relative shrink-0">
           <EntryCover entry={e} className="h-12 w-12" />
@@ -266,20 +267,20 @@ function EntryRow({ entry: e, active, compact }: { entry: LibraryEntry; active: 
       <Link href={e.href} aria-current={active ? "page" : undefined} className="min-w-0 flex-1 after:absolute after:inset-0 after:rounded-md">
         {compact ? (
           <span className="block truncate text-[14px]">
-            <span className={cn("font-semibold", isThis ? "text-rvm-accent" : "text-rvm-text")}>{e.title}</span>
+            <span className={cn("font-semibold", isThis ? "text-rvm-ink-accent" : "text-rvm-text")}>{e.title}</span>
             <span className="text-rvm-soft"> • {e.subtitle.split(" • ")[0]}</span>
           </span>
         ) : (
           <>
-            <span className={cn("block truncate text-[15px] font-semibold", isThis ? "text-rvm-accent" : "text-rvm-text")}>{e.title}</span>
+            <span className={cn("block truncate text-[15px] font-semibold", isThis ? "text-rvm-ink-accent" : "text-rvm-text")}>{e.title}</span>
             <span className="flex items-center gap-1 truncate text-[13px] text-rvm-soft">
-              {e.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 fill-rvm-accent text-rvm-accent" aria-label="Épinglé" /> : null}
+              {e.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 fill-rvm-ink-accent text-rvm-ink-accent" aria-label="Épinglé" /> : null}
               <span className="truncate">{e.subtitle}</span>
             </span>
           </>
         )}
       </Link>
-      {isThis ? <Volume2 className="relative h-4 w-4 shrink-0 text-rvm-accent" aria-label="En cours de lecture" /> : null}
+      {isThis ? <Volume2 className="relative h-4 w-4 shrink-0 text-rvm-ink-accent" aria-label="En cours de lecture" /> : null}
     </div>
   );
 }
@@ -287,21 +288,21 @@ function EntryRow({ entry: e, active, compact }: { entry: LibraryEntry; active: 
 function EntryCard({ entry: e, active }: { entry: LibraryEntry; active: boolean }) {
   const { isThis, playing, busy, play } = usePlayEntry(e);
   return (
-    <div className={cn("group relative rounded-md p-2.5 transition-colors hover:bg-white/[0.07]", active && "bg-white/10")}>
+    <div className={cn("group relative rounded-md p-2.5 transition-colors hover:bg-rvm-text/[0.07]", active && "bg-rvm-text/10")}>
       <div className="relative">
-        <EntryCover entry={e} size={320} className="w-full shadow-lg shadow-black/40" />
+        <EntryCover entry={e} size={320} className="w-full shadow-lg shadow-rvm-deep/40" />
         <button type="button" onClick={play} aria-label={playing ? `Mettre en pause ${e.title}` : `Écouter ${e.title}`}
-          className="absolute bottom-2 right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-black/40 opacity-0 transition hover:scale-105 group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none">
+          className="absolute bottom-2 right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-rvm-deep/40 opacity-0 transition hover:scale-105 group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none">
           {busy ? <LoaderCircle className="h-5 w-5 motion-safe:animate-spin" aria-hidden />
             : playing ? <Volume2 className="h-5 w-5" aria-hidden /> : <Play className="ml-0.5 h-5 w-5 fill-current" aria-hidden />}
         </button>
       </div>
       <Link href={e.href} aria-current={active ? "page" : undefined}
-        className={cn("mt-2 block truncate text-[15px] font-semibold after:absolute after:inset-0 after:rounded-md", isThis ? "text-rvm-accent" : "text-rvm-text")}>
+        className={cn("mt-2 block truncate text-[15px] font-semibold after:absolute after:inset-0 after:rounded-md", isThis ? "text-rvm-ink-accent" : "text-rvm-text")}>
         {e.title}
       </Link>
       <p className="flex items-center gap-1 truncate text-[13px] text-rvm-soft">
-        {e.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 fill-rvm-accent text-rvm-accent" aria-label="Épinglé" /> : null}
+        {e.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 fill-rvm-ink-accent text-rvm-ink-accent" aria-label="Épinglé" /> : null}
         <span className="truncate">{e.subtitle}</span>
       </p>
     </div>
@@ -353,8 +354,8 @@ function SortPopover({ anchor, onClose }: { anchor: HTMLElement; onClose: () => 
   const item = (checked: boolean, label: string, Icon: typeof Clock, onSelect: () => void) => (
     <button key={label} type="button" role="menuitemradio" aria-checked={checked} tabIndex={-1}
       onClick={() => { onSelect(); closeRef.current(); }}
-      className={cn("flex min-h-10 w-full items-center gap-3 px-3 text-left text-sm hover:bg-white/10 focus:bg-white/10 focus:outline-none",
-        checked ? "text-rvm-accent" : "text-rvm-text")}>
+      className={cn("flex min-h-10 w-full items-center gap-3 px-3 text-left text-sm hover:bg-rvm-text/10 focus:bg-rvm-text/10 focus:outline-none",
+        checked ? "text-rvm-ink-accent" : "text-rvm-text")}>
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       <span className="flex-1">{label}</span>
       {checked ? <Check className="h-4 w-4" aria-hidden /> : null}

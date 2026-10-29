@@ -102,7 +102,7 @@ export function LoginInviteHost() {
     <DialogShell onClose={closeInvite} labelledBy="rvm-login-invite-title" layerClassName="z-[70]"
       panelClassName="rvm-scope relative w-full max-w-md rounded-t-3xl border border-rvm-line bg-rvm-surface p-6 text-rvm-text shadow-2xl sm:rounded-3xl">
       <button type="button" onClick={closeInvite} aria-label="Fermer"
-        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-rvm-muted hover:bg-white/10 hover:text-rvm-text">
+        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-rvm-muted hover:bg-rvm-text/10 hover:text-rvm-text">
         <X className="h-5 w-5" aria-hidden />
       </button>
       <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rvm-accent to-rvm-brand text-rvm-on-accent">
@@ -113,7 +113,7 @@ export function LoginInviteHost() {
       <p className="mt-2 text-[13px] text-rvm-muted">Pas encore de compte ? Il se crée gratuitement depuis la page de connexion.</p>
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={closeInvite}
-          className="h-11 rounded-full border border-white/20 px-5 text-sm font-semibold text-rvm-text hover:border-white">
+          className="h-11 rounded-full border border-rvm-text/20 px-5 text-sm font-semibold text-rvm-text hover:border-rvm-text">
           Plus tard
         </button>
         <button type="button" onClick={login}

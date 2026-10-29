@@ -160,7 +160,7 @@ test("action en attente de connexion : valide, récente, chemin interne", () => 
 });
 
 // ── Finitions du 2026-10-22 ────────────────────────────────────────────────
-import { playerDuration, formatPlayerTime, homeShelves, recentIsUseful, heroHitBadge } from "./music-logic.ts";
+import { playerDuration, formatPlayerTime } from "./music-logic.ts";
 
 test("lecteur : durée du fichier une fois chargé, sinon celle du titre en base, sinon inconnue", () => {
   // File reprise après rechargement : rien n'est chargé → la durée du titre (plus de « 0:00 »).
@@ -173,29 +173,6 @@ test("lecteur : durée du fichier une fois chargé, sinon celle du titre en base
   assert.equal(playerDuration({ ready: false, mediaDuration: 0, trackDuration: 0 }), null);
   assert.equal(formatPlayerTime(209), "3:29");
   assert.equal(formatPlayerTime(null), "–:––");
-});
-
-test("accueil : jamais les mêmes cartes deux fois, regroupées quand les nouveautés n'ajoutent rien", () => {
-  const A = { id: "a" }, B = { id: "b" }, C = { id: "c" }, D = { id: "d" }, E = { id: "e" };
-  assert.deepEqual(homeShelves([A, B], [B, A]), { mode: "one", title: "La sélection Rivendy", releases: [A, B] });
-  assert.deepEqual(homeShelves([A], [B, A]), { mode: "one", title: "La sélection et les nouveautés", releases: [A, B] });
-  assert.deepEqual(homeShelves([], [A, B]), { mode: "one", title: "Nouveautés", releases: [A, B] });
-  assert.deepEqual(homeShelves([A], [B, C, D, A, E]), { mode: "two", selection: [A], news: [B, C, D, E] });
-});
-
-test("accueil : « Écoutés récemment » seulement s'il montre au moins 2 autres sorties", () => {
-  const shown = new Set(["a", "b"]);
-  assert.equal(recentIsUseful(["a", "b", "a"], shown), false);
-  assert.equal(recentIsUseful(["a", "c"], shown), false);
-  assert.equal(recentIsUseful(["c", "d", "c"], shown), true);
-});
-
-test("bannière : « N° 1 du Rivendy Hit » seulement s'il est vraiment premier", () => {
-  assert.deepEqual(heroHitBadge(null, "r1"), { kind: "none" });
-  assert.deepEqual(heroHitBadge({ rank: 2, releaseId: "r1" }, "r1"), { kind: "none" });
-  assert.deepEqual(heroHitBadge({ rank: 1, releaseId: "r1" }, "r1"), { kind: "same" });
-  assert.deepEqual(heroHitBadge({ rank: 1, releaseId: "r2" }, "r1"), { kind: "other" });
-  assert.deepEqual(heroHitBadge({ rank: 1, releaseId: null }, "r1"), { kind: "none" });
 });
 
 // ── Mise en page « application » ───────────────────────────────────────────
@@ -266,7 +243,7 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
 });
 
 import {
-  HOME_SHOWS, usefulRubrics, homeSpotlight, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
+  HOME_SHOWS, HOME_GRID, HOME_HIT, usefulRubrics, genreTone, GENRE_TONES, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
 } from "./music-logic.ts";
 
 test("navigation : Découvrir, Rechercher, Hit ; jamais ailleurs", () => {
@@ -303,13 +280,6 @@ test("accueil, petit catalogue : pas de raccourci vers une page qui répète l'a
   assert.deepEqual(usefulRubrics({ hitTracks: HOME_SHOWS.hit, releases: HOME_SHOWS.releases, artists: HOME_SHOWS.artists, clips: 0 }), []);
 });
 
-test("bannière à la une : la sélection d'abord, sinon la plus récente, jamais répétée dessous", () => {
-  const A = { id: "a" }, B = { id: "b" }, C = { id: "c" };
-  assert.deepEqual(homeSpotlight([B, A], [A, C, B]), { release: B, source: "featured", featured: [A], fresh: [A, C] });
-  assert.deepEqual(homeSpotlight([], [C, A]), { release: C, source: "latest", featured: [], fresh: [A] });
-  assert.deepEqual(homeSpotlight([], []), { release: null, source: null, featured: [], fresh: [] });
-});
-
 test("écran d'accueil : iPhone, appli Android, jamais dans une appli ni après « Plus tard »", () => {
   const now = Date.UTC(2026, 9, 23);
   const base = { standalone: false, touchPoints: 5, dismissedAt: null, now };
@@ -329,4 +299,12 @@ test("écran d'accueil : iPhone, appli Android, jamais dans une appli ni après 
   assert.equal(installHint({ ...base, ua: iphone, standalone: true }), null);
   assert.equal(installHint({ ...base, ua: iphone, dismissedAt: now - 1000 }), null);
   assert.equal(installHint({ ...base, ua: iphone, dismissedAt: now - INSTALL_HINT_SNOOZE_MS - 1 }), "ios");
+});
+
+test("accueil « fraîcheur » : 5 nouveautés, 3 titres du Hit, une couleur par genre qui revient au début", () => {
+  assert.equal(HOME_GRID, 5);
+  assert.equal(HOME_HIT, 3);
+  assert.equal(genreTone(0), GENRE_TONES[0]);
+  assert.equal(genreTone(GENRE_TONES.length + 1), GENRE_TONES[1]);
+  assert.equal(genreTone(-1), GENRE_TONES[GENRE_TONES.length - 1]);
 });

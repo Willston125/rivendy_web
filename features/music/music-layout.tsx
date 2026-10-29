@@ -20,8 +20,8 @@ export const RIGHT_MIN = 280;
 export const RIGHT_MAX = 440;
 /** Le panneau central ne descend jamais en dessous (lisibilité des listes). */
 export const CENTER_MIN = 420;
-/** Marges et espaces entre panneaux (px-2 + 2 × gap-2). */
-const CHROME = 32;
+/** Marges et espaces entre panneaux : aucun depuis le style « fraîcheur » (colonnes jointives). */
+const CHROME = 0;
 
 export type LibraryMode = "list" | "collapsed" | "expanded";
 export type LibraryView = "list" | "compact" | "grid";

@@ -265,7 +265,7 @@ export function MusicLibraryProvider({ children }: { children: ReactNode }) {
             <Play className="h-4 w-4 fill-current" aria-hidden /> Écouter
           </button>
           <button type="button" onClick={() => setResume(null)} aria-label="Plus tard"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-rvm-muted hover:bg-white/10 hover:text-rvm-text">
+            className="flex h-10 w-10 items-center justify-center rounded-full text-rvm-muted hover:bg-rvm-text/10 hover:text-rvm-text">
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
@@ -329,12 +329,12 @@ function PlaylistPicker({ item, playlists, onClose, onPick, onCreate }: {
           <p className="mt-0.5 truncate text-sm text-rvm-muted">{item.track.title}</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rvm-muted hover:bg-white/10 hover:text-rvm-text">
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rvm-muted hover:bg-rvm-text/10 hover:text-rvm-text">
           <X className="h-5 w-5" aria-hidden />
         </button>
       </div>
       <button type="button" onClick={onCreate}
-        className="mt-4 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+        className="mt-4 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-rvm-text/5">
         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-rvm-accent text-rvm-on-accent"><Plus className="h-5 w-5" aria-hidden /></span>
         <span className="font-semibold">Nouvelle playlist</span>
       </button>
@@ -345,7 +345,7 @@ function PlaylistPicker({ item, playlists, onClose, onPick, onCreate }: {
             <li key={p.id}>
               <button type="button" disabled={busy !== null}
                 onClick={async () => { setBusy(p.id); await onPick(p); setBusy(null); }}
-                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5 disabled:opacity-60">
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-rvm-text/5 disabled:opacity-60">
                 <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-rvm-raised text-rvm-muted"><ListMusic className="h-5 w-5" aria-hidden /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{p.name}</span>

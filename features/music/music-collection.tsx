@@ -85,7 +85,7 @@ export function useCoverTint(url: string | null | undefined): [number, number, n
 /** Tuile d'une collection sans pochette (favoris, historique, Hit). */
 export function IconTile({ icon: Icon, tone = "green", className }: { icon: LucideIcon; tone?: "green" | "night"; className?: string }) {
   return (
-    <div className={cn("flex aspect-square items-center justify-center rounded-md shadow-2xl shadow-black/50",
+    <div className={cn("flex aspect-square items-center justify-center rounded-md shadow-2xl shadow-rvm-deep/50",
       tone === "green" ? "bg-gradient-to-br from-rvm-accent via-rvm-brand to-[#064A42]" : "bg-gradient-to-br from-[#1C3A42] to-rvm-raised",
       className)}>
       <Icon className={cn("h-[38%] w-[38%] text-white", Icon === Heart && "fill-white")} aria-hidden />
@@ -97,12 +97,12 @@ export function IconTile({ icon: Icon, tone = "green", className }: { icon: Luci
 export function PlaylistCover({ covers, className, size = 480 }: { covers: string[]; className?: string; size?: 160 | 320 | 480 }) {
   if (covers.length >= 4) {
     return (
-      <div className={cn("grid aspect-square grid-cols-2 overflow-hidden rounded-md shadow-2xl shadow-black/50", className)}>
+      <div className={cn("grid aspect-square grid-cols-2 overflow-hidden rounded-md shadow-2xl shadow-rvm-deep/50", className)}>
         {covers.slice(0, 4).map((u) => <Cover key={u} url={u} size={size === 480 ? 320 : 160} alt="" rounded="rounded-none" className="w-full" />)}
       </div>
     );
   }
-  if (covers[0]) return <Cover url={covers[0]} size={size} alt="" rounded="rounded-md" className={cn("w-full shadow-2xl shadow-black/50", className)} />;
+  if (covers[0]) return <Cover url={covers[0]} size={size} alt="" rounded="rounded-md" className={cn("w-full shadow-2xl shadow-rvm-deep/50", className)} />;
   return <IconTile icon={ListMusic} tone="night" className={className} />;
 }
 
@@ -151,14 +151,14 @@ export function CollectionPage({ tint, kicker, title, cover, meta, description, 
   return (
     <div style={style}>
       <div aria-hidden={!compact}
-        className={cn("sticky top-0 z-20 -mb-16 flex h-16 items-center gap-3 bg-[rgb(var(--hdr))] px-4 shadow-lg shadow-black/20 transition-opacity duration-200 motion-reduce:transition-none @2xl:px-6",
+        className={cn("sticky top-0 z-20 -mb-16 flex h-16 items-center gap-3 bg-[rgb(var(--hdr))] px-4 shadow-lg shadow-rvm-deep/20 transition-opacity duration-200 motion-reduce:transition-none @2xl:px-6",
           compact ? "opacity-100" : "pointer-events-none opacity-0")}>
         {compactActions}
         <p className="min-w-0 truncate text-xl font-black tracking-tight text-white">{title}</p>
       </div>
 
       <header className="px-4 pb-6 pt-20 @2xl:px-6 @2xl:pt-24"
-        style={{ background: "linear-gradient(180deg, rgb(var(--hdr)) 0%, color-mix(in srgb, rgb(var(--hdr)) 70%, var(--rvm-surface)) 100%)" }}>
+        style={{ background: "linear-gradient(180deg, rgb(var(--hdr)) 0%, color-mix(in srgb, rgb(var(--hdr)) 84%, black) 100%)" }}>
         <div className="flex flex-col gap-5 @xl:flex-row @xl:items-end">
           <div className={cn("w-40 shrink-0 @xl:w-48 @4xl:w-56", roundCover && "overflow-hidden rounded-full")}>{cover}</div>
           <div className="min-w-0 text-white">
@@ -171,7 +171,7 @@ export function CollectionPage({ tint, kicker, title, cover, meta, description, 
       </header>
 
       <div ref={actionsRef} className="flex flex-wrap items-center gap-3 px-4 py-5 @2xl:gap-5 @2xl:px-6"
-        style={{ background: "linear-gradient(180deg, color-mix(in srgb, rgb(var(--hdr)) 38%, var(--rvm-surface)) 0%, var(--rvm-surface) 100%)" }}>
+        style={{ background: "linear-gradient(180deg, color-mix(in srgb, rgb(var(--hdr)) 22%, var(--rvm-ground)) 0%, var(--rvm-ground) 100%)" }}>
         {actions}
       </div>
 

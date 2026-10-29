@@ -55,7 +55,7 @@ export function MiniPlayer() {
     <>
       <div aria-hidden className="h-[calc(var(--rvm-player-h,76px)+8px)]" />
       <section ref={bar} aria-label="Lecteur Rivendy Musique"
-        className="rvm-scope fixed inset-x-0 bottom-0 z-[45] border-t border-rvm-line bg-rvm-panel/95 pb-[env(safe-area-inset-bottom)] text-rvm-text shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        className="rvm-scope rvm-deep fixed inset-x-0 bottom-0 z-[45] border-t border-rvm-line bg-rvm-panel/95 pb-[env(safe-area-inset-bottom)] text-rvm-text shadow-[0_-8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
         <MobileProgress />
         <div className="mx-auto grid h-[74px] max-w-[1680px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 md:h-[90px] md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)] md:gap-4 md:px-5">
           <NowPlaying item={cur} />
@@ -76,7 +76,7 @@ export function MiniPlayer() {
           </div>
           <div className="hidden items-center justify-end gap-1 md:flex">
             <button type="button" onClick={() => setQueueOpen((o) => !o)} aria-pressed={queueOpen} aria-label="File d’attente"
-              className={cn(iconButton, queueOpen && "text-rvm-accent hover:text-rvm-accent")}>
+              className={cn(iconButton, queueOpen && "text-rvm-ink-accent hover:text-rvm-ink-accent")}>
               <ListMusic className="h-5 w-5" aria-hidden />
             </button>
             <Volume />
@@ -110,7 +110,7 @@ export function MusicPlayerBar() {
   return (
     <>
       <section aria-label="Lecteur Rivendy Musique"
-        className="rvm-scope hidden h-20 shrink-0 grid-cols-[minmax(180px,1fr)_minmax(0,1.6fr)_minmax(180px,1fr)] items-center gap-4 px-4 text-rvm-text md:grid">
+        className="rvm-scope rvm-deep hidden h-[84px] shrink-0 grid-cols-[minmax(180px,1fr)_minmax(0,1.6fr)_minmax(180px,1fr)] items-center gap-4 px-4 text-rvm-text md:grid">
         {cur ? <NowPlaying item={cur} /> : (
           <p className="truncate text-sm text-rvm-soft">Choisissez un titre pour l’écouter.</p>
         )}
@@ -121,12 +121,12 @@ export function MusicPlayerBar() {
         <div className="flex items-center justify-end gap-0.5">
           <button type="button" onClick={layout?.toggleNowPlaying} disabled={!cur} aria-pressed={nowOpen}
             aria-label={nowOpen ? "Masquer le panneau En cours de lecture" : "Afficher le panneau En cours de lecture"}
-            title="En cours de lecture" className={cn(iconButton, nowOpen && "text-rvm-accent hover:text-rvm-accent")}>
+            title="En cours de lecture" className={cn(iconButton, nowOpen && "text-rvm-ink-accent hover:text-rvm-ink-accent")}>
             <PanelRight className="h-5 w-5" aria-hidden />
           </button>
           <button type="button" onClick={layout?.toggleQueue} disabled={!cur} aria-pressed={queueOpen}
             aria-label={queueOpen ? "Masquer la file d’attente" : "Afficher la file d’attente"}
-            title="File d’attente" className={cn(iconButton, queueOpen && "text-rvm-accent hover:text-rvm-accent")}>
+            title="File d’attente" className={cn(iconButton, queueOpen && "text-rvm-ink-accent hover:text-rvm-ink-accent")}>
             <ListMusic className="h-5 w-5" aria-hidden />
           </button>
           <Volume />
@@ -148,7 +148,7 @@ export function MobileMiniPlayer() {
   if (!cur) return null;
   const { track: t, release: r } = cur;
   return (
-    <section aria-label="Lecteur Rivendy Musique" className="rvm-scope relative mx-2 mb-1 overflow-hidden rounded-md bg-rvm-raised text-rvm-text shadow-lg shadow-black/40 md:hidden">
+    <section aria-label="Lecteur Rivendy Musique" className="rvm-scope rvm-deep relative mx-2 mb-1.5 overflow-hidden rounded-2xl text-rvm-text shadow-lg shadow-rvm-deep/30 md:hidden">
       <div className="flex h-14 items-center gap-2.5 pl-2 pr-1">
         <button type="button" onClick={() => p.setExpanded(true)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
           aria-label={`Agrandir le lecteur : ${t.title}, ${artistName(r)}`}>
@@ -213,7 +213,7 @@ function Controls({ size }: { size: "bar" | "full" }) {
   return (
     <div className={cn("flex items-center", big ? "gap-4 sm:gap-6" : "gap-2")}>
       <button type="button" onClick={p.toggleShuffle} disabled={none} aria-pressed={p.shuffled} aria-label="Lecture aléatoire"
-        className={cn(iconButton, p.shuffled && "text-rvm-accent hover:text-rvm-accent")}>
+        className={cn(iconButton, p.shuffled && "text-rvm-ink-accent hover:text-rvm-ink-accent")}>
         <Shuffle className={big ? "h-5 w-5" : "h-4 w-4"} aria-hidden />
       </button>
       <button type="button" onClick={p.previous} disabled={none} aria-label="Titre précédent" className={cn(iconButton, "text-rvm-text")}>
@@ -225,7 +225,7 @@ function Controls({ size }: { size: "bar" | "full" }) {
         <SkipForward className={cn(big ? "h-7 w-7" : "h-5 w-5", "fill-current")} aria-hidden />
       </button>
       <button type="button" onClick={p.cycleRepeat} disabled={none} aria-pressed={p.repeat !== "off"} aria-label={repeatLabel} title={repeatLabel}
-        className={cn(iconButton, p.repeat !== "off" && "text-rvm-accent hover:text-rvm-accent")}>
+        className={cn(iconButton, p.repeat !== "off" && "text-rvm-ink-accent hover:text-rvm-ink-accent")}>
         {p.repeat === "one" ? <Repeat1 className={big ? "h-5 w-5" : "h-4 w-4"} aria-hidden /> : <Repeat className={big ? "h-5 w-5" : "h-4 w-4"} aria-hidden />}
       </button>
     </div>
@@ -278,7 +278,7 @@ function MobileProgress({ inside = false }: { inside?: boolean }) {
   const pct = total ? Math.min(100, (position / total) * 100) : 0;
   return (
     <div role="progressbar" aria-label="Progression du titre" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}
-      className={cn("bg-white/10 md:hidden", inside ? "absolute inset-x-2 bottom-0 h-[2px]" : "h-[3px]")}>
+      className={cn("bg-rvm-text/10 md:hidden", inside ? "absolute inset-x-2 bottom-0 h-[2px]" : "h-[3px]")}>
       <div className="h-full bg-rvm-accent" style={{ width: `${pct}%` }} />
     </div>
   );
@@ -349,7 +349,7 @@ function FullPlayer() {
   const bg = thumbUrl(r.cover_url, 480);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Lecteur agrandi" className="rvm-scope fixed inset-0 z-[55] overflow-y-auto bg-rvm-ground text-rvm-text">
+    <div role="dialog" aria-modal="true" aria-label="Lecteur agrandi" className="rvm-scope rvm-deep fixed inset-0 z-[55] overflow-y-auto bg-rvm-ground text-rvm-text">
       <div aria-hidden className="pointer-events-none fixed inset-0">
         {bg && bg.startsWith("https://") ? <Image src={bg} alt="" fill unoptimized sizes="100vw" className="scale-125 object-cover opacity-30 blur-3xl" /> : null}
         <div className="absolute inset-0 bg-gradient-to-b from-rvm-ground/40 via-rvm-ground/85 to-rvm-ground" />
@@ -365,7 +365,7 @@ function FullPlayer() {
           </div>
           <div className="mx-auto mt-6 w-full max-w-[min(420px,80vw)] lg:mt-10">
             <Cover url={r.cover_url} size={720} alt={`Pochette de ${r.title}`} priority
-              className={cn("w-full shadow-2xl shadow-black/60 ring-1 ring-white/10 transition-transform duration-500 motion-reduce:transition-none", p.playing ? "scale-100" : "scale-95")}
+              className={cn("w-full shadow-2xl shadow-rvm-deep/60 ring-1 ring-rvm-text/10 transition-transform duration-500 motion-reduce:transition-none", p.playing ? "scale-100" : "scale-95")}
               rounded="rounded-3xl" />
           </div>
           <div className="mx-auto mt-8 w-full max-w-xl">

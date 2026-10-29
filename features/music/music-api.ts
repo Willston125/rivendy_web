@@ -110,6 +110,21 @@ export async function fetchRelease(id: string): Promise<{ release: MusicRelease 
 }
 
 /** Titres (avec leur sortie) dans l'ordre demandé, en gardant seulement les publiés. */
+/**
+ * Titres de plusieurs sorties, dans l'ordre des sorties puis des pistes
+ * (« Lancer la sélection » de l'accueil) ; mêmes règles que le catalogue :
+ * publiées, ouvertes dans le marché.
+ */
+export async function fetchTracksOfReleases(releaseIds: string[], market: string | null): Promise<MusicTrack[]> {
+  if (releaseIds.length === 0) return [];
+  const data = must(await supabase.from("music_tracks").select(TRACK_WITH_RELEASE)
+    .in("release_id", releaseIds).order("position"));
+  const order = new Map(releaseIds.map((id, i) => [id, i]));
+  return ((data ?? []) as unknown as MusicTrack[])
+    .filter((t) => published(t.music_releases) && availableIn(t.music_releases, market))
+    .sort((a, b) => (order.get(a.release_id) ?? 0) - (order.get(b.release_id) ?? 0) || a.position - b.position);
+}
+
 export async function fetchTracksByIds(ids: string[]): Promise<MusicTrack[]> {
   if (ids.length === 0) return [];
   const data = must(await supabase.from("music_tracks").select(TRACK_WITH_RELEASE).in("id", ids));

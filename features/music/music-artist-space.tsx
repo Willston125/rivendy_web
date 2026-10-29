@@ -38,10 +38,10 @@ export function MusicArtistSpaceView() {
 
   return (
     <div className="pb-10">
-      <header className="rvm-artist-header px-4 pb-7 pt-10 @2xl:px-8 @2xl:pt-12">
-        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-rvm-accent">Rivendy Musique</p>
+      <header className="rvm-deep rvm-artist-header px-4 pb-7 pt-10 @2xl:px-8 @2xl:pt-12">
+        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-rvm-ink-accent">Rivendy Musique</p>
         <h1 className="mt-1.5 flex items-center gap-3 font-rvm-display text-[clamp(2rem,5cqw,3rem)] font-black leading-none tracking-tight">
-          <MicVocal className="h-[0.8em] w-[0.8em] shrink-0 text-rvm-accent" aria-hidden /> Espace artiste
+          <MicVocal className="h-[0.8em] w-[0.8em] shrink-0 text-rvm-ink-accent" aria-hidden /> Espace artiste
         </h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-rvm-soft @2xl:text-base">
           {known && music
@@ -110,7 +110,7 @@ function AboutArtists() {
       <h2 id="rvm-about-artists" className="font-rvm-display text-xl font-extrabold sm:text-2xl">Vous êtes artiste ?</h2>
       <ul className="mt-3.5 space-y-2.5 text-[15px] leading-relaxed text-rvm-soft">
         {ABOUT.map((t) => (
-          <li key={t} className="flex gap-2.5"><Check className="mt-1 h-[18px] w-[18px] shrink-0 text-rvm-accent" aria-hidden />{t}</li>
+          <li key={t} className="flex gap-2.5"><Check className="mt-1 h-[18px] w-[18px] shrink-0 text-rvm-ink-accent" aria-hidden />{t}</li>
         ))}
       </ul>
     </section>
@@ -129,7 +129,7 @@ function Steps() {
       <h2 id="rvm-artist-steps" className="mb-3 font-rvm-display text-xl font-extrabold sm:text-2xl">En trois étapes</h2>
       <ol className="grid gap-3 @2xl:grid-cols-3">
         {STEPS.map((s, i) => (
-          <li key={s.title} className="rounded-2xl bg-white/[0.05] p-4">
+          <li key={s.title} className="rounded-2xl bg-rvm-text/[0.05] p-4">
             <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full bg-rvm-accent font-extrabold text-rvm-on-accent">{i + 1}</span>
             <p className="mt-2.5 text-[15px] font-bold">{s.title}</p>
             <p className="mt-1 text-[13.5px] leading-snug text-rvm-soft">{s.text}</p>
@@ -159,7 +159,7 @@ function RequestCard({ status, name, reason }: { status: Exclude<ArtistStatus, "
       {status === "suspended" ? (
         <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">
           La publication est fermée pour le moment.{" "}
-          <Link href="/help" prefetch={false} className="font-semibold text-rvm-accent hover:underline">Contactez Rivendy depuis l’Aide</Link> pour en savoir plus.
+          <Link href="/help" prefetch={false} className="font-semibold text-rvm-ink-accent hover:underline">Contactez Rivendy depuis l’Aide</Link> pour en savoir plus.
         </p>
       ) : null}
     </section>
@@ -177,7 +177,7 @@ function ArtistCard({ profile, music }: { profile: MyMusicArtist; music: boolean
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-rvm-accent">
+        <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-rvm-ink-accent">
           <CircleCheck className="h-4 w-4" aria-hidden /> Compte artiste validé
         </p>
         <h2 id="rvm-artist-name" className="mt-1 truncate font-rvm-display text-2xl font-extrabold">{profile.name}</h2>
@@ -194,12 +194,12 @@ function ArtistCard({ profile, music }: { profile: MyMusicArtist; music: boolean
 }
 
 const CHIP: Record<ReleaseState, string> = {
-  published: "bg-rvm-accent/15 text-rvm-accent",
-  approved: "bg-rvm-accent/15 text-rvm-accent",
+  published: "bg-rvm-accent/15 text-rvm-ink-accent",
+  approved: "bg-rvm-accent/15 text-rvm-ink-accent",
   pending: "bg-amber-300/[0.12] text-amber-300",
   rejected: "bg-amber-300/[0.12] text-amber-300",
-  draft: "bg-white/10 text-rvm-soft",
-  archived: "bg-white/10 text-rvm-soft",
+  draft: "bg-rvm-text/10 text-rvm-soft",
+  archived: "bg-rvm-text/10 text-rvm-soft",
 };
 
 /** Mes sorties, en lecture seule : leur état, et le motif d'un refus. */
@@ -258,16 +258,16 @@ function AppCard({ phase }: { phase: Phase }) {
     publish: <>Pour publier une sortie ou une story, ou reprendre un brouillon : ouvrez {strong("Musique")} et touchez {strong("Publier")}.</>,
   }[phase];
   return (
-    <aside aria-label="Dans l’application Rivendy" className="h-fit rounded-2xl border border-rvm-accent/35 bg-rvm-accent/[0.07] p-5">
-      <p className="flex items-center gap-2 font-semibold"><Smartphone className="h-5 w-5 text-rvm-accent" aria-hidden /> Dans l’application Rivendy</p>
+    <aside aria-label="Dans l’application Rivendy" className="h-fit rounded-2xl border border-rvm-ink-accent/35 bg-rvm-accent/[0.07] p-5">
+      <p className="flex items-center gap-2 font-semibold"><Smartphone className="h-5 w-5 text-rvm-ink-accent" aria-hidden /> Dans l’application Rivendy</p>
       <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">{how}</p>
       <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className={cn(secondaryButton, "mt-4 w-full")}>
         <Download className="h-4 w-4" aria-hidden /> L’application sur Google Play
       </a>
       <p className="mt-3 text-[12.5px] leading-snug text-rvm-muted">Les fichiers audio et les pochettes s’envoient depuis l’application, qui les prépare.</p>
-      <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.08] pt-4 text-sm font-semibold">
-        <Link href="/play/clips/artiste" prefetch={false} className="text-rvm-accent hover:underline">Vous publiez aussi des clips vidéo ? Rivendy Play →</Link>
-        <Link href="/droits-auteur" prefetch={false} className="text-rvm-accent hover:underline">Droits d’auteur sur Rivendy →</Link>
+      <div className="mt-4 flex flex-col gap-2 border-t border-rvm-text/[0.08] pt-4 text-sm font-semibold">
+        <Link href="/play/clips/artiste" prefetch={false} className="text-rvm-ink-accent hover:underline">Vous publiez aussi des clips vidéo ? Rivendy Play →</Link>
+        <Link href="/droits-auteur" prefetch={false} className="text-rvm-ink-accent hover:underline">Droits d’auteur sur Rivendy →</Link>
       </div>
     </aside>
   );

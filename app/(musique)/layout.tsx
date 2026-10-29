@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { MusicShell } from "@/features/music/music-shell";
-import { appFontVariables } from "@/lib/app-fonts";
+import { musicFontVariables } from "@/lib/app-fonts";
 
 /**
  * Espace Musique : les pages /music et la page unique d'un artiste (/artist,
@@ -10,19 +10,20 @@ import { appFontVariables } from "@/lib/app-fonts";
  * les panneaux : leur état et leur défilement sont gardés.
  *
  * Écran d'accueil (lot « Musique web », 2026-10-23) : un manifeste propre à
- * la Musique (s'ouvre sur /music, fond nuit) ; sur Android, il renvoie vers
- * l'appli Rivendy (`prefer_related_applications`) plutôt qu'une copie du site.
+ * la Musique (s'ouvre sur /music) ; sur Android, il renvoie vers l'appli
+ * Rivendy (`prefer_related_applications`) plutôt qu'une copie du site.
  *
- * Polices (refonte de l'accueil, 2026-10-28) : celles de Play — Urbanist pour
- * les titres, Inter pour l'interface — pour une seule signature Rivendy.
+ * Style « fraîcheur » (2026-10-29) : barre du haut blanche, d'où la couleur
+ * claire de la barre du navigateur ; Nunito pour les titres, Inter pour
+ * l'interface.
  */
 export const metadata: Metadata = {
   manifest: "/musique.webmanifest",
-  appleWebApp: { capable: true, title: "Rivendy Musique", statusBarStyle: "black" },
+  appleWebApp: { capable: true, title: "Rivendy Musique", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { themeColor: "#0B141A" };
+export const viewport: Viewport = { themeColor: "#FFFFFF" };
 
 export default function MusiqueLayout({ children }: { children: ReactNode }) {
-  return <MusicShell fontClassName={appFontVariables}>{children}</MusicShell>;
+  return <MusicShell fontClassName={musicFontVariables}>{children}</MusicShell>;
 }

@@ -81,7 +81,7 @@ export function NowPlayingPanel({ className }: { className?: string }) {
         {queueMode ? <QueueList limit={100} /> : (
           <>
             <Link href={`/music/album/${r.id}?t=${t.id}`} aria-label={`Ouvrir ${r.title}`} className="block">
-              <Cover url={r.cover_url} size={480} alt="" className="w-full shadow-xl shadow-black/40" rounded="rounded-lg" />
+              <Cover url={r.cover_url} size={480} alt="" className="w-full shadow-xl shadow-rvm-deep/40" rounded="rounded-lg" />
             </Link>
             <div className="mt-4 flex items-start gap-2">
               <div className="min-w-0 flex-1">
@@ -143,7 +143,7 @@ export function NowPlayingPanel({ className }: { className?: string }) {
 
             <section aria-label="Sortie" className="mt-4 rounded-lg bg-rvm-raised p-4">
               <h3 className="text-base font-bold">Extrait de</h3>
-              <Link href={`/music/album/${r.id}`} className="mt-3 flex items-center gap-3 rounded-md hover:bg-white/5">
+              <Link href={`/music/album/${r.id}`} className="mt-3 flex items-center gap-3 rounded-md hover:bg-rvm-text/5">
                 <Cover url={r.cover_url} size={160} alt="" className="h-12 w-12 shrink-0" rounded="rounded" />
                 <span className="min-w-0">
                   <span className="block truncate text-[15px] font-semibold">{r.title}</span>
@@ -161,7 +161,7 @@ export function NowPlayingPanel({ className }: { className?: string }) {
                 </button>
               </div>
               {nextItem ? (
-                <button type="button" onClick={() => p.playAt(p.index + 1)} className="mt-3 flex w-full items-center gap-3 rounded-md text-left hover:bg-white/5"
+                <button type="button" onClick={() => p.playAt(p.index + 1)} className="mt-3 flex w-full items-center gap-3 rounded-md text-left hover:bg-rvm-text/5"
                   aria-label={`Écouter ${nextItem.track.title}`}>
                   <Cover url={nextItem.release.cover_url} size={160} alt="" className="h-12 w-12 shrink-0" rounded="rounded" />
                   <span className="min-w-0">

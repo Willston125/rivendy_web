@@ -130,7 +130,7 @@ export function PremiumTag({ className }: { className?: string }) {
 }
 
 export function ExplicitTag() {
-  return <span title="Paroles explicites" className="ml-1.5 inline-flex h-4 items-center rounded-sm bg-white/20 px-1 align-middle text-[10px] font-bold text-rvm-text">E</span>;
+  return <span title="Paroles explicites" className="ml-1.5 inline-flex h-4 items-center rounded-sm bg-rvm-text/20 px-1 align-middle text-[10px] font-bold text-rvm-text">E</span>;
 }
 
 /** Égaliseur du titre en cours (immobile si les animations sont réduites). */
@@ -168,7 +168,7 @@ export function Section({ title, subtitle, href, hrefLabel = "Tout voir", childr
           {subtitle ? <p className="mt-0.5 text-sm text-rvm-muted">{subtitle}</p> : null}
         </div>
         {href ? (
-          <Link href={href} className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1.5 text-sm font-semibold text-rvm-soft hover:text-rvm-accent">
+          <Link href={href} className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1.5 text-[15px] font-bold text-rvm-ink-accent hover:underline">
             {hrefLabel} <ChevronRight className="h-4 w-4" aria-hidden />
           </Link>
         ) : null}
@@ -223,10 +223,10 @@ export function CardRow({ label, children }: { label: string; children: ReactNod
   );
 }
 
-/** Grille de pochettes de l'accueil en attente (mêmes colonnes que ReleaseCoverGrid). */
+/** Nouveautés de l'accueil en attente (mêmes colonnes que la rangée de l'accueil). */
 export function CoverGridSkeleton() {
   return (
-    <div aria-hidden className="grid grid-cols-2 gap-x-4 gap-y-6 @2xl:grid-cols-4 @3xl:gap-x-6">
+    <div aria-hidden className="grid grid-cols-2 gap-x-4 gap-y-6 @md:grid-cols-3 @2xl:grid-cols-5 @2xl:gap-x-5">
       {Array.from({ length: HOME_GRID }, (_, i) => (
         <div key={i}>
           <div className="aspect-square rounded-xl bg-rvm-raised motion-safe:animate-pulse" />
@@ -289,7 +289,7 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
       <p className="mt-3 font-semibold text-rvm-text">Impossible de charger la musique</p>
       <p className="mt-1 text-sm text-rvm-muted">Vérifiez votre connexion, puis réessayez.</p>
       <button type="button" onClick={onRetry}
-        className="mt-4 h-10 rounded-full border border-rvm-line px-5 text-sm font-semibold text-rvm-text hover:border-rvm-accent hover:text-rvm-accent">
+        className="mt-4 h-10 rounded-full border border-rvm-line px-5 text-sm font-semibold text-rvm-text hover:border-rvm-ink-accent hover:text-rvm-ink-accent">
         Réessayer
       </button>
     </div>
@@ -301,9 +301,9 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
 export const primaryButton =
   "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-rvm-accent px-5 text-sm font-bold text-rvm-on-accent shadow-lg shadow-rvm-accent/20 transition hover:bg-rvm-accent-hover active:bg-rvm-accent-pressed disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none";
 export const secondaryButton =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/20 px-5 text-sm font-semibold text-rvm-text transition hover:border-rvm-accent hover:text-rvm-accent disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rvm-text/20 px-5 text-sm font-semibold text-rvm-text transition hover:border-rvm-ink-accent hover:text-rvm-ink-accent disabled:cursor-not-allowed disabled:opacity-40";
 export const iconButton =
-  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rvm-muted transition hover:bg-white/10 hover:text-rvm-text disabled:cursor-not-allowed disabled:opacity-30";
+  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rvm-muted transition hover:bg-rvm-text/10 hover:text-rvm-text disabled:cursor-not-allowed disabled:opacity-30";
 
 /**
  * « Écouter » d'une page (sortie, playlist, favoris…) : si cette liste joue
@@ -326,7 +326,7 @@ export function PlayAllButton({ items, label = "Écouter", className, source, va
     return (
       <button type="button" disabled={playable.length === 0} onClick={onClick}
         aria-label={isThis && player.playing ? "Pause" : isThis ? "Reprendre la lecture" : `${label}${source ? ` : ${source.label}` : ""}`}
-        className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-black/40 transition hover:scale-105 hover:bg-rvm-accent-hover active:scale-95 active:bg-rvm-accent-pressed disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100", className)}>
+        className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-rvm-deep/40 transition hover:scale-105 hover:bg-rvm-accent-hover active:scale-95 active:bg-rvm-accent-pressed disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100", className)}>
         {isThis && player.playing ? <Pause className="h-6 w-6 fill-current" aria-hidden /> : <Play className="ml-0.5 h-6 w-6 fill-current" aria-hidden />}
       </button>
     );
@@ -422,15 +422,15 @@ export function SaveReleaseButton({ release, className, variant = "pill" }: { re
       <button type="button" onClick={toggle} aria-pressed={saved}
         aria-label={saved ? `Retirer « ${release.title} » de votre bibliothèque` : `Enregistrer « ${release.title} » dans votre bibliothèque`}
         title={saved ? "Retirer de votre bibliothèque" : "Enregistrer dans votre bibliothèque"}
-        className={cn(iconButton, "h-12 w-12", saved ? "text-rvm-accent hover:text-rvm-accent" : "text-rvm-soft", className)}>
-        {saved ? <CircleCheck className="h-7 w-7 fill-rvm-accent text-rvm-surface" aria-hidden /> : <CirclePlus className="h-7 w-7" aria-hidden />}
+        className={cn(iconButton, "h-12 w-12", saved ? "text-rvm-ink-accent hover:text-rvm-ink-accent" : "text-rvm-soft", className)}>
+        {saved ? <CircleCheck className="h-7 w-7 fill-rvm-ink-accent text-rvm-surface" aria-hidden /> : <CirclePlus className="h-7 w-7" aria-hidden />}
       </button>
     );
   }
 
   return (
     <button type="button" onClick={toggle} aria-pressed={saved}
-      className={cn(secondaryButton, saved && "border-rvm-accent text-rvm-accent", className)}>
+      className={cn(secondaryButton, saved && "border-rvm-ink-accent text-rvm-ink-accent", className)}>
       {saved ? <BookmarkCheck className="h-4 w-4" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
       {saved ? "Enregistré" : "Enregistrer"}
     </button>
@@ -443,7 +443,7 @@ export function PlayReleaseButton({ release, className }: { release: MusicReleas
   const player = useMusicPlayer();
   return (
     <button type="button" onClick={play} aria-label={isThis && player.playing ? `Mettre en pause ${release.title}` : `Écouter ${release.title}`}
-      className={cn("flex h-11 w-11 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-black/40 transition hover:scale-105 hover:bg-rvm-accent-hover active:bg-rvm-accent-pressed motion-reduce:transition-none motion-reduce:hover:scale-100", className)}>
+      className={cn("flex h-11 w-11 items-center justify-center rounded-full bg-rvm-accent text-rvm-on-accent shadow-xl shadow-rvm-deep/40 transition hover:scale-105 hover:bg-rvm-accent-hover active:bg-rvm-accent-pressed motion-reduce:transition-none motion-reduce:hover:scale-100", className)}>
       {busy ? <LoaderCircle className="h-5 w-5 motion-safe:animate-spin" aria-hidden />
         : isThis && player.playing ? <Pause className="h-5 w-5 fill-current" aria-hidden />
         : <Play className="ml-0.5 h-5 w-5 fill-current" aria-hidden />}
@@ -459,7 +459,7 @@ export function LikeButton({ track, className, size = "h-5 w-5" }: { track: { id
   return (
     <button type="button" onClick={() => void library.toggleLike(track)} aria-pressed={liked}
       aria-label={liked ? `Retirer « ${track.title} » de vos favoris` : `Ajouter « ${track.title} » à vos favoris`}
-      className={cn(iconButton, liked && "text-rvm-accent hover:text-rvm-accent", className)}>
+      className={cn(iconButton, liked && "text-rvm-ink-accent hover:text-rvm-ink-accent", className)}>
       <Heart className={cn(size, liked && "fill-current")} aria-hidden />
     </button>
   );
@@ -473,12 +473,12 @@ export function ReleaseCard({ release, priority = false }: { release: MusicRelea
   return (
     <div className="group relative min-w-0">
       <Link href={`/music/album/${release.id}`} className="block rounded-xl">
-        <div className={cn("relative overflow-hidden rounded-xl shadow-lg shadow-black/30 ring-1 ring-white/5", isThis && "ring-2 ring-rvm-accent")}>
+        <div className={cn("relative overflow-hidden rounded-xl shadow-lg shadow-rvm-deep/30 ring-1 ring-rvm-text/5", isThis && "ring-2 ring-rvm-ink-accent")}>
           <Cover url={release.cover_url} size={320} alt="" rounded="rounded-xl" priority={priority}
             className="w-full transition duration-300 motion-safe:group-hover:scale-[1.03]" />
           {release.is_premium ? <PremiumTag className="absolute left-2 top-2" /> : null}
         </div>
-        <p className={cn("mt-2.5 truncate text-[15px] font-semibold", isThis ? "text-rvm-accent" : "text-rvm-text")}>{release.title}</p>
+        <p className={cn("mt-2.5 truncate text-[15px] font-semibold", isThis ? "text-rvm-ink-accent" : "text-rvm-text")}>{release.title}</p>
         <p className="truncate text-[13px] text-rvm-soft">{artistName(release)} · {releaseKindLabel(release.kind)}</p>
       </Link>
       <div className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
@@ -500,14 +500,14 @@ export function ReleaseTile({ release }: { release: MusicRelease }) {
   const year = release.release_date?.slice(0, 4) || release.published_at?.slice(0, 4) || "";
   return (
     <div className={cn("group relative flex items-center gap-4 rounded-2xl border bg-rvm-surface p-3 transition-colors hover:bg-rvm-raised",
-      isThis ? "border-rvm-accent/70" : "border-rvm-line")}>
+      isThis ? "border-rvm-ink-accent/70" : "border-rvm-line")}>
       <Link href={`/music/album/${release.id}`} className="relative shrink-0" tabIndex={-1} aria-hidden>
-        <Cover url={release.cover_url} size={320} alt="" className="h-24 w-24 shadow-lg shadow-black/40 sm:h-28 sm:w-28" rounded="rounded-xl" />
+        <Cover url={release.cover_url} size={320} alt="" className="h-24 w-24 shadow-lg shadow-rvm-deep/40 sm:h-28 sm:w-28" rounded="rounded-xl" />
         {release.is_premium ? <PremiumTag className="absolute left-1.5 top-1.5" /> : null}
       </Link>
       <div className="min-w-0 flex-1">
         <Link href={`/music/album/${release.id}`}
-          className={cn("block truncate text-base font-bold after:absolute after:inset-0 after:rounded-2xl", isThis ? "text-rvm-accent" : "text-rvm-text")}>
+          className={cn("block truncate text-base font-bold after:absolute after:inset-0 after:rounded-2xl", isThis ? "text-rvm-ink-accent" : "text-rvm-text")}>
           {release.title}
         </Link>
         <p className="mt-0.5 truncate text-sm text-rvm-soft">{artistName(release)}</p>
@@ -534,28 +534,12 @@ export function ReleaseShelf({ releases, label }: { releases: MusicRelease[]; la
   return <CardRow label={label}>{releases.map((r, i) => <ReleaseCard key={r.id} release={r} priority={i < 2} />)}</CardRow>;
 }
 
-/**
- * Accueil (refonte du 2026-10-28) : grandes pochettes, 2 × 2 sur téléphone,
- * une rangée de 4 sur grand panneau (HOME_GRID) ; une ou deux sorties
- * seulement : tuiles larges, jamais une rangée presque vide.
- */
-export function ReleaseCoverGrid({ releases, label }: { releases: MusicRelease[]; label: string }) {
-  if (releases.length <= 2) return <ReleaseShelf releases={releases} label={label} />;
-  return (
-    <div role="list" aria-label={label} className="grid grid-cols-2 gap-x-4 gap-y-6 @2xl:grid-cols-4 @3xl:gap-x-6">
-      {releases.slice(0, HOME_GRID).map((r, i) => (
-        <div key={r.id} role="listitem" className="min-w-0"><ReleaseCard release={r} priority={i < 2} /></div>
-      ))}
-    </div>
-  );
-}
-
 /** Artiste à découvrir : portrait rond (ou initiale), nom, « Suivre ». */
 export function ArtistFollowCard({ artist }: { artist: MusicArtist }) {
   return (
     <div className="flex min-w-0 flex-col items-center text-center">
       <Link href={`/artist/${artist.id}`} className="group flex max-w-full flex-col items-center rounded-xl p-1">
-        <span className="block w-28 overflow-hidden rounded-full shadow-lg shadow-black/30 ring-1 ring-white/5">
+        <span className="block w-28 overflow-hidden rounded-full shadow-lg shadow-rvm-deep/30 ring-1 ring-rvm-text/5">
           {artist.avatar_url ? (
             <Cover url={artist.avatar_url} size={320} alt="" rounded="rounded-full"
               className="w-full transition duration-300 motion-safe:group-hover:scale-[1.04]" />
@@ -565,7 +549,7 @@ export function ArtistFollowCard({ artist }: { artist: MusicArtist }) {
             </span>
           )}
         </span>
-        <span className="mt-2.5 block max-w-full truncate text-[15px] font-bold text-rvm-text group-hover:text-rvm-accent">{artist.name}</span>
+        <span className="mt-2.5 block max-w-full truncate text-[15px] font-bold text-rvm-text group-hover:text-rvm-ink-accent">{artist.name}</span>
       </Link>
       <FollowArtistButton artist={artist} compact className="mt-1.5" />
     </div>
@@ -587,7 +571,7 @@ export function ArtistList({ artists }: { artists: MusicArtist[] }) {
               </span>
             )}
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-semibold text-rvm-text group-hover:text-rvm-accent">{a.name}</span>
+              <span className="block truncate text-[15px] font-semibold text-rvm-text group-hover:text-rvm-ink-accent">{a.name}</span>
               <span className="block truncate text-[13px] text-rvm-soft">{a.genre || "Artiste"}</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-rvm-muted" aria-hidden />
@@ -610,7 +594,7 @@ export function ReleaseGrid({ releases, empty = "Rien pour l’instant." }: { re
 export function ArtistCard({ artist }: { artist: MusicArtist }) {
   return (
     <Link href={`/artist/${artist.id}`} className="group block rounded-xl p-1 text-center">
-      <div className="mx-auto w-full max-w-[160px] overflow-hidden rounded-full shadow-lg shadow-black/30 ring-1 ring-white/5">
+      <div className="mx-auto w-full max-w-[160px] overflow-hidden rounded-full shadow-lg shadow-rvm-deep/30 ring-1 ring-rvm-text/5">
         {artist.avatar_url ? (
           <Cover url={artist.avatar_url} size={320} alt="" rounded="rounded-full"
             className="w-full transition duration-300 motion-safe:group-hover:scale-[1.04]" />
@@ -620,7 +604,7 @@ export function ArtistCard({ artist }: { artist: MusicArtist }) {
           </div>
         )}
       </div>
-      <p className="mt-2.5 truncate text-[15px] font-semibold text-rvm-text group-hover:text-rvm-accent">{artist.name}</p>
+      <p className="mt-2.5 truncate text-[15px] font-semibold text-rvm-text group-hover:text-rvm-ink-accent">{artist.name}</p>
       <p className="truncate text-[13px] text-rvm-soft">{artist.genre || "Artiste"}</p>
     </Link>
   );
@@ -698,14 +682,14 @@ export function TrackList({
           const play = () => { if (!playable) return; if (isCurrent) player.toggle(); else player.playQueue(items, i, { source }); };
           return (
             <li key={`${t.id}-${i}`} id={`t-${t.id}`} onDoubleClick={play}
-              className={cn("group flex scroll-mt-32 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.07]",
-                isCurrent && "bg-rvm-accent/10 hover:bg-rvm-accent/15", highlight === t.id && "ring-1 ring-rvm-accent/70",
+              className={cn("group flex scroll-mt-32 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-rvm-text/[0.07]",
+                isCurrent && "bg-rvm-accent/25 hover:bg-rvm-accent/30", highlight === t.id && "ring-1 ring-rvm-ink-accent/70",
                 !playable && "opacity-60")}>
               <div className="relative flex h-10 w-8 shrink-0 flex-col items-center justify-center">
                 {isCurrent ? <Equalizer paused={!player.playing} className="group-hover:invisible group-focus-within:invisible" />
                   : rank ? (
                     <span className="flex flex-col items-center leading-none group-hover:invisible group-focus-within:invisible">
-                      <span className={cn("text-sm font-black tabular-nums", rank.rank <= 3 ? "text-rvm-accent" : "text-rvm-text")}>{rank.rank}</span>
+                      <span className={cn("text-sm font-black tabular-nums", rank.rank <= 3 ? "text-rvm-ink-accent" : "text-rvm-text")}>{rank.rank}</span>
                       {rank.move ? <span className="mt-0.5 text-[10px] text-rvm-muted">{rank.move}</span> : null}
                     </span>
                   ) : (
@@ -720,7 +704,7 @@ export function TrackList({
               {showCover ? <Cover url={r.cover_url} size={160} alt="" className="h-10 w-10 shrink-0" rounded="rounded" /> : null}
               <div className="min-w-0 flex-1">
                 <button type="button" onClick={play} disabled={!playable} tabIndex={-1}
-                  className={cn("block max-w-full truncate text-left text-[15px] font-semibold", isCurrent ? "text-rvm-accent" : "text-rvm-text")}>
+                  className={cn("block max-w-full truncate text-left text-[15px] font-semibold", isCurrent ? "text-rvm-ink-accent" : "text-rvm-text")}>
                   {t.title}{t.explicit ? <ExplicitTag /> : null}
                 </button>
                 <span className="block truncate text-[13px] text-rvm-soft">
@@ -755,12 +739,12 @@ export function TrackList({
 function QueueRow({ item, i, current }: { item: QueueItem; i: number; current: boolean }) {
   const p = useMusicPlayer();
   return (
-    <li className={cn("group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-white/[0.07]", current && "bg-rvm-accent/10")}>
+    <li className={cn("group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-rvm-text/[0.07]", current && "bg-rvm-accent/25")}>
       <button type="button" onClick={() => (current ? p.toggle() : p.playAt(i))} className="flex min-w-0 flex-1 items-center gap-3 text-left"
         aria-label={current ? (p.playing ? `Mettre en pause ${item.track.title}` : `Reprendre ${item.track.title}`) : `Écouter ${item.track.title}`}>
         <Cover url={item.release.cover_url} size={160} alt="" className="h-11 w-11 shrink-0" rounded="rounded" />
         <span className="min-w-0 flex-1">
-          <span className={cn("flex items-center gap-2 truncate text-[15px] font-semibold", current ? "text-rvm-accent" : "text-rvm-text")}>
+          <span className={cn("flex items-center gap-2 truncate text-[15px] font-semibold", current ? "text-rvm-ink-accent" : "text-rvm-text")}>
             {current ? <Equalizer paused={!p.playing} /> : null}<span className="truncate">{item.track.title}</span>
           </span>
           <span className="block truncate text-[13px] text-rvm-soft">{artistName(item.release)}</span>
@@ -858,7 +842,7 @@ export function FollowArtistButton({ artist, className, compact = false }: {
       className={cn(compact
         ? "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors"
         : secondaryButton,
-        following ? "border-rvm-accent text-rvm-accent" : "border-white/30 text-rvm-text hover:border-white", className)}>
+        following ? "border-rvm-ink-accent text-rvm-ink-accent" : "border-rvm-text/30 text-rvm-text hover:border-rvm-text", className)}>
       {following ? <UserCheck className="h-4 w-4" aria-hidden /> : <UserPlus className="h-4 w-4" aria-hidden />}
       {following ? "Abonné" : "Suivre"}
     </button>
@@ -964,7 +948,7 @@ function TrackMenu({ item, anchor, extra = [], hideRelease, onClose, onOpenPage 
         {entries.map((e) => (
           <button key={e.label} type="button" role="menuitem" tabIndex={-1}
             onClick={() => { onClose(); e.onSelect(); }}
-            className={cn("flex w-full items-center gap-3 text-left text-sm hover:bg-white/10 focus:bg-white/10 focus:outline-none",
+            className={cn("flex w-full items-center gap-3 text-left text-sm hover:bg-rvm-text/10 focus:bg-rvm-text/10 focus:outline-none",
               sheet ? "min-h-12 px-5 text-base" : "min-h-11 px-3.5", e.danger ? "text-red-300" : "text-rvm-text")}>
             <e.icon className={cn("h-[18px] w-[18px] shrink-0", e.danger ? "text-red-300" : "text-rvm-muted")} aria-hidden />
             {e.label}

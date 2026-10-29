@@ -184,7 +184,9 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   celui de la marque : `--rvm-accent` = `--rv-primary-light` (#00BFA5, lisible
   sur fond sombre), appuyé = `--rv-primary` (#009688). L'or (`rvm-premium`) est
   RÉSERVÉ à la marque Premium. Jamais de code couleur écrit dans un composant
-  Musique. Mêmes valeurs dans l'app (`MusiqueColors`).
+  Musique. Mêmes valeurs dans l'app (`MusiqueColors`). **Thème sombre remplacé
+  sur le site le 2026-10-29 par le style « fraîcheur » (plus bas) ; l'app le
+  garde jusqu'à son propre lot.**
 - **Coque** : remplacée le même jour par la mise en page « application »
   (section suivante) ; l'ancienne barre latérale et `--rvm-top` n'existent plus.
 - **Lecteur** : toujours UN `<audio>` (`music-player-provider.tsx`). La position
@@ -272,7 +274,8 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     l'appli ; jamais dans une appli intégrée ni une fois installée ; « Plus
     tard » = 30 jours (`installHint`). Essai sur un vrai iPhone : propriétaire.
 - **Accueil « Monte le son. » (2026-10-28, branche `feat/musique-accueil`)** —
-  maquette verte du propriétaire, corrigée puis validée sur un visuel :
+  maquette verte du propriétaire, corrigée puis validée sur un visuel
+  (REMPLACÉ le 2026-10-29 par le style « fraîcheur », plus bas) :
   - Haut de page : accroche + filtres de genre (vrais genres seulement, plus
     collés en haut) + bannière À LA UNE (`music-home-hero.tsx`) : la 1re
     sortie de la sélection, sinon la plus récente (`homeSpotlight`, qui la
@@ -311,6 +314,52 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     lecture seule = la lecture de l'app (`artist_id` + `submitted_by` non nul,
     RLS du compte), états et libellés de `studioStateOf` (`releaseState`,
     `RELEASE_STATE_LABEL`). Rien ne se publie sur le site.
+- **Style « fraîcheur » (2026-10-29, branche `feat/musique-fraicheur`)** — 2e
+  référence du propriétaire (image joyeuse, icônes fraîches, « donner envie de
+  danser »), validée sur un visuel (canevas, page « fraiche »). La proposition
+  « façon Spotify » du même jour a été ANNULÉE (code gardé hors dépôt, non
+  poussé) :
+  - **Thème clair** : jetons `--rvm-*` de `app/site.css` retournés (fond menthe
+    #F3F9F6, cartes blanches, encre #0E2B27). Citron vert #D8F23E = remplissage
+    seulement (boutons, élément actif) ; écrit sur fond clair, l'accent passe
+    par `--rvm-ink-accent` (#0B7A6E) — JAMAIS `text-rvm-accent` sur fond clair
+    (1,3:1). Jetons ajoutés : `eq`, `deep`, `deep-2`, `raised-hover`, `field`,
+    `sun`, pastels `--rvm-rythme-*`, tuiles `--rvm-genre-*`.
+  - **Îlots vert lagon** : la classe `.rvm-deep` RE-DÉFINIT les jetons (texte
+    blanc, accent écrit en citron) pour la colonne de gauche, les lecteurs, la
+    bannière, la carte et l'en-tête « Espace artiste », la navigation du
+    téléphone : un composant s'écrit une fois et prend la couleur du lieu.
+  - **Polices** : Nunito (titres, `--font-nunito`) + Inter
+    (`musicFontVariables` de `lib/app-fonts.ts`) ; Play garde Urbanist + Inter.
+  - **Coque** : barre du haut blanche (logo, « ♫ MUSIQUE », recherche,
+    « Installer l'appli », cloche, compte) ; colonne lagon = `MusicNav`
+    (Découvrir, Rechercher, Le Hit, Clips → /play/clips) + bibliothèque +
+    `ArtistSpaceCard` (photo, effacée sous 900 px de haut) + `AppSwitcher`
+    (Market / Musique / Play). Le visiteur a la même colonne ; panneaux
+    jointifs (`CHROME = 0`).
+  - **Accueil** (`MusicHomeView`) : « Bonjour {prénom} » + soleil ; bannière
+    `SelectionHero` (photo de la référence, `public/music/une-danse.webp`, pas
+    en économie de données) qui joue la sélection (`fetchTracksOfReleases`) ;
+    puces Pour toi + genres, Nouveautés, Ambiances ; 5 nouveautés
+    (`HOME_GRID`) ; le Hit (3 titres, `HOME_HIT`) à côté de « À chaque envie,
+    son rythme » (les GENRES en cartes pastel : pas encore de playlists
+    d'ambiance) ; affiche sponsorisée ; « Artistes à découvrir ». Supprimés :
+    `homeShelves`, `homeSpotlight`, `heroHitBadge`, `recentIsUseful`,
+    `ReleaseCoverGrid`, `.rvm-stage`, `.rvm-vinyl`.
+  - PIÈGE : une rangée qui défile au doigt avec `-mx-4 px-4` et `snap-start`
+    demande `scroll-px-4`, sinon le navigateur cale la 1re carte contre le bord.
+  - **Publicité** (`music-ads.ts`) : position EXISTANTE `web_category_banner`,
+    `target_category = 'musique'` (texte libre, aucun SQL) ; jamais pour un
+    abonné Rivendy+ (`rivendy_entitlements` → `active_until` à venir ; inconnu
+    ou erreur = pas d'affiche) ; « Sponsorisé » toujours affiché,
+    `rel="sponsored"`. L'onglet « Musique » se choisit au dashboard (branche
+    `feat/ads-onglet-musique`).
+  - Photos de la bannière et de la carte artiste : recadrées de la référence du
+    propriétaire (à remplacer par des photos sous licence ou un visuel réglable
+    au dashboard). Concerts : demandent une table (SQL + phrase), pas faits.
+  - PIÈGE de développement : après un rechargement complet de Fast Refresh, la
+    feuille `app/layout.css` peut rester vide dans l'onglet (0 règle, fichier
+    servi pourtant bon) → recharger la page avant de conclure.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 
