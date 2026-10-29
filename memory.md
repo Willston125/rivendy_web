@@ -367,6 +367,12 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     `music-layout.tsx` : colonne de gauche à `LIB_MIN`, poignée seulement dès
     `lg`, largeur choisie sur ordinateur gardée) ; sous 18rem de colonne, le titre
     devient « Bibliothèque » (libellé du téléphone) au lieu d'être tronqué.
+  - **Régression corrigée** : l'accueil « fraîcheur » avait retiré la rangée
+    « Écoutés récemment », SEUL accès à `/music/history`. L'accès vit désormais
+    dans la bibliothèque (`HistoryItem`, épinglé après « Titres likés » comme dans
+    la référence, en liste, compacte, grille, rail et page du téléphone ; masqué
+    pendant un filtre ou une recherche, réservé aux comptes). Avant de retirer une
+    section, chercher ce qu'elle était la seule à relier.
   - Vérifié avec un BANC D'ESSAI LOCAL temporaire (compte fictif après montage
     dans `auth-provider`, `fetchStreamGrant` → sons WAV de `public/essai-local/`,
     bibliothèque en mémoire, affiche d'exemple, comptages et suivi de pub coupés :

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,6 +31,8 @@ import { useMusicPlayer } from "./player/music-player-provider";
  */
 
 const KIND_LABEL: Record<"playlist" | "album" | "artist", string> = { playlist: "Playlists", album: "Albums", artist: "Artistes" };
+/** Historique du compte (page existante) : épinglé dans la bibliothèque, comme dans la référence « fraîcheur ». */
+const HISTORY_HREF = "/music/history";
 const SORT_LABEL: Record<LibrarySort, string> = { recent: "Récents", added: "Ajoutés récemment", alpha: "Ordre alphabétique" };
 const VIEW_LABEL: Record<LibraryView, string> = { compact: "Compacte", list: "Liste", grid: "Grille" };
 
@@ -49,6 +51,16 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
   const all = library.entries ?? [];
   const kinds = libraryKinds(all);
   const shown = sortLibrary(filterLibrary(all, kind, query), layout.libSort);
+  // « Écoutés récemment » juste après les entrées épinglées (favoris), hors filtre et recherche.
+  const firstFree = shown.findIndex((e) => !e.pinned);
+  const historyAt = user && !kind && !query ? (firstFree < 0 ? shown.length : firstFree) : -1;
+  const historyActive = pathname === HISTORY_HREF;
+  function withHistory(rows: ReactNode[], history: ReactNode): ReactNode[] {
+    if (historyAt < 0) return rows;
+    const out = [...rows];
+    out.splice(historyAt, 0, history);
+    return out;
+  }
 
   // Un filtre qui ne correspond plus à rien (album retiré…) s'efface.
   const { setLibKind } = layout;
@@ -72,7 +84,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           <Plus className="h-5 w-5" aria-hidden />
         </button>
         <ul className="mt-1 flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pb-2">
-          {shown.map((e) => (
+          {withHistory(shown.map((e) => (
             <li key={e.key}>
               <Link href={e.href} aria-label={`${e.title} — ${e.subtitle}`} title={e.title}
                 aria-current={pathname === e.href ? "page" : undefined}
@@ -80,7 +92,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
                 <EntryCover entry={e} className="h-12 w-12" />
               </Link>
             </li>
-          ))}
+          )), <li key="history"><HistoryItem variant="rail" active={historyActive} /></li>)}
         </ul>
         <ArtistSpaceIcon />
       </nav>
@@ -176,11 +188,13 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           <p className="px-3 py-4 text-sm text-rvm-soft">{query ? `Rien ne correspond à « ${query} ».` : "Rien pour ce filtre."}</p>
         ) : view === "grid" ? (
           <ul className={cn("grid gap-2", page ? "grid-cols-2 @lg:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6" : "grid-cols-[repeat(auto-fill,minmax(118px,1fr))]")}>
-            {shown.map((e) => <li key={e.key}><EntryCard entry={e} active={pathname === e.href} /></li>)}
+            {withHistory(shown.map((e) => <li key={e.key}><EntryCard entry={e} active={pathname === e.href} /></li>),
+              <li key="history"><HistoryItem variant="card" active={historyActive} /></li>)}
           </ul>
         ) : (
           <ul>
-            {shown.map((e) => <li key={e.key}><EntryRow entry={e} active={pathname === e.href} compact={view === "compact"} /></li>)}
+            {withHistory(shown.map((e) => <li key={e.key}><EntryRow entry={e} active={pathname === e.href} compact={view === "compact"} /></li>),
+              <li key="history"><HistoryItem variant={view === "compact" ? "compact" : "row"} active={historyActive} /></li>)}
           </ul>
         )}
         {user && library.entries && all.length <= 2 && !query && !kind ? <Starter hasPlaylist={all.some((e) => e.kind === "playlist")} /> : null}
@@ -312,6 +326,52 @@ function EntryCard({ entry: e, active }: { entry: LibraryEntry; active: boolean 
         <span className="truncate">{e.subtitle}</span>
       </p>
     </div>
+  );
+}
+
+/**
+ * « Écoutés récemment » : un lien vers l'historique du compte, dans chaque vue de
+ * la bibliothèque (liste, compacte, grille, rail). La page existe déjà ; seul
+ * son accès vit ici depuis que l'accueil « fraîcheur » n'a plus cette rangée.
+ */
+function HistoryItem({ variant, active }: { variant: "row" | "compact" | "card" | "rail"; active: boolean }) {
+  const label = "Écoutés récemment";
+  const current = active ? "page" : undefined;
+  if (variant === "rail") {
+    return (
+      <Link href={HISTORY_HREF} aria-label={`${label} — Historique`} title={label} aria-current={current}
+        className={cn("block rounded-md p-1.5 hover:bg-rvm-text/[0.07]", active && "bg-rvm-text/10")}>
+        <IconTile icon={Clock} className="h-12 w-12 rounded shadow-none" />
+      </Link>
+    );
+  }
+  if (variant === "card") {
+    return (
+      <Link href={HISTORY_HREF} aria-current={current}
+        className={cn("block rounded-md p-2.5 transition-colors hover:bg-rvm-text/[0.07]", active && "bg-rvm-text/10")}>
+        <IconTile icon={Clock} className="w-full shadow-lg shadow-rvm-deep/40" />
+        <span className="mt-2 block truncate text-[15px] font-semibold text-rvm-text">{label}</span>
+        <span className="block truncate text-[13px] text-rvm-soft">Historique</span>
+      </Link>
+    );
+  }
+  return (
+    <Link href={HISTORY_HREF} aria-current={current}
+      className={cn("flex items-center gap-3 rounded-md px-2 transition-colors hover:bg-rvm-text/[0.07]",
+        variant === "compact" ? "h-9" : "py-1.5", active && "bg-rvm-text/10 hover:bg-rvm-text/[0.13]")}>
+      {variant === "row" ? <IconTile icon={Clock} className="h-12 w-12 shrink-0 rounded shadow-none" /> : null}
+      {variant === "compact" ? (
+        <span className="block min-w-0 flex-1 truncate text-[14px]">
+          <span className="font-semibold text-rvm-text">{label}</span>
+          <span className="text-rvm-soft"> • Historique</span>
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold text-rvm-text">{label}</span>
+          <span className="block truncate text-[13px] text-rvm-soft">Historique</span>
+        </span>
+      )}
+    </Link>
   );
 }
 
