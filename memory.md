@@ -423,6 +423,25 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
       visiteur : 1520×740, 1440×900, 1680×900 (panneau dans la page), 900×768,
       375×812, 0 requête en échec en visiteur.
 
+  - **Lecteur agrandi « radio-cassette » (même jour, branche
+    `feat/musique-cassette`)**, d'après la maquette du propriétaire :
+    `features/music/player/cassette-player.tsx` (`CassetteDeck`, `Boombox` en
+    SVG, `Cassette` avec la vraie pochette dans l'étiquette, `Reels` dont la
+    bande suit la progression, vumètres DÉCORATIFS — aucune analyse du son,
+    l'audio n'ouvre pas ses règles CORS) ; `FullPlayer` de `mini-player.tsx`
+    recomposé (clair, « Vous écoutez », platine, état « En lecture / En pause /
+    Chargement… », titre, favori rond vert profond, gros curseurs
+    `.rvm-range-lg`, file d'attente à droite pleine hauteur avec la source en
+    bas). Animations dans site.css (`.rvm-deck[data-state]`, `.rvm-reel`,
+    `.rvm-vu-bar`, `.rvm-speaker-glow`, `.rvm-wait`, `.rvm-cassette[data-phase]`),
+    toutes coupées par `prefers-reduced-motion`. Changement de morceau : sortie
+    160 ms + entrée 220 ms (`useCassetteSwap`), jamais empilées, l'affichage
+    final = le morceau actif. Téléphone ou écran bas : cassette compacte ;
+    paysage bas : cassette à gauche, commandes à droite. « Mode cassette »
+    (clé `rivendy_music_cassette_v1`) ramène la grande pochette. PIÈGE
+    d'essai : un panneau de navigateur MASQUÉ empêche la page de démarrer
+    (React ne s'hydrate pas) → afficher le panneau avant de conclure.
+
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 
 - **Couleurs** : jetons `--rvp-*` dans `app/site.css` (`:root` + `@theme inline`

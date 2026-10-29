@@ -367,6 +367,79 @@ body {
     .rvm-range::-webkit-slider-thumb { transition: none; }
   }
 
+  /* Curseurs du lecteur agrandi (maquette « radio-cassette ») : piste plus
+     épaisse, pastille citron toujours visible, cernée de vert profond pour
+     rester lisible sur le fond clair. */
+  .rvm-range-lg { height: 22px; }
+  .rvm-range-lg::-webkit-slider-runnable-track { height: 6px; }
+  .rvm-range-lg::-moz-range-track { height: 6px; }
+  .rvm-range-lg::-webkit-slider-thumb {
+    margin-top: -6px;
+    width: 18px;
+    height: 18px;
+    opacity: 1;
+    background: var(--rvm-accent);
+    box-shadow: 0 0 0 2px var(--rvm-text), 0 2px 8px rgb(6 63 59 / 0.3);
+  }
+  .rvm-range-lg::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    opacity: 1;
+    background: var(--rvm-accent);
+    box-shadow: 0 0 0 2px var(--rvm-text), 0 2px 8px rgb(6 63 59 / 0.3);
+  }
+
+  /* Lecteur agrandi « radio-cassette » (2026-10-29) : bobines, vumètres,
+     lueurs et point d'attente suivent l'état réel du lecteur (data-state sur
+     .rvm-deck) — en pause, ils s'arrêtent là où ils sont ; au chargement,
+     seul le point citron clignote. Les vumètres sont un décor, pas une
+     mesure du son. Un onglet caché ne dessine plus rien : rien à couper. */
+  @keyframes rvm-reel-spin { to { transform: rotate(360deg); } }
+  @keyframes rvm-vu { from { transform: scaleY(0.22); } to { transform: scaleY(1); } }
+  @keyframes rvm-glow { from { opacity: 0.35; } to { opacity: 0.9; } }
+  @keyframes rvm-wait { 50% { opacity: 0.15; } }
+  @keyframes rvm-cassette-in { from { transform: translateY(-14%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .rvm-reel {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: rvm-reel-spin 2.4s linear infinite paused;
+  }
+  .rvm-vu-bar {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    transform: scaleY(0.22);
+    animation: rvm-vu 900ms ease-in-out infinite alternate paused;
+  }
+  .rvm-speaker-glow { opacity: 0.35; }
+  .rvm-wait { opacity: 0; }
+  .rvm-deck[data-state="playing"] .rvm-reel,
+  .rvm-deck[data-state="playing"] .rvm-vu-bar { animation-play-state: running; }
+  .rvm-deck[data-state="playing"] .rvm-speaker-glow { animation: rvm-glow 1.4s ease-in-out infinite alternate; }
+  .rvm-deck[data-state="loading"] .rvm-wait { opacity: 1; animation: rvm-wait 1s ease-in-out infinite; }
+  /* Changement de morceau : la cassette sort (vers le haut), la suivante entre. */
+  .rvm-cassette { transition: transform 160ms ease-in, opacity 160ms ease-in; }
+  .rvm-cassette[data-phase="out"] { transform: translateY(-18%); opacity: 0; }
+  .rvm-cassette[data-phase="in"] { animation: rvm-cassette-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  /* Vitre du compartiment : reflet posé par-dessus la cassette. */
+  .rvm-deck-glass {
+    background: linear-gradient(115deg, rgb(255 255 255 / 0.2) 0%, rgb(255 255 255 / 0.05) 30%, transparent 46%, transparent 70%, rgb(255 255 255 / 0.08) 100%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  }
+  /* Fond du lecteur agrandi : menthe, lumière douce, une touche de soleil. */
+  .rvm-player-sky {
+    background:
+      radial-gradient(55% 45% at 32% 26%, rgb(214 255 54 / 0.2), transparent 70%),
+      radial-gradient(45% 55% at 0% 100%, rgb(0 150 136 / 0.16), transparent 70%),
+      radial-gradient(40% 50% at 100% 12%, rgb(0 150 136 / 0.1), transparent 70%),
+      var(--rvm-ground);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rvm-reel, .rvm-vu-bar, .rvm-speaker-glow, .rvm-wait { animation: none !important; }
+    .rvm-deck[data-state="loading"] .rvm-wait { opacity: 1; }
+    .rvm-cassette { transition: none; }
+    .rvm-cassette[data-phase] { animation: none; transform: none; opacity: 1; }
+  }
+
   /* Bannière « La sélection Rivendy » (style « fraîcheur », 2026-10-29) :
      vert lagon plein à gauche (le texte blanc y reste lisible quelle que soit
      la photo), qui s'efface sur la photo à droite. */
