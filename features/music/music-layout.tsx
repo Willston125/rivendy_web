@@ -147,9 +147,12 @@ export function MusicLayoutProvider({ children, hasCurrent }: { children: ReactN
 
   const rightDocked = wide && saved.rightOpen && hasCurrent;
   const rightVisible = hasCurrent && (wide ? saved.rightOpen : drawerOpen);
+  // Tablette (768-1023 px) : navigation compacte, la colonne de gauche à sa
+  // largeur minimale (sans poignée) ; la largeur choisie sur ordinateur est gardée.
+  const compactLeft = vw < 1024;
   const fitted = fitPanels({
     available: vw - CHROME,
-    left: saved.libMode === "collapsed" ? LIB_COLLAPSED : saved.libWidth,
+    left: saved.libMode === "collapsed" ? LIB_COLLAPSED : compactLeft ? LIB_MIN : saved.libWidth,
     right: rightDocked ? saved.rightWidth : 0,
     leftMin: saved.libMode === "collapsed" ? LIB_COLLAPSED : LIB_MIN,
     rightMin: rightDocked ? RIGHT_MIN : 0,

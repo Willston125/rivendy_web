@@ -319,8 +319,9 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   danser »), validée sur un visuel (canevas, page « fraiche »). La proposition
   « façon Spotify » du même jour a été ANNULÉE (code gardé hors dépôt, non
   poussé) :
-  - **Thème clair** : jetons `--rvm-*` de `app/site.css` retournés (fond menthe
-    #F3F9F6, cartes blanches, encre #0E2B27). Citron vert #D8F23E = remplissage
+  - **Thème clair** : jetons `--rvm-*` de `app/site.css` retournés (fond
+    #F5FAF5, cartes blanches, encre vert profond #063F3B : valeurs du cahier des
+    charges du propriétaire). Citron #D6FF36 = remplissage
     seulement (boutons, élément actif) ; écrit sur fond clair, l'accent passe
     par `--rvm-ink-accent` (#0B7A6E) — JAMAIS `text-rvm-accent` sur fond clair
     (1,3:1). Jetons ajoutés : `eq`, `deep`, `deep-2`, `raised-hover`, `field`,
@@ -360,6 +361,21 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
   - PIÈGE de développement : après un rechargement complet de Fast Refresh, la
     feuille `app/layout.css` peut rester vide dans l'onglet (0 règle, fichier
     servi pourtant bon) → recharger la page avant de conclure.
+  - **Conformité au cahier des charges (même jour, branche
+    `feat/musique-conformite`)** : couleurs exactes du propriétaire (ci-dessus) ;
+    tablette 768-1023 px = navigation compacte (`compactLeft` dans
+    `music-layout.tsx` : colonne de gauche à `LIB_MIN`, poignée seulement dès
+    `lg`, largeur choisie sur ordinateur gardée) ; sous 18rem de colonne, le titre
+    devient « Bibliothèque » (libellé du téléphone) au lieu d'être tronqué.
+  - Vérifié avec un BANC D'ESSAI LOCAL temporaire (compte fictif après montage
+    dans `auth-provider`, `fetchStreamGrant` → sons WAV de `public/essai-local/`,
+    bibliothèque en mémoire, affiche d'exemple, comptages et suivi de pub coupés :
+    RIEN écrit en base ; actif seulement sur localhost:3281 ; retiré avant commit,
+    `git checkout` des fichiers + grep « ESSAI LOCAL » vide) : lecture, même
+    `<audio>` d'une page à l'autre, ligne du Hit en cours, favoris, playlists
+    (création, ajout, page), recherche, filtres, panneau « En cours de lecture »,
+    mini-lecteur au-dessus de la navigation du téléphone, lecteur plein écran,
+    affiche « Sponsorisé », focus clavier. Un compte réel reste à essayer.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 

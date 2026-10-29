@@ -159,7 +159,7 @@ function ResizeHandle({ label, side, value, min, max, onChange }: {
   return (
     <div role="separator" aria-orientation="vertical" aria-label={label} aria-valuemin={min} aria-valuemax={max} aria-valuenow={value}
       tabIndex={0} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={key}
-      className={cn("group absolute inset-y-0 z-20 hidden w-3 cursor-col-resize touch-none md:block",
+      className={cn("group absolute inset-y-0 z-20 hidden w-3 cursor-col-resize touch-none lg:block",
         side === "right" ? "-right-[10px]" : "-left-[10px]")}>
       <span aria-hidden className={cn("absolute inset-y-2 left-1/2 w-0.5 -translate-x-1/2 rounded-full transition-colors",
         active ? "bg-rvm-accent" : "bg-transparent group-hover:bg-rvm-text/30 group-focus-visible:bg-rvm-accent")} />

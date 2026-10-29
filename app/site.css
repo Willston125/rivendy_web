@@ -36,19 +36,21 @@
      tient la structure (barre de gauche, lecteur : îlots .rvm-deep, qui
      retournent ces mêmes jetons) ; le citron vert dit « agis ici » (boutons,
      élément actif). Le citron n'est JAMAIS un texte sur fond clair (1,3:1) :
-     --rvm-ink-accent écrit l'accent (5,2:1 sur blanc). Or : Premium seul. */
-  --rvm-ground:         #F3F9F6;  /* fond des pages (menthe)            */
+     --rvm-ink-accent écrit l'accent (5,2:1 sur blanc). Or : Premium seul.
+     Fond, encre et citron : valeurs du cahier des charges du propriétaire
+     (#F5FAF5, #063F3B, #D6FF36). */
+  --rvm-ground:         #F5FAF5;  /* fond des pages (blanc teinté)      */
   --rvm-panel:          #FFFFFF;  /* barre du haut, panneaux            */
   --rvm-surface:        #FFFFFF;  /* cartes                             */
   --rvm-raised:         #E3F1EC;  /* survol, champs, puces au repos     */
   --rvm-line:           #E2ECE8;  /* séparateurs, bordures              */
-  --rvm-text:           #0E2B27;  /* encre : titres et texte, 14:1      */
+  --rvm-text:           #063F3B;  /* encre vert profond, 11,8:1         */
   --rvm-soft:           #3F5A55;  /* texte secondaire, 7,5:1 sur blanc  */
   --rvm-muted:          #5B746F;  /* discret, 4,8:1 sur blanc           */
-  --rvm-accent:         #D8F23E;  /* citron vert : boutons, actif       */
-  --rvm-accent-hover:   #E3F76E;
-  --rvm-accent-pressed: #C5DF24;
-  --rvm-on-accent:      #0B3B36;  /* encre posée sur le citron, 9,8:1   */
+  --rvm-accent:         #D6FF36;  /* citron lumineux : boutons, actif   */
+  --rvm-accent-hover:   #E1FF6A;
+  --rvm-accent-pressed: #C2EB1F;
+  --rvm-on-accent:      #063F3B;  /* encre posée sur le citron, 10:1    */
   --rvm-ink-accent:     #0B7A6E;  /* accent écrit sur fond clair        */
   --rvm-eq:             #15803D;  /* barres « en lecture » sur fond clair */
   --rvm-deep:           #0A4A44;  /* vert lagon : barre, lecteur, la une */
@@ -294,8 +296,8 @@ body {
     --rvm-text: #FFFFFF;
     --rvm-soft: rgb(255 255 255 / 0.86);
     --rvm-muted: rgb(255 255 255 / 0.74);
-    --rvm-ink-accent: #D8F23E;
-    --rvm-eq: #D8F23E;
+    --rvm-ink-accent: var(--rvm-accent);
+    --rvm-eq: var(--rvm-accent);
     background-color: var(--rvm-deep);
     color: #FFFFFF;
   }
@@ -381,7 +383,7 @@ body {
   }
   .rvm-artist-header {
     background:
-      radial-gradient(70% 140% at 88% 0%, rgb(216 242 62 / 0.2), transparent 60%),
+      radial-gradient(70% 140% at 88% 0%, rgb(214 255 54 / 0.2), transparent 60%),
       linear-gradient(160deg, var(--rvm-deep-2), var(--rvm-deep));
   }
 

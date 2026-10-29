@@ -90,7 +90,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
   return (
     // Page (téléphone) : c'est le panneau central qui défile, pas la liste.
     <nav aria-label="Ma bibliothèque" className={cn("@container flex min-h-0 flex-col", !page && "h-full")}>
-      <div className={cn("flex shrink-0 items-center gap-2 px-4 pb-2", page ? "pt-5 @2xl:px-6" : "pt-3")}>
+      <div className={cn("flex shrink-0 items-center gap-2 px-4 pb-2", page ? "pt-5 @2xl:px-6" : "pt-3 @max-[18rem]:gap-1 @max-[18rem]:px-3")}>
         {!page ? (
           <button type="button" onClick={() => layout.setLibMode("collapsed")} aria-label="Replier la bibliothèque" title="Replier la bibliothèque"
             className={cn(iconButton, "-ml-2 h-9 w-9 text-rvm-soft")}>
@@ -99,7 +99,13 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
         ) : null}
         {page
           ? <h1 className="min-w-0 flex-1 truncate text-2xl font-black">Ma bibliothèque</h1>
-          : <h2 className="min-w-0 flex-1 truncate text-base font-bold">Ma bibliothèque</h2>}
+          : (
+            // Colonne étroite (tablette) : le libellé court de la navigation du téléphone.
+            <h2 className="min-w-0 flex-1 truncate text-base font-bold">
+              <span className="@max-[18rem]:hidden">Ma bibliothèque</span>
+              <span className="hidden @max-[18rem]:inline">Bibliothèque</span>
+            </h2>
+          )}
         <button type="button" onClick={() => void library.newPlaylist()} aria-label="Créer une playlist"
           title="Créer une playlist"
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-rvm-raised text-sm font-bold text-rvm-text transition-colors hover:bg-rvm-text/15 @xs:w-auto @xs:px-3.5">
