@@ -546,6 +546,36 @@ export function homeSpotlight<R extends Pick<MusicRelease, "id">>(featured: R[],
   return { release, source: featured[0] ? "featured" : "latest", featured: featured.filter(other), fresh: fresh.filter(other) };
 }
 
+// ── Navigation et espace artiste (lot 2, 2026-10-29) ───────────────────────
+
+export type MusicNavKey = "discover" | "search" | "hit";
+
+/** Entrée de la navigation active pour une adresse ; Rivendy Play, hors de la Musique, ne l'est jamais. */
+export function musicNavActive(pathname: string): MusicNavKey | null {
+  const p = pathname.split("?")[0].replace(/\/+$/, "") || "/";
+  if (p === "/music") return "discover";
+  if (p.startsWith("/music/explore") || p.startsWith("/music/search")) return "search";
+  if (p.startsWith("/music/hit")) return "hit";
+  return null;
+}
+
+export type ReleaseState = "draft" | "pending" | "approved" | "rejected" | "published" | "archived";
+
+/** État d'une sortie envoyée par un artiste : la règle de l'app (`studioStateOf`). */
+export function releaseState(status: string | null | undefined, reviewStatus: string | null | undefined): ReleaseState {
+  if (status === "published") return "published";
+  if (status === "archived") return "archived";
+  if (reviewStatus === "pending") return "pending";
+  if (reviewStatus === "rejected") return "rejected";
+  if (reviewStatus === "approved") return "approved";
+  return "draft";
+}
+
+/** Libellés de l'app (`studioStateLabel`). */
+export const RELEASE_STATE_LABEL: Record<ReleaseState, string> = {
+  draft: "Brouillon", rejected: "Refusée", pending: "En vérification", approved: "Validée", published: "En ligne", archived: "Retirée",
+};
+
 export type InstallHint = "ios" | "android" | null;
 /** « Plus tard » : l'invitation se tait 30 jours. */
 export const INSTALL_HINT_SNOOZE_MS = 30 * 24 * 3_600_000;

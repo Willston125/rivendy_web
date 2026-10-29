@@ -6,17 +6,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowDownAZ, Check, Clock, Heart, LayoutGrid, Library, List, LoaderCircle, Maximize2, Minimize2, PanelLeftClose, Pin,
-  Play, Plus, Rows3, Search, Smartphone, Volume2, X,
+  Play, Plus, Rows3, Search, Volume2, X,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
-import { PLAY_STORE_URL } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
 import { fetchArtistTopTracks, fetchLikedTracks, fetchPlaylist, fetchRelease } from "./music-api";
 import { IconTile, PlaylistCover } from "./music-collection";
 import { useMusicLayout, type LibraryView } from "./music-layout";
 import { useMusicLibrary } from "./music-library";
 import { inviteLogin } from "./music-login-invite";
+import { ArtistSpaceCard, ArtistSpaceIcon } from "./music-nav";
 import { filterLibrary, libraryKinds, sortLibrary, type LibraryEntry, type LibraryKind, type LibrarySort } from "./music-logic";
 import { loginHref } from "./music-pending";
 import { Cover, iconButton, toQueue } from "./music-ui";
@@ -81,6 +81,7 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
             </li>
           ))}
         </ul>
+        <ArtistSpaceIcon />
       </nav>
     );
   }
@@ -176,13 +177,11 @@ export function LibraryPanel({ variant = "panel" }: { variant?: "panel" | "page"
           </ul>
         )}
         {user && library.entries && all.length <= 2 && !query && !kind ? <Starter hasPlaylist={all.some((e) => e.kind === "playlist")} /> : null}
-        {!page && mode === "list" ? (
-          <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
-            className="mx-2 mt-4 flex items-center gap-2 rounded-md px-2 py-2 text-[13px] text-rvm-soft hover:text-rvm-text">
-            <Smartphone className="h-4 w-4 shrink-0" aria-hidden /> Vous êtes artiste ? Publiez depuis l’application Rivendy
-          </a>
-        ) : null}
+        {/* Téléphone : l'« Espace artiste » suit la liste (pas de colonne de gauche). */}
+        {page ? <ArtistSpaceCard variant="row" className="mx-1 mt-6" /> : null}
       </div>
+      {/* Panneau : la carte reste en bas, hors de la liste qui défile (lot 2, 2026-10-29). */}
+      {!page && mode === "list" ? <div className="shrink-0 px-2 pb-2 pt-1"><ArtistSpaceCard /></div> : null}
     </nav>
   );
 }
@@ -204,6 +203,7 @@ function VisitorRail({ busy }: { busy: boolean }) {
         className="flex h-10 w-10 items-center justify-center rounded-full bg-rvm-raised text-rvm-text hover:bg-white/15 disabled:opacity-40">
         <Plus className="h-5 w-5" aria-hidden />
       </button>
+      <ArtistSpaceIcon className="mt-auto" />
     </nav>
   );
 }

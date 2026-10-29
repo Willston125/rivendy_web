@@ -265,7 +265,32 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
   assert.deepEqual(headerTint([30, 30, 60]), [30, 30, 60]);
 });
 
-import { HOME_SHOWS, usefulRubrics, homeSpotlight, installHint, INSTALL_HINT_SNOOZE_MS } from "./music-logic.ts";
+import {
+  HOME_SHOWS, usefulRubrics, homeSpotlight, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
+} from "./music-logic.ts";
+
+test("navigation : Découvrir, Rechercher, Hit ; jamais ailleurs", () => {
+  assert.equal(musicNavActive("/music"), "discover");
+  assert.equal(musicNavActive("/music/"), "discover");
+  assert.equal(musicNavActive("/music/explore?q=afro"), "search");
+  assert.equal(musicNavActive("/music/search"), "search");
+  assert.equal(musicNavActive("/music/hit"), "hit");
+  assert.equal(musicNavActive("/music/album/abc"), null);
+  assert.equal(musicNavActive("/music/artiste"), null);
+  assert.equal(musicNavActive("/artist/abc"), null);
+});
+
+test("sorties d'un artiste : mêmes états et libellés que l'app", () => {
+  assert.equal(releaseState("published", "approved"), "published");
+  assert.equal(releaseState("archived", null), "archived");
+  assert.equal(releaseState("draft", "pending"), "pending");
+  assert.equal(releaseState("draft", "rejected"), "rejected");
+  assert.equal(releaseState("draft", "approved"), "approved");
+  assert.equal(releaseState("draft", null), "draft");
+  assert.equal(releaseState(null, undefined), "draft");
+  assert.equal(RELEASE_STATE_LABEL.pending, "En vérification");
+  assert.equal(RELEASE_STATE_LABEL.published, "En ligne");
+});
 
 test("accueil, petit catalogue : pas de raccourci vers une page qui répète l'accueil ou une page vide", () => {
   // Le catalogue d'aujourd'hui : 2 sorties, 2 titres au Hit, 1 artiste, aucun clip.

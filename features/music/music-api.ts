@@ -445,3 +445,37 @@ export async function fetchLibraryOverview(): Promise<LibraryOverview | null> {
     lastPlayedByArtist,
   };
 }
+
+// ── Espace artiste (lot 2, 2026-10-29) ─────────────────────────────────────
+
+export type MyMusicArtist = {
+  id: string; name: string; status: string; avatar_url: string | null; review_reason: string | null;
+  /** « Clips seulement » quand false (audit n° 18, U3) ; absent = Musique activée, comme l'app. */
+  music_enabled: boolean | null;
+};
+
+/** Profil artiste du compte, quel que soit son statut (null : pas encore artiste). */
+export async function fetchMyMusicArtist(userId: string): Promise<MyMusicArtist | null> {
+  const data = must(await supabase.from("play_artists")
+    .select("id, name, status, avatar_url, review_reason, music_enabled").eq("user_id", userId).maybeSingle());
+  return (data as MyMusicArtist | null) ?? null;
+}
+
+export type MyRelease = {
+  id: string; kind: string; title: string; cover_url: string | null; status: string | null;
+  review_status: string | null; review_reason: string | null; release_date: string | null;
+  published_at: string | null; created_at: string;
+};
+
+/**
+ * Mes sorties ENVOYÉES par l'artiste, brouillons compris : la lecture de
+ * l'app (`MusiqueStudioService.fetchMyReleases`) — la RLS ne rend que celles
+ * du compte. Les sorties publiées par Rivendy pour lui n'y figurent pas.
+ */
+export async function fetchMyReleases(artistId: string): Promise<MyRelease[]> {
+  const data = must(await supabase.from("music_releases")
+    .select("id, kind, title, cover_url, status, review_status, review_reason, release_date, published_at, created_at")
+    .eq("artist_id", artistId).not("submitted_by", "is", null)
+    .order("created_at", { ascending: false }).limit(100));
+  return (data ?? []) as MyRelease[];
+}

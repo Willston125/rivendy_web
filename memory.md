@@ -292,6 +292,25 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     en blanc), « MUSIQUE » visible aussi sur téléphone.
   - Restent hors lot : navigation gauche Découvrir / Rechercher / Hit / Play
     et carte « Espace artiste » (destination à choisir), puis l'app.
+- **Lot 2 : navigation et espace artiste (2026-10-29, branche `feat/musique-nav`)**
+  - `music-nav.tsx` : `MusicNav` au-dessus de « Ma bibliothèque » (la colonne
+    de gauche = deux panneaux), libellés en liste, icônes seules dans le rail
+    (visiteur, bibliothèque repliée) ; entrée active par `musicNavActive` ;
+    Rivendy Play sort de la Musique (flèche, jamais actif, `prefetch={false}`).
+    Le bouton maison de la barre du haut est retiré (« Découvrir » le remplace).
+  - Entrée « Espace artiste » : `ArtistSpaceCard` épinglée en bas de la
+    bibliothèque (texte court sous 860 px de haut), en ligne en bas de
+    /music/library sur téléphone ; `ArtistSpaceIcon` dans les rails. Remplace
+    l'ancien lien Play Store « Vous êtes artiste ? ». Même texte pour tous :
+    aucune lecture de plus à chaque page.
+  - Page `/music/artiste` (`music-artist-space.tsx`), jumelle de
+    /play/clips/artiste : état réel du compte (`play_artists`, avec
+    `music_enabled` = « clips seulement »), chemin EXACT de l'app (Musique →
+    Publier → « Devenir artiste » / « Mon espace artiste » / « Mon profil
+    artiste », libellés de `musique_publish_sheet.dart`), « Mes sorties » en
+    lecture seule = la lecture de l'app (`artist_id` + `submitted_by` non nul,
+    RLS du compte), états et libellés de `studioStateOf` (`releaseState`,
+    `RELEASE_STATE_LABEL`). Rien ne se publie sur le site.
 
 ## Refonte « salle de cinéma » de Rivendy Play du 2026-10-22 (branche `feat/play-cinema`)
 

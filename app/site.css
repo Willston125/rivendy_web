@@ -343,6 +343,18 @@ body {
       radial-gradient(70% 40% at 60% 0%, rgb(0 191 165 / 0.38), transparent 70%),
       var(--rvm-panel);
   }
+  /* Espace artiste (lot 2, 2026-10-29) : carte de la bibliothèque et en-tête
+     de la page — un vert de scène venu d'en haut à droite. */
+  .rvm-artist-card {
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgb(0 191 165 / 0.32), transparent 60%),
+      linear-gradient(160deg, #16323A, var(--rvm-panel));
+  }
+  .rvm-artist-header {
+    background:
+      radial-gradient(70% 140% at 85% 0%, rgb(0 191 165 / 0.28), transparent 60%),
+      linear-gradient(180deg, #123A3A 0%, var(--rvm-surface) 100%);
+  }
   /* Disque qui dépasse derrière la pochette (décor). */
   .rvm-vinyl {
     border-radius: 999px;

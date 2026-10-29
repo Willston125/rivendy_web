@@ -16,6 +16,7 @@ import { useSearchDraft } from "./music-ui";
 import {
   LIB_COLLAPSED, LIB_MAX, LIB_MIN, MusicLayoutProvider, RIGHT_MAX, RIGHT_MIN, useMusicLayout,
 } from "./music-layout";
+import { ARTIST_SPACE_PATH, MusicNav } from "./music-nav";
 import { NowPlayingPanel } from "./music-now-playing";
 import { MobileMiniPlayer, MusicPlayerBar } from "./player/mini-player";
 import { useMusicPlayer } from "./player/music-player-provider";
@@ -68,10 +69,14 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
     <div className={cn("rvm-scope flex h-dvh flex-col overflow-hidden bg-rvm-ground font-rvm-body text-rvm-text", fontClassName)}>
       <MusicTopBar />
       <div className="relative flex min-h-0 flex-1 md:gap-2 md:px-2">
-        <aside aria-label="Bibliothèque"
+        {/* Navigation (lot 2, 2026-10-29) au-dessus de la bibliothèque : deux panneaux, une seule colonne. */}
+        <aside aria-label="Navigation et bibliothèque"
           style={{ width: rail ? LIB_COLLAPSED : expanded ? undefined : layout.shownLib }}
-          className={cn("relative hidden min-h-0 shrink-0 overflow-hidden rounded-lg bg-rvm-surface md:block", expanded && "md:flex-1")}>
-          <LibraryPanel />
+          className={cn("relative hidden min-h-0 shrink-0 flex-col gap-2 md:flex", expanded && "md:flex-1")}>
+          <MusicNav compact={rail || layout.libMode === "collapsed"} />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-rvm-surface">
+            <LibraryPanel />
+          </div>
           {layout.libMode === "list" && !rail ? (
             <ResizeHandle label="Redimensionner la bibliothèque" side="right" value={layout.libWidth} min={LIB_MIN} max={LIB_MAX}
               onChange={layout.setLibWidth} />
@@ -173,7 +178,6 @@ function MusicTopBar() {
   const { unreadCount } = useNotifications();
   const homeHref = country?.id ? marketHomePath(country.id) : "/";
   const initial = (profile?.full_name || profile?.store_name || "R").trim().slice(0, 1).toUpperCase();
-  const onHome = pathname === "/music";
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 px-3 md:px-4">
@@ -189,12 +193,8 @@ function MusicTopBar() {
         </Link>
       </div>
 
+      {/* L'accueil est « Découvrir » dans la navigation de gauche (lot 2) : plus de bouton maison ici. */}
       <div className="mx-auto hidden w-full max-w-[560px] items-center gap-2 md:flex">
-        <Link href="/music" aria-label="Accueil Musique" aria-current={onHome ? "page" : undefined} title="Accueil"
-          className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-full bg-rvm-surface transition hover:scale-105 hover:bg-rvm-raised motion-reduce:hover:scale-100",
-            onHome ? "text-rvm-text" : "text-rvm-soft")}>
-          <House className={cn("h-6 w-6", onHome && "fill-current")} aria-hidden />
-        </Link>
         <Suspense fallback={<SearchBoxShell />}>
           <SearchBox />
         </Suspense>
@@ -285,7 +285,7 @@ function MobileNav() {
     { href: "/music", label: "Accueil", icon: House, active: pathname === "/music" },
     { href: "/music/explore", label: "Rechercher", icon: Search, active: pathname.startsWith("/music/explore") },
     { href: "/music/library", label: "Bibliothèque", icon: Library,
-      active: ["/music/library", "/music/playlist", "/music/favorites", "/music/history"].some((p) => pathname.startsWith(p)) },
+      active: ["/music/library", "/music/playlist", "/music/favorites", "/music/history", ARTIST_SPACE_PATH].some((p) => pathname.startsWith(p)) },
     { href: homeHref, label: "Marketplace", icon: Store, active: false },
   ];
   return (
