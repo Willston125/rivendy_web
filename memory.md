@@ -618,4 +618,23 @@ données, aux routes, au compte, à la lecture ni à Supabase.
   ajout et retrait — écritures interceptées, rien envoyé). Marketplace et Musique
   inchangées. `npm run check` OK (play 25/25).
 
-*Dernière mise à jour : 24 octobre 2026 (refonte « Emerald Cinema » de Play)*
+## Mini-lecteur vidéo de Play (2026-10-31, branche `fix/play-continuite`)
+
+- **Avant** : la vidéo vivait dans la page de lecture ; aller vers la marketplace ou la
+  Musique la coupait (source vidée), revenir la relançait de zéro. L'image dans l'image du
+  navigateur mourait avec la page.
+- **Maintenant** : `features/play/player/play-dock.tsx` — UNE lecture vidéo montée à la racine
+  (`app/providers.tsx`, comme la Musique), rendue par portail dans une « scène » DÉPLACÉE entre
+  la page (`<KeepVideo>`) et le mini-lecteur. Même balise, même hls.js, même comptage.
+  Films/épisodes (`WatchView` entier) et clips (`ClipPlayback`).
+- **Piège** : le déplacement doit être SYNCHRONE (effet de mise en page). Une `<video>` détachée
+  du document plus d'une tâche est mise en pause par le navigateur (mesuré : 50 ms suffisent).
+- **Règles** (= app) : quitter pendant la lecture → mini-lecteur ; en pause / finie / aperçu /
+  erreur → fermeture. Une seule vidéo à la fois. Croix = pause + tout libéré. Changement de
+  compte → fermeture. Fin d'épisode en mini : pas de changement de page.
+- **Piège corrigé** : `WatchView` dépendait de l'objet `user` (recréé par supabase-js au
+  rafraîchissement du jeton) → la lecture se redemandait et repartait. Dépendre de `user?.id`.
+- Vérifié en local (Chromium) : clips sans compte, films/épisodes avec un compte SIMULÉ
+  (écritures interceptées) — 1 seul manifeste chargé sur tout le parcours.
+
+*Dernière mise à jour : 31 octobre 2026 (mini-lecteur vidéo de Play)*
