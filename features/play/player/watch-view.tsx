@@ -18,6 +18,7 @@ import {
 } from "../play-logic";
 import { btnPrimary, btnSecondary, display } from "../play-theme";
 import { EmptyState, PlayPage, Spinner } from "../play-ui";
+import { useDockSession } from "./play-dock";
 import { VideoPlayer, type FatalReason } from "./video-player";
 
 /**
@@ -31,6 +32,11 @@ import { VideoPlayer, type FatalReason } from "./video-player";
  *   fin → derniers envois + playback_close (keepalive à la fermeture).
  * « Lecture réelle » : en lecture, son non coupé, vitesse ≤ 2×. Les seuils et
  * plafonds restent dans les fonctions serveur.
+ *
+ * Mini-lecteur (2026-10-31) : cette vue est montée à la racine du site par
+ * <KeepVideo> (play-dock) et AFFICHÉE dans la page de lecture ; quitter la
+ * page pendant la lecture la fait passer dans le mini-lecteur, où seule
+ * l'image reste (`mini`). Le comptage ci-dessous continue sans interruption.
  */
 
 export type WatchKind = "movie" | "episode" | "clip";
@@ -63,6 +69,15 @@ const STOP_MESSAGES: Record<string, string> = {
 export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; start: number | null }) {
   const router = useRouter();
   const { user, session, loading: authLoading } = useAuth();
+  // Le compte, pas l'objet : supabase-js en recrée un à chaque rafraîchissement
+  // du jeton (≈ 1 h) ou au retour sur l'onglet, ce qui redemandait la lecture
+  // et relançait le film à la dernière position enregistrée.
+  const userId = user?.id ?? null;
+  const { mini, report } = useDockSession();
+  const miniRef = useRef(mini);
+  useEffect(() => { miniRef.current = mini; }, [mini]);
+  // Point de départ lu à l'ouverture : revenir sur la page de la MÊME lecture ne relance rien.
+  const [startFrom] = useState(start);
   const [loaded, setLoaded] = useState<Loaded | null | undefined>(undefined);
   const [grant, setGrant] = useState<PlaybackGrant | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +128,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
   // 2. La lecture (droits vérifiés par le serveur), puis la position de reprise.
   useEffect(() => {
-    if (!loaded || !user) return;
+    if (!loaded || !userId) return;
     let alive = true;
     const titleId = loaded.title.id;
     const episodeId = loaded.episode?.id ?? null;
@@ -128,7 +143,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
       setError(null);
       let at = 0;
       if (resumeRef.current != null) at = resumeRef.current;
-      else if (start != null) at = Math.max(0, start);
+      else if (startFrom != null) at = Math.max(0, startFrom);
       else if (!res.grant.preview) {
         const p = progress.find((x) => x.title_id === titleId && (x.episode_id ?? null) === episodeId);
         if (p) at = resumeAt(p.position_seconds, p.duration_seconds);
@@ -156,7 +171,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
       setGrant(res.grant);
     })();
     return () => { alive = false; };
-  }, [loaded, user, start, attempt, takeOver, kind]);
+  }, [loaded, userId, startFrom, attempt, takeOver, kind]);
 
   // 3. Le comptage, branché sur l'élément vidéo.
   useEffect(() => {
@@ -276,7 +291,22 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
     : null;
   const goNext = useCallback(() => { if (next) router.push(`/play/watch/episode/${next.id}`); }, [next, router]);
 
+  // ── Ce que le mini-lecteur affiche et décide ─────────────────────────────
+  // Continue dans le mini-lecteur : film ou épisode accordé par le serveur.
+  // L'aperçu gratuit ne le suit pas (comme dans l'app) : il se ferme en quittant la page.
+  const floatable = !!grant && !grant.preview && !error && !stopped;
+  const problem = error ? playbackErrorMessage(error) : stopped;
+  const dockLabel = loaded?.title.title ?? "";
+  const dockDetail = loaded?.episode ? `S${loaded.episode.season} É${loaded.episode.episode_number}` : null;
+  useEffect(() => { report({ video: binding?.video ?? null }); }, [binding, report]);
+  useEffect(() => {
+    report({ floatable, problem, label: dockLabel, detail: dockDetail });
+  }, [report, floatable, problem, dockLabel, dockDetail]);
+
   // ── Écrans ───────────────────────────────────────────────────────────────
+
+  // Mini-lecteur : l'image seule ; erreurs et invitations restent celles de la page (« Agrandir »).
+  if (mini && (!loaded || authLoading || !user || error || !grant)) return null;
 
   const here = `/play/watch/${kind}/${id}`;
   if (loaded === null) {
@@ -344,11 +374,13 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
   const markers = episode ?? title;
   const duration = Number(episode?.duration_seconds ?? title.duration_seconds ?? 0);
 
+  // Page ou mini-lecteur : MÊME arbre (les blocs de la page deviennent vides),
+  // pour que le lecteur ne soit jamais remonté — donc jamais rechargé.
   return (
-    <PlayPage className="max-w-[1320px]">
-      {back}
-      <h1 className={`${display} mb-4 text-2xl text-rvp-text sm:text-3xl`}>{heading}</h1>
-      {grant.preview ? (
+    <PlayPage bare={mini} className={mini ? undefined : "max-w-[1320px]"}>
+      {mini ? null : back}
+      {mini ? null : <h1 className={`${display} mb-4 text-2xl text-rvp-text sm:text-3xl`}>{heading}</h1>}
+      {!mini && grant.preview ? (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-rvp-premium/30 bg-rvp-premium/10 px-4 py-3 text-sm text-rvp-soft">
           <Lock className="h-4 w-4 shrink-0 text-rvp-premium" aria-hidden />
           <span className="flex-1">
@@ -357,7 +389,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
           <Link href="/plus" className="font-bold text-rvp-premium underline underline-offset-4">Découvrir Rivendy+</Link>
         </div>
       ) : null}
-      {stopped ? (
+      {!mini && stopped ? (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           <span className="flex-1">{stopped}</span>
           <button type="button" onClick={() => { resumeRef.current = binding ? Math.floor(binding.video.currentTime) : null; setTakeOver(true); setAttempt((n) => n + 1); }}
@@ -373,21 +405,24 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
         vertical={false}
         intro={kind === "clip" ? null : { start: markers.intro_start_s, end: markers.intro_end_s }}
         upNext={next ? { at: upNextAt(markers.credits_start_s, duration || Number.MAX_SAFE_INTEGER), label: "Épisode suivant", onGo: goNext } : null}
+        mini={mini}
         onVideo={onVideo}
-        onEnded={() => { setEnded(true); if (next && !grant.preview) goNext(); }}
+        // Dans le mini-lecteur, la fin d'un épisode ne fait pas changer de page :
+        // l'épisode suivant se lance en agrandissant.
+        onEnded={() => { setEnded(true); if (next && !grant.preview && !miniRef.current) goNext(); }}
         onFatal={onFatal}
       />
-      {ended && grant.preview ? (
+      {!mini && ended && grant.preview ? (
         <Notice title="Fin de l’aperçu" text="Regardez la suite avec Rivendy+, sur le site et dans l’application, avec le même compte.">
           <Link href="/plus" className={btnPrimary}>Découvrir Rivendy+</Link>
         </Notice>
       ) : null}
-      {isArtistClip(title) && title.artist ? (
+      {!mini && isArtistClip(title) && title.artist ? (
         <p className="mt-4 text-sm text-rvp-soft">
           Clip de <Link href={`/artist/${title.artist_id}`} className="font-bold text-rvp-accent underline-offset-4 hover:underline">{title.artist}</Link>
         </p>
       ) : null}
-      {(episode?.synopsis || title.synopsis) ? (
+      {!mini && (episode?.synopsis || title.synopsis) ? (
         <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-7 text-rvp-soft">{episode?.synopsis || title.synopsis}</p>
       ) : null}
     </PlayPage>

@@ -62,7 +62,7 @@ async function nativeSource(src: string, q: QualityId): Promise<string> {
 
 export function VideoPlayer({
   src, poster, startAt = 0, subtitles = [], intro, upNext, autoPlay = true, vertical = false,
-  overlays = false, speedControl = true, endOverlay, title,
+  overlays = false, speedControl = true, endOverlay, title, mini = false, frameClassName,
   onVideo, onEnded, onFatal,
 }: {
   src: string;
@@ -88,6 +88,14 @@ export function VideoPlayer({
   endOverlay?: React.ReactNode;
   /** Nom de la vidéo pour les lecteurs d'écran. */
   title?: string;
+  /**
+   * Dans le mini-lecteur (play-dock, 2026-10-31) : l'image seule — les
+   * commandes sont celles du mini-lecteur. La balise vidéo reste la même :
+   * passer d'un affichage à l'autre ne recharge rien.
+   */
+  mini?: boolean;
+  /** Classes ajoutées au cadre du lecteur (coins sur téléphone…). */
+  frameClassName?: string;
   /** L'élément vidéo, une fois prêt (le comptage s'y abonne). */
   onVideo?: (v: HTMLVideoElement | null) => void;
   onEnded?: () => void;
@@ -243,7 +251,7 @@ export function VideoPlayer({
   };
   const onKey = (e: React.KeyboardEvent) => {
     const v = videoRef.current;
-    if (!v || (e.target as HTMLElement).tagName === "SELECT") return;
+    if (!v || mini || (e.target as HTMLElement).tagName === "SELECT") return;
     const k = e.key.toLowerCase();
     if (k === " " || k === "k") { e.preventDefault(); if (v.paused) void v.play().catch(() => undefined); else v.pause(); }
     else if (k === "f") { e.preventDefault(); toggleFullscreen(); }
@@ -252,16 +260,18 @@ export function VideoPlayer({
     else if (k === "arrowleft") { e.preventDefault(); v.currentTime = Math.max(0, v.currentTime - 10); }
   };
 
-  const skipIntro = intro ? showSkipIntro(now, intro.start, intro.end) : false;
-  const showNext = !!upNext && now > 0 && now >= upNext.at;
+  const skipIntro = !mini && intro ? showSkipIntro(now, intro.start, intro.end) : false;
+  const showNext = !mini && !!upNext && now > 0 && now >= upNext.at;
+  // Mini-lecteur : ni commandes de la page, ni messages posés sur l'image (le mini-lecteur a les siens).
+  const layers = overlays && !mini;
 
   return (
-    <div ref={wrapRef} tabIndex={0} onKeyDown={onKey}
-      className={cn("flex flex-col overflow-hidden bg-black outline-none", fullscreen ? "h-screen w-screen" : "rounded-2xl")}>
+    <div ref={wrapRef} tabIndex={mini ? -1 : 0} onKeyDown={onKey}
+      className={cn("flex flex-col overflow-hidden bg-black outline-none", fullscreen ? "h-screen w-screen" : !mini && "rounded-2xl", !mini && frameClassName)}>
       <div className={cn("relative bg-black", fullscreen ? "min-h-0 flex-1" : vertical ? "mx-auto aspect-[9/16] w-full max-w-sm" : "aspect-video w-full")}>
-        <video ref={videoRef} controls playsInline crossOrigin="anonymous" controlsList="nodownload nofullscreen"
+        <video ref={videoRef} controls={!mini} playsInline crossOrigin="anonymous" controlsList="nodownload nofullscreen"
           disablePictureInPicture={!pipOk} poster={poster ?? undefined} aria-label={title}
-          onDoubleClick={toggleFullscreen} onContextMenu={(e) => e.preventDefault()}
+          onDoubleClick={mini ? undefined : toggleFullscreen} onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 h-full w-full bg-black object-contain">
           {subtitles.map((s) => (
             <track key={s.url} kind="subtitles" src={s.url} srcLang={s.lang} label={s.lang.toUpperCase()} />
@@ -279,7 +289,7 @@ export function VideoPlayer({
             <SkipForward className="h-4 w-4" /> {upNext.label}
           </button>
         ) : null}
-        {overlays && blocked ? (
+        {layers && blocked ? (
           // Le navigateur exige un geste : la commande est DANS le lecteur, jamais une autre page.
           <div className="absolute inset-0 grid place-items-center bg-black/45">
             <button type="button"
@@ -291,7 +301,7 @@ export function VideoPlayer({
               <span className="text-[15px] font-semibold drop-shadow">Lancer la lecture</span>
             </button>
           </div>
-        ) : overlays && !ended && (!started || buffering) ? (
+        ) : layers && !ended && (!started || buffering) ? (
           <div role="status" className="pointer-events-none absolute inset-0 grid place-items-center">
             <span className="flex flex-col items-center gap-3 text-white">
               <Loader2 className="h-11 w-11 animate-spin text-rvp-accent motion-reduce:animate-none" aria-hidden />
@@ -299,9 +309,9 @@ export function VideoPlayer({
             </span>
           </div>
         ) : null}
-        {overlays && ended && endOverlay ? <div className="absolute inset-0">{endOverlay}</div> : null}
+        {layers && ended && endOverlay ? <div className="absolute inset-0">{endOverlay}</div> : null}
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-rvp-surface px-3 py-2 text-xs text-rvp-soft">
+      {mini ? null : <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-rvp-surface px-3 py-2 text-xs text-rvp-soft">
         {/* Clips : la qualité seulement si la source en propose plusieurs (HLS natif : inconnu, gardée). */}
         {!overlays || levels == null || levels > 1 ? (
           <label className="flex items-center gap-1">
@@ -331,7 +341,7 @@ export function VideoPlayer({
         <button type="button" onClick={toggleFullscreen} className="flex h-10 w-10 items-center justify-center rounded-lg text-rvp-text hover:bg-white/10" aria-label={fullscreen ? "Quitter le plein écran" : "Plein écran"}>
           {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

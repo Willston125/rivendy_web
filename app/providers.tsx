@@ -12,6 +12,7 @@ import { DialogsProvider } from "@/features/ui/dialogs";
 import { MusicPlayerProvider } from "@/features/music/player/music-player-provider";
 import { MiniPlayer } from "@/features/music/player/mini-player";
 import { MusicLibraryProvider } from "@/features/music/music-library";
+import { PlayDockProvider } from "@/features/play/player/play-dock";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -33,8 +34,12 @@ export function Providers({ children }: { children: ReactNode }) {
               {/* Favoris, playlists et partage du compte, communs aux pages
                   Musique et au lecteur (refonte du 2026-10-22). */}
               <MusicLibraryProvider>
-                {children}
-                <MiniPlayer />
+                {/* Rivendy Play (2026-10-31) : la lecture vidéo en cours, montée ici
+                    elle aussi — elle continue dans le mini-lecteur hors de sa page. */}
+                <PlayDockProvider>
+                  {children}
+                  <MiniPlayer />
+                </PlayDockProvider>
               </MusicLibraryProvider>
             </MusicPlayerProvider>
           </CartProvider>

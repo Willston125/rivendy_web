@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
+import { KeepVideo } from "@/features/play/player/play-dock";
 import { WatchView, type WatchKind } from "@/features/play/player/watch-view";
 import { UUID_RE } from "@/features/play/server/play-server";
 
@@ -17,5 +18,12 @@ export default async function PlayWatchPage({ params, searchParams }: Props) {
   // Clips (refonte du 2026-10-26) : l'écran du clip lit lui-même la vidéo ; les anciens liens y mènent.
   if (kind === "clip") permanentRedirect(`/play/clip/${id.toLowerCase()}`);
   const s = start != null && /^\d{1,6}$/.test(start) ? Number(start) : null;
-  return <WatchView key={`${kind}:${id}`} kind={kind as WatchKind} id={id.toLowerCase()} start={s} />;
+  const lid = id.toLowerCase();
+  // La lecture vit à la racine du site (mini-lecteur, 2026-10-31) : elle continue
+  // en quittant cette page, et la retrouver ici ne la relance pas.
+  return (
+    <KeepVideo sessionKey={`${kind}:${lid}`} href={`/play/watch/${kind}/${lid}`}>
+      <WatchView kind={kind as WatchKind} id={lid} start={s} />
+    </KeepVideo>
+  );
 }

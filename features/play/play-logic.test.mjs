@@ -374,3 +374,40 @@ test("scène : le fond paysage plein cadre, sinon l'affiche ; jamais une adresse
   assert.deepEqual(sceneArt({ kind: "film", poster_url: null, thumbnail_url: back }), { src: null, wide: false });
   assert.deepEqual(sceneArt({ kind: "film", poster_url: "http://non-sur/a.jpg" }), { src: null, wide: false });
 });
+
+// ── Mini-lecteur vidéo (2026-10-31) ──────────────────────────────────────────
+import { shouldFloat, settleDock, clampDock, dockClock } from "./player/dock-logic.ts";
+
+test("mini-lecteur : seule une lecture EN COURS suit l'utilisateur hors de la page", () => {
+  assert.equal(shouldFloat(true, { paused: false, ended: false }), true);
+  assert.equal(shouldFloat(true, { paused: true, ended: false }), false, "en pause : la lecture se ferme");
+  assert.equal(shouldFloat(true, { paused: false, ended: true }), false, "finie : la lecture se ferme");
+  assert.equal(shouldFloat(false, { paused: false, ended: false }), false, "aperçu, erreur : pas de mini-lecteur");
+  assert.equal(shouldFloat(true, null), false, "pas encore de vidéo");
+});
+
+test("mini-lecteur : un déplacement le colle au bord le plus proche, toujours visible", () => {
+  const size = { w: 272, h: 200 };
+  const view = { w: 390, h: 844 };
+  const limits = { top: 56, bottom: 8 };
+  assert.deepEqual(settleDock({ x: 100, y: 400 }, size, view, limits), { side: "left", bottom: 344 });
+  assert.deepEqual(settleDock({ x: 300, y: 400 }, size, view, limits), { side: "right", bottom: 344 });
+  // Lâché trop bas : jamais sous la marge basse ; trop haut : jamais sous les barres du haut.
+  assert.equal(settleDock({ x: 300, y: 900 }, size, view, limits).bottom, 8);
+  assert.equal(settleDock({ x: 300, y: -50 }, size, view, limits).bottom, 844 - 56 - 200);
+});
+
+test("mini-lecteur : rotation ou fenêtre réduite, la position gardée reste dans l'écran", () => {
+  const spot = { side: "right", bottom: 500 };
+  const size = { w: 272, h: 200 };
+  const limits = { top: 56, bottom: 8 };
+  assert.deepEqual(clampDock(spot, size, { w: 844, h: 390 }, limits), { side: "right", bottom: 390 - 56 - 200 });
+  assert.equal(clampDock(spot, size, { w: 390, h: 844 }, limits), spot, "inchangée : même objet (pas de rendu inutile)");
+});
+
+test("mini-lecteur : temps affiché", () => {
+  assert.equal(dockClock(0), "0:00");
+  assert.equal(dockClock(65.9), "1:05");
+  assert.equal(dockClock(3723), "1:02:03");
+  assert.equal(dockClock(Number.NaN), "0:00");
+});

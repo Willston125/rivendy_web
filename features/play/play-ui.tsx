@@ -24,8 +24,12 @@ import { btnSecondary, display, eyebrow, motion } from "./play-theme";
  * (`@container`) : grilles et rangées se règlent sur la largeur RÉELLE du
  * panneau (le menu latéral la réduit), pas sur celle de la fenêtre.
  */
-export function PlayPage({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("@container mx-auto w-full max-w-[1480px] px-4 pb-6 pt-4 sm:px-6 md:pt-2 xl:px-8", className)}>{children}</div>;
+export function PlayPage({ children, className, bare = false }: {
+  children: ReactNode; className?: string;
+  /** Sans largeur ni marges (lecture affichée dans le mini-lecteur) : même élément, rien n'est remonté. */
+  bare?: boolean;
+}) {
+  return <div className={bare ? className : cn("@container mx-auto w-full max-w-[1480px] px-4 pb-6 pt-4 sm:px-6 md:pt-2 xl:px-8", className)}>{children}</div>;
 }
 
 /** En-tête d'une page (Films, Séries, Clips, Ma liste…) : « RIVENDY PLAY », grand titre, présentation. */

@@ -13,6 +13,7 @@ import { inTerritory, playImage, playbackErrorMessage, publicManifest, type Play
 import { usePlayList } from "../play-list";
 import { btnPrimary, btnSecondary, display, motion } from "../play-theme";
 import { EmptyState } from "../play-ui";
+import { KeepVideo, useDockSession } from "../player/play-dock";
 import { VideoPlayer, type FatalReason } from "../player/video-player";
 import { ClipComments } from "./clip-comments";
 import { useClipViewTracking } from "./clip-tracking";
@@ -156,48 +157,9 @@ export function ClipWatchView({ initial }: { initial: Clip }) {
     }
   };
 
-  // ── Source de la vidéo ───────────────────────────────────────────────────
-  const [source, setSource] = useState<Source>({ kind: "loading" });
-  const [attempt, setAttempt] = useState(0);
-  const refreshes = useRef(0);
+  // ── Lecteur (ClipPlayback, monté à la racine du site) ────────────────────
   const artistClip = !!clip.artist_id;
-  const publicUid = clip.public_video_uid ?? null;
   const allowed = artistClip || !market || inTerritory(clip.play_title_countries, market);
-  const videoReady = clip.video_status === "ready";
-
-  useEffect(() => {
-    if (!videoReady) { setSource({ kind: "error", code: "video_not_ready" }); return; }
-    if (!allowed) { setSource({ kind: "error", code: "not_in_territory" }); return; }
-    // Clip d'artiste : vidéo publique, aucun jeton, aucun compte demandé.
-    if (publicUid) { setSource({ kind: "ready", url: publicManifest(publicUid), sessionId: null }); return; }
-    if (authLoading) { setSource({ kind: "loading" }); return; }
-    if (!userId) { setSource({ kind: "login" }); return; }
-    let alive = true;
-    setSource({ kind: "loading" });
-    void fetchPlayback(clip.id, null, deviceId()).then((res) => {
-      if (!alive) return;
-      setSource(res.ok ? { kind: "ready", url: res.grant.hls_url, sessionId: res.grant.playback_session_id } : { kind: "error", code: res.error });
-    });
-    return () => { alive = false; };
-  }, [clip.id, publicUid, videoReady, allowed, authLoading, userId, attempt]);
-
-  const onFatal = useCallback((reason: FatalReason) => {
-    // Jeton échu (clip de Rivendy) : une nouvelle demande, deux fois au plus.
-    if (reason === "auth" && !publicUid && refreshes.current < 2) { refreshes.current += 1; setAttempt((n) => n + 1); return; }
-    setSource({ kind: "error", code: reason === "network" ? "network" : "media" });
-  }, [publicUid]);
-  const retry = () => { refreshes.current = 0; setAttempt((n) => n + 1); };
-
-  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const onVideo = useCallback((v: HTMLVideoElement | null) => { videoRef.current = v; setVideo(v); }, []);
-  const replay = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = 0;
-    void v.play().catch(() => undefined);
-  }, []);
-  useClipViewTracking(video, clip.id, source.kind === "ready" ? source.sessionId : null);
 
   // ── À suivre ─────────────────────────────────────────────────────────────
   const suggestions = useMemo(() => (ready ? clipSuggestions(clip, ready.clips, 12) : []), [ready, clip]);
@@ -229,45 +191,11 @@ export function ClipWatchView({ initial }: { initial: Clip }) {
     <ClipsPage className="max-w-[1720px] max-sm:pt-0">
       <div className="grid gap-x-8 gap-y-6 @min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
         <div className="min-w-0">
-          <div className="max-sm:-mx-4 max-sm:[&>div]:rounded-none">
-            {source.kind === "ready" ? (
-              <VideoPlayer
-                key={`${clip.id}:${attempt}:${source.url}`}
-                src={source.url}
-                poster={poster}
-                title={`${clip.title} — ${name}`}
-                overlays
-                speedControl={false}
-                onVideo={onVideo}
-                onFatal={onFatal}
-                onEnded={() => undefined}
-                endOverlay={<EndCard next={next} auto={autoNext} onReplay={replay} />}
-              />
-            ) : (
-              <PlayerFrame poster={poster}>
-                {source.kind === "loading" ? (
-                  <span role="status" className="flex flex-col items-center gap-3 text-white">
-                    <Loader2 className="h-11 w-11 animate-spin text-rvp-accent motion-reduce:animate-none" aria-hidden />
-                    <span className="rounded-md bg-black/55 px-2 py-0.5 text-[13px] font-semibold">Préparation du clip…</span>
-                  </span>
-                ) : source.kind === "login" ? (
-                  <PlayerMessage title="Connectez-vous pour regarder ce clip"
-                    text="Ce clip de Rivendy demande un compte (gratuit). Vous revenez ici juste après.">
-                    <Link href={`/auth/login?next=${encodeURIComponent(pathname)}`} prefetch={false} className={btnPrimary}>
-                      <LogIn className="h-[18px] w-[18px]" aria-hidden /> Se connecter
-                    </Link>
-                  </PlayerMessage>
-                ) : (
-                  <PlayerMessage title={source.code === "not_in_territory" ? "Indisponible dans votre pays" : "Lecture impossible"}
-                    text={playbackErrorMessage(source.code).replace("Ce titre", "Ce clip")}>
-                    {["network", "media", "bad_response", "too_many_requests", "internal", "signing_unavailable", "unknown"].includes(source.code) ? (
-                      <button type="button" onClick={retry} className={btnSecondary}><RotateCcw className="h-4 w-4" aria-hidden /> Réessayer</button>
-                    ) : null}
-                  </PlayerMessage>
-                )}
-              </PlayerFrame>
-            )}
-          </div>
+          {/* La lecture vit à la racine du site (mini-lecteur, 2026-10-31) : elle continue
+              en quittant cette page, et la retrouver ici ne la relance pas. */}
+          <KeepVideo sessionKey={`clip:${clip.id}`} href={clipPath(clip.id)} className="max-sm:-mx-4">
+            <ClipPlayback clip={clip} allowed={allowed} poster={poster} name={name} next={next} autoNext={autoNext} />
+          </KeepVideo>
 
           <h1 className={cn(display, "mt-4 text-[22px] leading-tight text-rvp-text sm:text-[26px]")}>{clip.title}</h1>
 
@@ -351,10 +279,117 @@ export function ClipWatchView({ initial }: { initial: Clip }) {
   );
 }
 
-/** Cadre du lecteur avant la vidéo (chargement, connexion, refus) : même place, mêmes proportions. */
-function PlayerFrame({ poster, children }: { poster: string | null; children: React.ReactNode }) {
+/**
+ * Le lecteur du clip et son comptage (mini-lecteur, 2026-10-31) : rendu à la
+ * racine du site par <KeepVideo>, il continue dans le mini-lecteur quand on
+ * quitte la page pendant la lecture. Le reste de l'écran (artiste, J'aime,
+ * commentaires, À suivre) reste dans la page.
+ */
+function ClipPlayback({ clip, allowed, poster, name, next, autoNext }: {
+  clip: Clip; allowed: boolean; poster: string | null; name: string; next: PlayTitle | null; autoNext: boolean;
+}) {
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
+  const { mini, report } = useDockSession();
+
+  // ── Source de la vidéo ───────────────────────────────────────────────────
+  const [source, setSource] = useState<Source>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  const refreshes = useRef(0);
+  const publicUid = clip.public_video_uid ?? null;
+  const videoReady = clip.video_status === "ready";
+
+  useEffect(() => {
+    if (!videoReady) { setSource({ kind: "error", code: "video_not_ready" }); return; }
+    if (!allowed) { setSource({ kind: "error", code: "not_in_territory" }); return; }
+    // Clip d'artiste : vidéo publique, aucun jeton, aucun compte demandé.
+    if (publicUid) { setSource({ kind: "ready", url: publicManifest(publicUid), sessionId: null }); return; }
+    if (authLoading) { setSource({ kind: "loading" }); return; }
+    if (!userId) { setSource({ kind: "login" }); return; }
+    let alive = true;
+    setSource({ kind: "loading" });
+    void fetchPlayback(clip.id, null, deviceId()).then((res) => {
+      if (!alive) return;
+      setSource(res.ok ? { kind: "ready", url: res.grant.hls_url, sessionId: res.grant.playback_session_id } : { kind: "error", code: res.error });
+    });
+    return () => { alive = false; };
+  }, [clip.id, publicUid, videoReady, allowed, authLoading, userId, attempt]);
+
+  const onFatal = useCallback((reason: FatalReason) => {
+    // Jeton échu (clip de Rivendy) : une nouvelle demande, deux fois au plus.
+    if (reason === "auth" && !publicUid && refreshes.current < 2) { refreshes.current += 1; setAttempt((n) => n + 1); return; }
+    setSource({ kind: "error", code: reason === "network" ? "network" : "media" });
+  }, [publicUid]);
+  const retry = () => { refreshes.current = 0; setAttempt((n) => n + 1); };
+
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const onVideo = useCallback((v: HTMLVideoElement | null) => { videoRef.current = v; setVideo(v); }, []);
+  const replay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    void v.play().catch(() => undefined);
+  }, []);
+  useClipViewTracking(video, clip.id, source.kind === "ready" ? source.sessionId : null);
+
+  // ── Mini-lecteur : ce qu'il affiche, et s'il peut prendre le relais ──────
+  const ready = source.kind === "ready";
+  const problem = source.kind === "error" ? playbackErrorMessage(source.code).replace("Ce titre", "Ce clip") : null;
+  useEffect(() => { report({ video }); }, [report, video]);
+  useEffect(() => { report({ floatable: ready, problem, label: clip.title, detail: name }); }, [report, ready, problem, clip.title, name]);
+
+  if (ready) {
+    return (
+      <VideoPlayer
+        key={`${clip.id}:${attempt}:${source.url}`}
+        src={source.url}
+        poster={poster}
+        title={`${clip.title} — ${name}`}
+        overlays
+        speedControl={false}
+        mini={mini}
+        frameClassName="max-sm:rounded-none"
+        onVideo={onVideo}
+        onFatal={onFatal}
+        onEnded={() => undefined}
+        endOverlay={<EndCard next={next} auto={autoNext} onReplay={replay} />}
+      />
+    );
+  }
+  // Mini-lecteur : l'image seule ; les messages (connexion, refus) restent ceux de la page.
+  if (mini) return null;
+  const here = clipPath(clip.id);
   return (
-    <div className="relative grid aspect-video w-full place-items-center overflow-hidden rounded-2xl bg-black">
+    <PlayerFrame poster={poster} className="max-sm:rounded-none">
+      {source.kind === "loading" ? (
+        <span role="status" className="flex flex-col items-center gap-3 text-white">
+          <Loader2 className="h-11 w-11 animate-spin text-rvp-accent motion-reduce:animate-none" aria-hidden />
+          <span className="rounded-md bg-black/55 px-2 py-0.5 text-[13px] font-semibold">Préparation du clip…</span>
+        </span>
+      ) : source.kind === "login" ? (
+        <PlayerMessage title="Connectez-vous pour regarder ce clip"
+          text="Ce clip de Rivendy demande un compte (gratuit). Vous revenez ici juste après.">
+          <Link href={`/auth/login?next=${encodeURIComponent(here)}`} prefetch={false} className={btnPrimary}>
+            <LogIn className="h-[18px] w-[18px]" aria-hidden /> Se connecter
+          </Link>
+        </PlayerMessage>
+      ) : (
+        <PlayerMessage title={source.code === "not_in_territory" ? "Indisponible dans votre pays" : "Lecture impossible"}
+          text={problem ?? ""}>
+          {["network", "media", "bad_response", "too_many_requests", "internal", "signing_unavailable", "unknown"].includes(source.code) ? (
+            <button type="button" onClick={retry} className={btnSecondary}><RotateCcw className="h-4 w-4" aria-hidden /> Réessayer</button>
+          ) : null}
+        </PlayerMessage>
+      )}
+    </PlayerFrame>
+  );
+}
+
+/** Cadre du lecteur avant la vidéo (chargement, connexion, refus) : même place, mêmes proportions. */
+function PlayerFrame({ poster, className, children }: { poster: string | null; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("relative grid aspect-video w-full place-items-center overflow-hidden rounded-2xl bg-black", className)}>
       {poster ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35 blur-sm" />
