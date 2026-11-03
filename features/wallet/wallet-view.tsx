@@ -1,15 +1,17 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
   CheckCircle,
   Clock,
   Loader2,
+  Lock,
   MessageCircle,
   Package,
   Receipt,
+  Unlock,
   Wallet,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
@@ -19,6 +21,16 @@ import { formatMoney } from "@/lib/utils/format";
 import { minWithdrawalFor } from "@/lib/utils/seller-offer-prices";
 import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import type { AppOrder, Country } from "@/types/rivendy";
+import {
+  PENDING_PAYOUT_STATUSES,
+  availableFor,
+  isCreditType,
+  pendingByMarket,
+  splitWalletLines,
+  toWalletLines,
+  type WalletLine,
+} from "./wallet-markets";
+import { WithdrawDialog } from "./withdraw-dialog";
 
 /** Libellés lisibles des types de mouvement (le code technique s'affichait tel quel). */
 const TX_TYPE_LABELS: Record<string, string> = {
@@ -28,14 +40,12 @@ const TX_TYPE_LABELS: Record<string, string> = {
   payout: "Retrait",
   withdrawal: "Retrait",
   refund: "Remboursement",
+  refund_credit: "Remboursement",
   adjustment: "Ajustement",
   commission: "Commission",
+  commission_debit: "Commission",
+  bonus: "Bonus",
 };
-
-/** Demandes de retrait encore en cours (mêmes statuts que l'app). */
-const PENDING_PAYOUT_STATUSES = ["pending_director", "approved_director", "pending_ceo", "approved_ceo"];
-
-type WalletRow = { balance: number | string | null; currency: string | null; country_id: string | null };
 
 const MONTHS = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
 function formatDate(iso: string) {
@@ -54,17 +64,26 @@ interface WalletTransaction {
   created_at: string;
 }
 
+/**
+ * Mes Gains — UN portefeuille, UN SOLDE PAR MARCHÉ (audit des paramètres,
+ * D-05, maquette validée le 2026-11-03).
+ *
+ * Une vente crédite la ligne `wallets` du marché de la commande, dans sa
+ * monnaie. La ligne du pays du compte garde la carte en dégradé ; les autres
+ * marchés suivent, chacun avec son solde, son minimum et son « Retirer ».
+ * Rivendy paie un retrait depuis son compte de ce marché, dans sa monnaie :
+ * on n'additionne jamais deux lignes.
+ */
 export function WalletView() {
   const { user, profile } = useAuth();
   const country = useCountryOrDefault();
   const { countries } = useCountry();
   const [orders, setOrders] = useState<AppOrder[]>([]);
-  const [wallet, setWallet] = useState<WalletRow | null>(null);
-  const [pendingPayouts, setPendingPayouts] = useState<number>(0);
-  const withdrawingRef = useRef(false);
+  const [lines, setLines] = useState<WalletLine[]>([]);
+  const [pending, setPending] = useState<Map<string, number>>(new Map());
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawLine, setWithdrawLine] = useState<WalletLine | null>(null);
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
@@ -84,29 +103,22 @@ export function WalletView() {
         }) as AppOrder),
       );
 
-      // 2. Portefeuille : solde, DEVISE et PAYS. Un portefeuille par vendeur,
-      //    sa devise est figée au premier crédit — c'est elle qui fait foi pour
-      //    un retrait, jamais le marché affiché à l'écran.
+      // 2. Portefeuille : UNE LIGNE PAR MARCHÉ (D-05). Plus de maybeSingle() :
+      //    avec deux lignes, il renvoyait une erreur ignorée et le solde
+      //    s'affichait à 0.
       const { data: walletData } = await supabase
         .from("wallets")
-        .select("balance, currency, country_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setWallet((walletData as WalletRow | null) ?? null);
+        .select("id, balance, currency, country_id")
+        .eq("user_id", user.id);
+      setLines(toWalletLines(walletData as Array<Record<string, unknown>> | null));
 
-      // 2 bis. Retraits déjà demandés et pas encore versés (comme l'app,
-      //    WalletService.getPendingPayoutRequests).
+      // 2 bis. Retraits déjà demandés et pas encore versés, PAR MARCHÉ.
       const { data: payoutRows } = await supabase
         .from("payout_requests")
-        .select("amount, status")
+        .select("amount, country_id")
         .eq("seller_id", user.id)
         .in("status", PENDING_PAYOUT_STATUSES);
-      setPendingPayouts(
-        ((payoutRows ?? []) as Array<{ amount: number | string | null }>).reduce(
-          (sum, p) => sum + Number(p.amount ?? 0),
-          0,
-        ),
-      );
+      setPending(pendingByMarket(payoutRows as Array<{ amount: unknown; country_id: unknown }> | null));
 
       // 3. Charger l'historique des transactions financières
       const { data: txData } = await supabase
@@ -129,91 +141,43 @@ export function WalletView() {
   // ── Calculs ────────────────────────────────────────────────
   // L'état livré vit dans `status` (delivered / delivered_by_rider /
   // delivered_confirmed / completed) — même convention que seller-dashboard.
-  // `payment_status` ne prend que pending_cash/paid au checkout : l'ancien
-  // filtre `payment_status === "delivered"` comptait toujours 0.
   const DELIVERED_STATUSES = ["completed", "delivered", "delivered_by_rider", "delivered_confirmed"];
-  // Commandes en cours (non livrées, non annulées) — compteur seulement :
-  // payment_status n'est jamais remis à jour au versement, il ne dit pas
-  // si l'argent est encore « en attente ».
   const pendingOrders = orders.filter(
     (o) => !DELIVERED_STATUSES.includes(o.status) && o.status !== "cancelled" && o.status !== "disputed",
   );
   const deliveredOrders = orders.filter((o) => DELIVERED_STATUSES.includes(o.status));
 
-  // Pays et devise DU PORTEFEUILLE (repli : marché affiché, si aucun portefeuille).
-  const walletCountry: Country | null =
-    (wallet?.country_id && countries.find((c) => c.id === wallet.country_id)) || null;
-  const money = walletCountry
-    ?? (wallet?.currency ? { currency_symbol: wallet.currency, currency_code: wallet.currency } : country);
-  const walletCountryId = wallet?.country_id ?? null;
+  const marketOf = (id: string | null): Country | null => (id && countries.find((c) => c.id === id)) || null;
+  const nameOf = (id: string) => marketOf(id)?.name ?? id;
+  const { main, others } = splitWalletLines(lines, profile?.country_id, nameOf);
+  const lineById = new Map(lines.map((l) => [l.id, l]));
+  // Monnaie d'une ligne : celle de son marché (repli : sa devise, puis le marché affiché).
+  const moneyOf = (line: WalletLine | null | undefined) =>
+    marketOf(line?.country_id ?? null)
+      ?? (line?.currency ? { currency_symbol: line.currency, currency_code: line.currency } : country);
 
-  const confirmedEarnings = Number(wallet?.balance ?? 0);
-  // « En attente » = retraits demandés et pas encore versés, comme l'app.
-  const pendingEarnings = pendingPayouts;
-  // Disponible = solde moins ce qui est déjà demandé : redemander le même
-  // argent créait une seconde demande pour les mêmes fonds.
-  const availableToWithdraw = Math.max(0, confirmedEarnings - pendingPayouts);
-
-  // Seuil : 5 000 KMF aux Comores, 2 000 ailleurs (décision du 2026-08-11),
-  // selon le pays DU PORTEFEUILLE.
-  // ~10 € dans la devise du portefeuille (DV-1, 2026-10-08) — miroir app + serveur.
-  // Sans portefeuille encore (aucune vente versée), le minimum se lit sur le
-  // marché actif : il s'affichait « Retrait à partir de 0 FDJ ».
-  const MIN_WITHDRAW = minWithdrawalFor(walletCountryId ?? country?.id);
-  const canWithdraw = !!wallet && !!walletCountryId && availableToWithdraw >= MIN_WITHDRAW;
-  const withdrawalMethods = walletCountryId
-    ? getMobileMoneyForCountry(walletCountryId).filter((m) => m.id !== "cash")
+  // Sans aucune ligne (rien encore versé), la carte principale montre 0 dans
+  // le marché affiché, avec son minimum.
+  const mainMarket = main ? marketOf(main.country_id) : country;
+  const mainMoney = main ? moneyOf(main) : country;
+  const mainAvailable = main ? availableFor(main, pending) : 0;
+  const mainPending = main ? (pending.get(main.country_id ?? "") ?? 0) : 0;
+  // ~10 € dans la monnaie DE LA LIGNE (DV-1) — miroir app + serveur.
+  const mainMin = minWithdrawalFor(main?.country_id ?? country?.id);
+  const mainCanWithdraw = !!main && !!mainMarket && mainAvailable >= mainMin;
+  const singleMarketMethods = main && others.length === 0 && main.country_id
+    ? getMobileMoneyForCountry(main.country_id).filter((m) => m.id !== "cash")
     : [];
 
-  // ── Demande de retrait — elle vit dans le DASHBOARD ────────
-  // Deux défauts corrigés le 2026-09-11, tous deux silencieux :
-  //
-  // 1. l'erreur de l'INSERT était JETÉE (`.then(() => null, () => null)`),
-  //    puis « Demande de retrait envoyée ✅ » s'affichait quoi qu'il arrive.
-  //    Une demande pouvait disparaître sans que le vendeur le sache, et sans
-  //    laisser la moindre trace dans le dashboard ;
-  // 2. `phone_number` recevait le numéro de l'AGENCE. Or le dashboard
-  //    l'affiche à l'opérateur comme la destination du virement (Finances →
-  //    Retraits) : il y lisait le numéro de Rivendy au lieu de celui du
-  //    vendeur.
-  async function requestWithdrawal() {
-    // Verrou posé AVANT tout await : deux clics = une seule demande.
-    if (!user || !wallet || !walletCountryId || !canWithdraw || withdrawingRef.current) return;
-    withdrawingRef.current = true;
-    setWithdrawLoading(true);
-    setMessage("");
-
-    // P0 (audit 2026-10-04) : pays et devise du PORTEFEUILLE. Le site prenait
-    // le marché affiché : un vendeur comorien qui naviguait sur Djibouti
-    // demandait son solde en KMF libellé FDJ, adressé au directeur de Djibouti.
-    const amount = availableToWithdraw;
-    const { error } = await supabase.from("payout_requests").insert({
-      seller_id: user.id,
-      country_id: walletCountryId,
-      amount,
-      currency_code: wallet.currency ?? walletCountry?.currency_code ?? "",
-      method: "mobile_money",
-      // Le numéro du VENDEUR, jamais celui de l'agence. À défaut NULL :
-      // mieux vaut que l'opérateur le réclame qu'un numéro faux.
-      phone_number: profile?.whatsapp_number || null,
-      notes: `Demande web — ${deliveredOrders.length} commande(s) livrée(s)`,
-      status: "pending_director",
+  function onSent(line: WalletLine, amount: number) {
+    setWithdrawLine(null);
+    setPending((prev) => {
+      const next = new Map(prev);
+      next.set(line.country_id ?? "", (next.get(line.country_id ?? "") ?? 0) + amount);
+      return next;
     });
-
-    setWithdrawLoading(false);
-    withdrawingRef.current = false;
-
-    if (error) {
-      setMessage(
-        "Votre demande de retrait n'a pas pu être enregistrée. Réessayez, " +
-          "ou contactez Rivendy depuis Aide & Support.",
-      );
-      return;
-    }
-
-    setPendingPayouts((p) => p + amount);
     setMessage(
-      `Demande de retrait de ${formatMoney(amount, money)} enregistrée ✅ — ` +
+      `Demande de retrait de ${formatMoney(amount, moneyOf(line))} enregistrée ✅ — ` +
         "l'équipe Rivendy la traite et vous contactera.",
     );
   }
@@ -227,6 +191,8 @@ export function WalletView() {
   }
 
   if (!country) return null;
+
+  const withdrawMarket = withdrawLine ? marketOf(withdrawLine.country_id) : null;
 
   return (
     <div className="w-full">
@@ -247,48 +213,58 @@ export function WalletView() {
         </button>
       </div>
 
-      {/* Carte gains principale */}
-      <div className="mb-5 rounded-3xl bg-gradient-to-br from-[#009688] to-[#00C4B4] p-6 text-white shadow-xl shadow-[#007168]/20">
-        <p className="text-sm font-semibold text-white/70">Gains confirmés</p>
-        <p className="mt-1 text-4xl font-black">{formatMoney(confirmedEarnings, money)}</p>
+      {/* Message retrait */}
+      {message && (
+        <div className="mb-5 rounded-2xl bg-[#E0F2F1] px-4 py-3 text-sm font-semibold text-[#00796B]">
+          {message}
+        </div>
+      )}
 
-        {pendingEarnings > 0 && (
-          <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-semibold text-white/80">
+      {/* Carte gains principale : la ligne du pays du compte */}
+      <div className="mb-5 rounded-3xl bg-gradient-to-br from-[#009688] to-[#00C4B4] p-6 text-white shadow-xl shadow-[#007168]/20">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-white/80">Gains confirmés</p>
+          {mainMarket && (
+            <span className="rounded-xl bg-white/20 px-3 py-1 text-xs font-black">
+              {mainMarket.id} · {mainMarket.name}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-4xl font-black">{formatMoney(main?.balance ?? 0, mainMoney)}</p>
+
+        {mainPending > 0 && (
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-semibold text-white/90">
             <Clock className="h-3.5 w-3.5" />
-            {formatMoney(pendingEarnings, money)} de retrait en cours
+            {formatMoney(mainPending, mainMoney)} de retrait en cours
           </div>
         )}
 
         {/* La commission s'AJOUTE au prix vendeur (grille par prix du
             2026-10-02) : le vendeur encaisse exactement son prix. */}
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-white/50">
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-white/80">
           <span>ℹ️</span>
           Vous encaissez exactement votre prix vendeur — la commission est payée par l&apos;acheteur
         </div>
 
         {/* Seuil retrait */}
         <div className={`mt-2 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold ${
-          canWithdraw ? "bg-white/15 text-white/80" : "bg-orange-500/30 text-white/80"
+          mainCanWithdraw ? "bg-white/15 text-white/90" : "bg-orange-500/30 text-white/90"
         }`}>
-          {canWithdraw ? "🔓" : "🔒"}
-          {canWithdraw
-            ? `Retrait disponible : ${formatMoney(availableToWithdraw, money)}`
-            : `Retrait à partir de ${formatMoney(MIN_WITHDRAW, money)}`}
+          {mainCanWithdraw ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+          {mainCanWithdraw
+            ? `Retrait disponible : ${formatMoney(mainAvailable, mainMoney)}`
+            : `Retrait à partir de ${formatMoney(mainMin, mainMoney)}`}
         </div>
 
         {/* Actions */}
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid max-w-md grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={!canWithdraw || withdrawLoading}
-            onClick={requestWithdrawal}
+            disabled={!mainCanWithdraw}
+            onClick={() => main && setWithdrawLine(main)}
             className="flex items-center justify-center gap-2 rounded-2xl bg-white/20 py-3 text-sm font-black text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {withdrawLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowUpRight className="h-4 w-4" />
-            )}
+            <ArrowUpRight className="h-4 w-4" />
             Retirer
           </button>
           {/* Plus de WhatsApp (2026-10-09) : l'aide passe par la page Aide. */}
@@ -302,11 +278,70 @@ export function WalletView() {
         </div>
       </div>
 
-      {/* Message retrait */}
-      {message && (
-        <div className="mb-5 rounded-2xl bg-[#E0F2F1] px-4 py-3 text-sm font-semibold text-[#009688]">
-          {message}
-        </div>
+      {/* Les autres marchés : chacun son solde, sa monnaie, son retrait */}
+      {others.length > 0 && (
+        <section aria-labelledby="autres-marches" className="mb-5">
+          <h2 id="autres-marches" className="text-lg font-black text-[#1A1A1A]">Vos gains dans d&apos;autres marchés</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Payés par Rivendy depuis son compte de ce marché, dans sa monnaie. Ils ne s&apos;additionnent jamais.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {others.map((line) => {
+              const market = marketOf(line.country_id);
+              const money = moneyOf(line);
+              const available = availableFor(line, pending);
+              const inFlight = pending.get(line.country_id ?? "") ?? 0;
+              const min = minWithdrawalFor(line.country_id);
+              const canWithdraw = !!market && available >= min;
+              const methods = line.country_id
+                ? getMobileMoneyForCountry(line.country_id).filter((m) => m.id !== "cash" && m.enabled).map((m) => m.name)
+                : [];
+              return (
+                <div key={line.id} className="flex min-w-0 flex-[1_1_280px] flex-col gap-3 rounded-2xl bg-white p-5 shadow-sm sm:max-w-[460px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E0F2F1] text-xs font-black text-[#00695C]">
+                        {line.country_id}
+                      </span>
+                      <span className="flex flex-col">
+                        <span className="font-black text-[#1A1A1A]">{market?.name ?? line.country_id}</span>
+                        <span className="text-xs text-slate-600">{market?.currency_code ?? line.currency}</span>
+                      </span>
+                    </div>
+                    <span className="text-xl font-black text-[#1A1A1A]">{formatMoney(line.balance, money)}</span>
+                  </div>
+                  {inFlight > 0 && (
+                    <span className="inline-flex w-fit items-center gap-1.5 rounded-xl bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-800">
+                      <Clock className="h-3.5 w-3.5" />
+                      {formatMoney(inFlight, money)} de retrait en cours
+                    </span>
+                  )}
+                  <span className={`inline-flex w-fit items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold ${
+                    canWithdraw ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
+                  }`}>
+                    {canWithdraw ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                    {canWithdraw
+                      ? `Retrait disponible : ${formatMoney(available, money)}`
+                      : `Retrait à partir de ${formatMoney(min, money)}`}
+                  </span>
+                  <p className="text-sm text-slate-600">
+                    Vente faite dans ce marché : l&apos;argent est sur le compte Rivendy de ce marché.
+                    {methods.length > 0 ? ` Retrait par ${methods.join(", ")} ou à l'agence Rivendy.` : " Retrait à l'agence Rivendy."}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!canWithdraw}
+                    onClick={() => setWithdrawLine(line)}
+                    className="inline-flex w-fit items-center gap-2 rounded-full bg-[#00796B] px-5 py-2.5 text-sm font-black text-white transition hover:bg-[#00695C] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600"
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                    Retirer ({market?.name ?? line.country_id})
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Stats rapides */}
@@ -314,50 +349,51 @@ export function WalletView() {
         <div className="rounded-2xl bg-white p-4 text-center shadow-sm">
           <Receipt className="mx-auto h-5 w-5 text-[#6A5ACD]" />
           <p className="mt-2 text-xl font-black text-[#6A5ACD]">{orders.length}</p>
-          <p className="text-xs font-semibold text-slate-400">Ventes totales</p>
+          <p className="text-xs font-semibold text-slate-500">Ventes totales</p>
         </div>
         <div className="rounded-2xl bg-white p-4 text-center shadow-sm">
-          <CheckCircle className="mx-auto h-5 w-5 text-green-500" />
-          <p className="mt-2 text-xl font-black text-green-500">{deliveredOrders.length}</p>
-          <p className="text-xs font-semibold text-slate-400">Livrées</p>
+          <CheckCircle className="mx-auto h-5 w-5 text-green-600" />
+          <p className="mt-2 text-xl font-black text-green-600">{deliveredOrders.length}</p>
+          <p className="text-xs font-semibold text-slate-500">Livrées</p>
         </div>
         <div className="rounded-2xl bg-white p-4 text-center shadow-sm">
-          <Clock className="mx-auto h-5 w-5 text-orange-500" />
-          <p className="mt-2 text-xl font-black text-orange-500">{pendingOrders.length}</p>
-          <p className="text-xs font-semibold text-slate-400">En attente</p>
+          <Clock className="mx-auto h-5 w-5 text-orange-600" />
+          <p className="mt-2 text-xl font-black text-orange-600">{pendingOrders.length}</p>
+          <p className="text-xs font-semibold text-slate-500">En attente</p>
         </div>
       </div>
 
-      {/* Méthodes de retrait */}
-      <div className="mb-5 rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-black text-[#1A1A1A]">Méthodes de retrait</h2>
-        {/* Opérateurs du pays DU PORTEFEUILLE (mobile-money.ts, miroir de
-            l'app) — l'ancienne liste affichait ceux de Djibouti partout. */}
-        <div className="flex flex-wrap gap-2">
-          {withdrawalMethods.length > 0 ? (
-            withdrawalMethods.map(({ id, name, color, enabled }) => (
-              <span
-                key={id}
-                style={{ color, borderColor: `${color}40`, backgroundColor: `${color}12` }}
-                className={`rounded-xl border px-3 py-1.5 text-xs font-black ${enabled ? "" : "opacity-50"}`}
-              >
-                {name}{enabled ? "" : " · bientôt"}
-              </span>
-            ))
-          ) : (
-            <span className="text-xs text-slate-500">Versement organisé par l&apos;agence Rivendy de votre pays.</span>
-          )}
+      {/* Méthodes de retrait : vendeur d'un seul marché (avec plusieurs
+          marchés, chaque fiche de retrait montre les siennes). */}
+      {others.length === 0 && (
+        <div className="mb-5 rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-sm font-black text-[#1A1A1A]">Méthodes de retrait</h2>
+          <div className="flex flex-wrap gap-2">
+            {singleMarketMethods.length > 0 ? (
+              singleMarketMethods.map(({ id, name, color, enabled }) => (
+                <span
+                  key={id}
+                  style={{ color, borderColor: `${color}40`, backgroundColor: `${color}12` }}
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-black ${enabled ? "" : "opacity-50"}`}
+                >
+                  {name}{enabled ? "" : " · bientôt"}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-slate-600">Versement organisé par l&apos;agence Rivendy de votre pays.</span>
+            )}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Le retrait est traité sous 24h après validation par l&apos;équipe Rivendy.
+          </p>
         </div>
-        <p className="mt-3 text-xs text-slate-400">
-          Le retrait est traité sous 24h après validation par l&apos;équipe Rivendy.
-        </p>
-      </div>
+      )}
 
       {/* Historique des transactions */}
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-black text-[#1A1A1A]">Historique des transactions</h2>
-          <span className="text-sm text-slate-400">
+          <span className="text-sm text-slate-500">
             {transactions.length} transaction{transactions.length > 1 ? "s" : ""}
           </span>
         </div>
@@ -368,7 +404,7 @@ export function WalletView() {
               <Wallet className="h-7 w-7 text-[#009688]" />
             </div>
             <p className="mt-4 font-bold text-[#1A1A1A]">Aucune transaction pour le moment</p>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-500">
               Publiez un article et commencez à générer des gains dès aujourd&apos;hui.
             </p>
             <Link
@@ -382,7 +418,11 @@ export function WalletView() {
         ) : (
           <div className="space-y-3">
             {transactions.map((tx) => {
-              const isCredit = tx.type === "credit" || tx.type === "order_credit" || tx.amount > 0;
+              // Le TYPE donne le signe : en base tous les montants sont
+              // positifs, un retrait s'affichait donc en vert avec « + ».
+              const isCredit = isCreditType(tx.type);
+              const txLine = lineById.get(tx.wallet_id);
+              const txMarket = marketOf(txLine?.country_id ?? null);
               return (
                 <div key={tx.id} className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
                   {/* Icon status */}
@@ -405,22 +445,27 @@ export function WalletView() {
                     <p className="line-clamp-1 text-sm font-bold text-[#1A1A1A]">
                       {tx.description || (isCredit ? "Crédit portefeuille" : "Débit portefeuille")}
                     </p>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <span className="text-xs text-slate-400">{formatDate(tx.created_at)}</span>
-                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-slate-500">{formatDate(tx.created_at)}</span>
+                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">
                         {TX_TYPE_LABELS[tx.type] ?? tx.type}
                       </span>
+                      {lines.length > 1 && txMarket && (
+                        <span className="inline-block rounded-md bg-[#E0F2F1] px-2 py-0.5 text-[10px] font-black text-[#00695C]">
+                          {txMarket.name}
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Montant */}
+                  {/* Montant, dans la monnaie de SA ligne */}
                   <div className="text-right">
                     <p
                       className={`text-sm font-black ${
-                        isCredit ? "text-green-600" : "text-red-500"
+                        isCredit ? "text-green-600" : "text-red-600"
                       }`}
                     >
-                      {isCredit ? "+" : "-"} {formatMoney(Math.abs(tx.amount), money)}
+                      {isCredit ? "+" : "-"} {formatMoney(Math.abs(tx.amount), moneyOf(txLine))}
                     </p>
                   </div>
                 </div>
@@ -429,6 +474,20 @@ export function WalletView() {
           </div>
         )}
       </div>
+
+      {withdrawLine && withdrawMarket && user && (
+        <WithdrawDialog
+          line={withdrawLine}
+          market={withdrawMarket}
+          available={availableFor(withdrawLine, pending)}
+          min={minWithdrawalFor(withdrawLine.country_id)}
+          sellerId={user.id}
+          defaultPhone={withdrawLine.country_id === profile?.country_id ? (profile?.whatsapp_number ?? null) : null}
+          defaultName={profile?.full_name ?? ""}
+          onClose={() => setWithdrawLine(null)}
+          onSent={(amount) => onSent(withdrawLine, amount)}
+        />
+      )}
     </div>
   );
 }

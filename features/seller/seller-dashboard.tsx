@@ -26,6 +26,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { cn } from "@/lib/utils/cn";
 import { rejectReasonLabel } from "@/lib/utils/reject-reason";
+import { splitWalletLines, toWalletLines, type WalletLine } from "@/features/wallet/wallet-markets";
 import type { AppOrder, Country, Product } from "@/types/rivendy";
 
 /* ── Skeleton ────────────────────────────────────────────────────── */
@@ -62,8 +63,6 @@ function Metric({ icon: Icon, label, value, accent = false }: {
   );
 }
 
-type WalletRow = { balance: number | string | null; currency: string | null; country_id: string | null };
-
 /* ── Vue principale ─────────────────────────────────────────────── */
 /**
  * Tableau de bord vendeur. Remis à plat le 2026-10-04 :
@@ -72,8 +71,8 @@ type WalletRow = { balance: number | string | null; currency: string | null; cou
  *  - plus de second formulaire de retrait (montant libre, sans seuil ni
  *    verrou, bouton « via WhatsApp » qui n'ouvrait rien) : le retrait vit
  *    dans le portefeuille, comme dans l'app ;
- *  - solde dans la devise du PORTEFEUILLE, articles et commandes dans la
- *    devise de leur marché ;
+ *  - solde PAR MARCHÉ (D-05, 2026-11-03), chacun dans sa monnaie, jamais
+ *    additionnés ; articles et commandes dans la devise de leur marché ;
  *  - statuts de commande groupés comme l'app (« À préparer », etc.).
  */
 export function SellerDashboard() {
@@ -83,7 +82,7 @@ export function SellerDashboard() {
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [orders, setOrders]               = useState<AppOrder[]>([]);
-  const [wallet, setWallet]               = useState<WalletRow | null>(null);
+  const [walletLines, setWalletLines]     = useState<WalletLine[]>([]);
   const [loading, setLoading]             = useState(true);
 
   const marketOf = useCallback(
@@ -102,7 +101,9 @@ export function SellerDashboard() {
         // Audit 21 (DBSEC-7) : plus de lecture directe d'orders par le vendeur
         // (fuite coordonnées). seller_orders() renvoie la liste sans PII.
         supabase.rpc("seller_orders", { p_limit: 50, p_offset: 0 }),
-        supabase.from("wallets").select("balance, currency, country_id").eq("user_id", user.id).maybeSingle(),
+        // Une ligne par marché (D-05) : plus de maybeSingle(), qui échouait
+        // dès deux lignes et affichait 0.
+        supabase.from("wallets").select("id, balance, currency, country_id").eq("user_id", user.id),
       ]);
       setProducts(((prodResp.data ?? []) as Product[]).filter((p) => p.status !== "deleted"));
       setOrders(
@@ -110,7 +111,7 @@ export function SellerDashboard() {
           (row) => ({ ...row, items: row.order_items }) as AppOrder,
         ),
       );
-      setWallet((walletResp?.data as WalletRow | null) ?? null);
+      setWalletLines(toWalletLines(walletResp?.data as Array<Record<string, unknown>> | null));
     } catch {
       // ne pas bloquer l'UI si une requête échoue
     } finally {
@@ -148,10 +149,14 @@ export function SellerDashboard() {
   }, [user]);
 
   /* ── Calculs ────────────────────────────────────────────────────── */
-  // Solde confirmé : wallets.balance (serveur), dans la devise DU PORTEFEUILLE.
-  const walletCountry    = wallet?.country_id ? marketOf(wallet.country_id) : null;
-  const walletMoneyFmt   = walletCountry ?? (wallet?.currency ? { currency_symbol: wallet.currency, currency_code: wallet.currency } : country);
-  const earnings         = Number(wallet?.balance ?? 0);
+  // Solde confirmé : une ligne par marché (D-05), chacune dans la monnaie de
+  // son marché, jamais additionnées : « 12 000 KMF · 3 000 FDJ ».
+  const { main: mainLine, others: otherLines } = splitWalletLines(
+    walletLines, profile?.country_id, (id) => marketOf(id)?.name ?? id);
+  const earningsText = [mainLine, ...otherLines]
+    .filter((l): l is WalletLine => !!l)
+    .map((l) => formatMoney(l.balance, marketOf(l.country_id)))
+    .join(" · ") || formatMoney(0, country);
   const pendingCount     = products.filter((p) => p.status === "pending").length;
   const rejectedCount    = products.filter((p) => p.status === "rejected").length;
   const activeCount      = products.filter((p) => p.status === "active").length;
@@ -203,7 +208,7 @@ export function SellerDashboard() {
 
       {/* ══ Métriques ════════════════════════════════════════════════ */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Metric icon={Wallet}    label="Gains confirmés"    value={formatMoney(earnings, walletMoneyFmt)} accent />
+        <Metric icon={Wallet}    label="Gains confirmés"    value={earningsText} accent />
         <Metric icon={Banknote}  label="Commandes reçues"   value={String(orders.length)} />
         <Metric icon={ShoppingBag} label={toPrepareCount > 0 ? `En cours · ${toPrepareCount} à préparer` : "En cours"} value={String(pendingOrders.length)} />
         <Metric icon={Package}   label="Produits publiés"   value={String(products.length)} />
@@ -439,8 +444,10 @@ export function SellerDashboard() {
               <p className="text-sm font-black text-slate-900">Mes gains</p>
             </div>
             <div className="mt-1 flex items-center justify-between">
-              <p className="text-xs text-slate-500">Disponible</p>
-              <p className="text-sm font-black text-[#009688]">{formatMoney(earnings, walletMoneyFmt)}</p>
+              {/* « Solde » et non « Disponible » : les retraits en cours ne sont
+                  pas déduits ici (ils le sont dans le portefeuille). */}
+              <p className="text-xs text-slate-500">Solde</p>
+              <p className="text-right text-sm font-black text-[#009688]">{earningsText}</p>
             </div>
             <Link
               href="/wallet"

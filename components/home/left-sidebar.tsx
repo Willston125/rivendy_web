@@ -23,8 +23,9 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
+import { splitWalletLines, toWalletLines, type WalletLine } from "@/features/wallet/wallet-markets";
 import { FacebookIcon, InstagramIcon } from "@/components/ui/social-icons";
 import { StoriesRail } from "@/features/products/stories-rail";
 import type { Product } from "@/types/rivendy";
@@ -60,33 +61,47 @@ export function LeftSidebar({
      (chargement ou échec réseau) : on affiche « — » plutôt qu'un 0 qui
      ferait croire à un vendeur qu'il n'a rien gagné. Aucune ligne
      `wallets` = 0 réel, même sémantique que l'espace vendeur
-     (features/seller/seller-dashboard.tsx). */
+     (features/seller/seller-dashboard.tsx).
+     Une ligne par marché (D-05, 2026-11-03), chacune dans la monnaie DE SON
+     marché — et non celle du marché affiché, qui libellait 12 000 KMF en FDJ
+     pour un vendeur comorien naviguant sur Djibouti. */
+  const { countries } = useCountry();
   const userId = user?.id;
-  const [balance, setBalance] = useState<number | null>(null);
+  const [walletLines, setWalletLines] = useState<WalletLine[] | null>(null);
 
   useEffect(() => {
     if (!userId) {
-      setBalance(null);
+      setWalletLines(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("wallets")
-          .select("balance")
-          .eq("user_id", userId)
-          .maybeSingle();
+          .select("id, balance, currency, country_id")
+          .eq("user_id", userId);
         if (cancelled) return;
-        setBalance(data && data.balance != null ? Number(data.balance) : 0);
+        setWalletLines(error ? null : toWalletLines(data as Array<Record<string, unknown>> | null));
       } catch {
-        if (!cancelled) setBalance(null);
+        if (!cancelled) setWalletLines(null);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [userId]);
+
+  const marketOf = (id: string | null) => (id && countries.find((c) => c.id === id)) || country;
+  const balanceText = walletLines === null
+    ? null
+    : (() => {
+        const { main, others } = splitWalletLines(walletLines, profile?.country_id, (id) => marketOf(id)?.name ?? id);
+        return [main, ...others]
+          .filter((l): l is WalletLine => !!l)
+          .map((l) => formatMoney(l.balance, marketOf(l.country_id)))
+          .join(" · ") || formatMoney(0, country);
+      })();
 
   const displayName = profile?.full_name || profile?.store_name || user?.email?.split("@")[0] || "Invité";
   const isCertified = profile?.is_certified ?? false;
@@ -152,9 +167,9 @@ export function LeftSidebar({
                 <p className="mt-0.5 text-lg font-extrabold text-slate-900">
                   {!balanceVisible
                     ? "••••••"
-                    : balance === null
+                    : balanceText === null
                       ? "—"
-                      : formatMoney(balance, country)}
+                      : balanceText}
                 </p>
               </div>
 
