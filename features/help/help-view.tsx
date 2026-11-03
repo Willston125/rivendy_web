@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { ChevronDown, Mail } from "lucide-react";
 import { SupportRequestForm } from "@/features/help/support-request-form";
+import { useCountry } from "@/features/country/country-provider";
+import { formatMoney } from "@/lib/utils/format";
+import { minWithdrawalFor } from "@/lib/utils/seller-offer-prices";
 
 const FAQS = [
   {
@@ -31,7 +34,7 @@ const FAQS = [
   },
   {
     q: "Comment fonctionne le portefeuille Rivendy ?",
-    a: "En tant que vendeur, vous êtes crédité de votre prix dans le portefeuille Rivendy dès que l'acheteur confirme la réception (ou automatiquement après 24 h). Depuis le portefeuille, faites une demande de retrait (à partir de 5 000 KMF aux Comores, 2 000 ailleurs) : l'équipe Rivendy la valide puis vous verse sur votre Mobile Money.",
+    a: "En tant que vendeur, vous êtes crédité de votre prix dans le portefeuille Rivendy dès que l'acheteur confirme la réception (ou automatiquement après 24 h). Depuis le portefeuille, faites une demande de retrait à partir de {retrait_min} : l'équipe Rivendy la valide puis vous verse sur votre Mobile Money.",
   },
   {
     q: "Comment obtenir le badge Vendeur Certifié ?",
@@ -45,6 +48,14 @@ const FAQS = [
 
 export function HelpView({ initialTopic }: { initialTopic?: string }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // Retrait minimum du marché actif, même source que le portefeuille
+  // (MIN_WITHDRAWAL_BY_MARKET, miroir du serveur) — l'ancien texte disait
+  // « 2 000 ailleurs » (audit des paramètres du 2026-11-03, m-11).
+  const { country } = useCountry();
+  const withdrawalMin = minWithdrawalFor(country?.id);
+  const withdrawalMinLabel = withdrawalMin > 0
+    ? `${formatMoney(withdrawalMin, country)} sur votre marché`
+    : "le minimum affiché dans votre portefeuille";
   const emailUrl = `mailto:support@rivendy.com?subject=Aide%20Rivendy&body=Bonjour%2C%20j'ai%20besoin%20d'aide%20avec%20Rivendy.`;
 
   return (
@@ -103,7 +114,7 @@ export function HelpView({ initialTopic }: { initialTopic?: string }) {
                 }`}
               >
                 <div className="border-t border-slate-50 px-5 pb-4 pt-3">
-                  <p className="text-sm leading-relaxed text-slate-600">{a}</p>
+                  <p className="text-sm leading-relaxed text-slate-600">{a.replace("{retrait_min}", withdrawalMinLabel)}</p>
                 </div>
               </div>
             </div>

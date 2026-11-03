@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   offerBenefits, durationLabel, isValidPayerPhone, isValidOperatorReference,
   requestErrorMessage, declareErrorMessage, periodStatus, requestValidUntil, rejectReasons,
-  DELIVERY_CREDITS_LIVE,
+  DELIVERY_CREDITS_LIVE, EXCLUSIVE_CONTENT_LIVE, EARLY_ACCESS_LIVE,
 } from "./plus-logic.ts";
 
 const NOW = new Date("2026-10-28T15:00:00Z");
@@ -23,6 +23,15 @@ test("avantages : lus dans les droits de la formule, jamais supposés", () => {
   const day = offerBenefits({ entitlements: { play_premium: true, simultaneous_streams: 1 } });
   assert.ok(!day.some((b) => b.includes("écrans")));
   assert.ok(!day.includes("Contenus exclusifs"));
+});
+
+test("contenus exclusifs et avant-premières : jamais promis avant d'exister", () => {
+  assert.equal(EXCLUSIVE_CONTENT_LIVE, false);
+  assert.equal(EARLY_ACCESS_LIVE, false);
+  const b = offerBenefits({ entitlements: { play_premium: true, exclusive_content: true, early_access: true } });
+  assert.ok(!b.includes("Contenus exclusifs"));
+  assert.ok(!b.includes("Avant-premières"));
+  assert.ok(b.includes("Films et séries Premium sur Rivendy Play"));
 });
 
 test("crédits livraison : jamais promis avant le lot F", () => {

@@ -46,6 +46,7 @@ export function SubscriptionView() {
   const [channels, setChannels] = useState<PlusChannel[]>([]);
   const [agencyNames, setAgencyNames] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [catalogMarket, setCatalogMarket] = useState<{ market?: string; currency?: string }>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -55,6 +56,7 @@ export function SubscriptionView() {
     setEnt(e);
     setPeriods(p);
     setChannels(catalog.channels ?? []);
+    setCatalogMarket({ market: catalog.market, currency: catalog.currency });
     setReasons(rejectReasons(notes));
     const ids = [...new Set((p ?? []).map((x) => x.agency_id).filter((x): x is string => !!x))];
     setAgencyNames(await fetchAgencyNames(ids));
@@ -64,9 +66,15 @@ export function SubscriptionView() {
   useEffect(() => { if (user) void Promise.resolve().then(() => load()); }, [user, load]);
 
   const money = useCallback((amount: number, market: string) => {
-    const c = countries.find((x) => x.id === market);
-    return formatMoney(amount, c ?? { currency_code: market === "KM" ? "KMF" : "", currency_symbol: "" });
-  }, [countries]);
+    // Devise du marché de la demande : liste des pays, sinon celle que le
+    // serveur a rendue avec le catalogue. Jamais une devise écrite en dur
+    // (audit des paramètres du 2026-11-03, m-15) : inconnue, le montant seul.
+    const c = countries.find((x) => x.id === market)
+      ?? (market === catalogMarket.market && catalogMarket.currency
+        ? { currency_code: catalogMarket.currency, currency_symbol: "" }
+        : null);
+    return c ? formatMoney(amount, c) : new Intl.NumberFormat("fr-FR").format(amount);
+  }, [countries, catalogMarket]);
 
   const now = useMemo(() => new Date(), [periods]); // eslint-disable-line react-hooks/exhaustive-deps
   const pending = (periods ?? []).filter((p) => p.status === "pending");

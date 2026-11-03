@@ -61,14 +61,22 @@ export interface PlusCatalog {
 /** Les crédits livraison n'existent qu'au lot F : jamais promis avant. */
 export const DELIVERY_CREDITS_LIVE = false;
 
+/**
+ * Contenus exclusifs et avant-premières : droits semés à vrai (formule
+ * `month`) mais qu'aucun contenu ni aucune règle n'applique encore (audit des
+ * paramètres du 2026-11-03, M-01). Jamais promis avant d'exister.
+ */
+export const EXCLUSIVE_CONTENT_LIVE = false;
+export const EARLY_ACCESS_LIVE = false;
+
 /** Avantages affichés pour une formule, d'après SES droits (jamais supposés). */
 export function offerBenefits(offer: Pick<PlusOffer, "entitlements">): string[] {
   const e = offer.entitlements ?? {};
   const out: string[] = [];
   if (e.play_premium === true) out.push("Films et séries Premium sur Rivendy Play");
   if (e.music_premium === true) out.push("Musique Premium en écoute complète");
-  if (e.exclusive_content === true) out.push("Contenus exclusifs");
-  if (e.early_access === true) out.push("Avant-premières");
+  if (EXCLUSIVE_CONTENT_LIVE && e.exclusive_content === true) out.push("Contenus exclusifs");
+  if (EARLY_ACCESS_LIVE && e.early_access === true) out.push("Avant-premières");
   const streams = Number(e.simultaneous_streams ?? 0);
   if (streams >= 2) out.push(`${streams} écrans en même temps`);
   if (DELIVERY_CREDITS_LIVE) {

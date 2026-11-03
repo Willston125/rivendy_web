@@ -48,8 +48,13 @@ Copier `.env.local.example` vers `.env.local` si necessaire.
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NEXT_PUBLIC_RIVENDY_WHATSAPP_FALLBACK=+25377145306
+NEXT_PUBLIC_PLAY_STORE_URL=
+NEXT_PUBLIC_APP_STORE_URL=
+GOOGLE_SITE_VERIFICATION=
 ```
+
+Aucun numero de telephone dans l'environnement : le contact passe par le
+numero de l'agence du marche (`countries.whatsapp_number`), lu en base.
 
 La cle service role n'est pas utilisee par cette web app publique.
 
@@ -57,7 +62,7 @@ La cle service role n'est pas utilisee par cette web app publique.
 
 - Aucun telephone vendeur n'est affiche sur les pages publiques.
 - Aucun bouton "contacter le vendeur" n'existe.
-- Les achats passent par `/checkout`, creent `orders` + `order_items`, puis ouvrent le WhatsApp officiel Rivendy du pays.
+- Les achats passent par `/checkout` et la RPC `secure_create_order` (commandes + lignes) ; aucune demande ne passe par WhatsApp depuis le 2026-10-09 (suivi par l'equipe Rivendy, dashboard).
 - Les produits publies depuis le web sont en `pending` et attendent la validation admin.
 - Les boosts et certifications sont crees en `pending` et restent a valider dans le dashboard.
 - Les publicites sont lues depuis `advertisements`; le web tente `web_home_banner`, `web_feed_inline`, `web_category_banner` avec fallback mobile.
