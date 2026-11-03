@@ -244,7 +244,20 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
 
 import {
   HOME_SHOWS, HOME_GRID, HOME_HIT, usefulRubrics, genreTone, rythmeTagline, GENRE_TONES, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
+  homeTop,
 } from "./music-logic.ts";
+
+test("homeTop : une seule bannière en haut, jamais de pub pour Rivendy+ ni dans le doute", () => {
+  const base = { plusSettled: true, plusReady: true, plusActive: false, adLoading: false, hasAd: true };
+  assert.equal(homeTop(base), "ad");
+  assert.equal(homeTop({ ...base, hasAd: false }), "selection");
+  // Statut Rivendy+ pas encore lu, puis affiches pas encore lues : on attend, sans montrer la bannière verte.
+  assert.equal(homeTop({ ...base, plusSettled: false, plusReady: false }), "wait");
+  assert.equal(homeTop({ ...base, adLoading: true, hasAd: false }), "wait");
+  // Abonné, ou lecture du statut en échec : la sélection, même si une affiche traîne en mémoire.
+  assert.equal(homeTop({ ...base, plusActive: true }), "selection");
+  assert.equal(homeTop({ ...base, plusReady: false }), "selection");
+});
 
 test("navigation : Découvrir, Rechercher, Hit ; jamais ailleurs", () => {
   assert.equal(musicNavActive("/music"), "discover");

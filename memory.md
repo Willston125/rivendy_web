@@ -344,7 +344,7 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     puces Pour toi + genres, Nouveautés, Ambiances ; 5 nouveautés
     (`HOME_GRID`) ; le Hit (3 titres, `HOME_HIT`) à côté de « À chaque envie,
     son rythme » (les GENRES en cartes pastel : pas encore de playlists
-    d'ambiance) ; affiche sponsorisée ; « Artistes à découvrir ». Supprimés :
+    d'ambiance) ; « Artistes à découvrir ». Supprimés :
     `homeShelves`, `homeSpotlight`, `heroHitBadge`, `recentIsUseful`,
     `ReleaseCoverGrid`, `.rvm-stage`, `.rvm-vinyl`.
   - PIÈGE : une rangée qui défile au doigt avec `-mx-4 px-4` et `snap-start`
@@ -355,6 +355,16 @@ Les migrations suivantes ont été ajoutées pour synchroniser les schémas Web 
     ou erreur = pas d'affiche) ; « Sponsorisé » toujours affiché,
     `rel="sponsored"`. L'onglet « Musique » se choisit au dashboard (branche
     `feat/ads-onglet-musique`).
+  - **Une seule grande bannière en haut** (2026-11-03, visuel validé) :
+    `homeTop` (music-logic) choisit l'affiche sponsorisée si elle est en ligne,
+    sinon `SelectionHero` ; tant que le statut Rivendy+ ou les affiches ne sont
+    pas lus, `HomeTopSkeleton` neutre (la bannière verte n'apparaît jamais
+    pour être remplacée). Avec l'affiche, `SelectionButton` (« Lancer la
+    sélection Rivendy ») ouvre la ligne des puces, JAMAIS sur l'image.
+    L'affiche n'est jamais rognée : `aspect-[1600/600] max-h-[21rem]`, image
+    en `object-contain`, côtés = la même affiche floutée (même `src` et
+    `sizes` → aucun octet de plus). Plus d'affiche sous le Hit ; un filtre
+    ne la retire plus. `useMusicPlus().settled` = lecture finie, réussie ou non.
   - Photos de la bannière et de la carte artiste : recadrées de la référence du
     propriétaire (à remplacer par des photos sous licence ou un visuel réglable
     au dashboard). Concerts : demandent une table (SQL + phrase), pas faits.

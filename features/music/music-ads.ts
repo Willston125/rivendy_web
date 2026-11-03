@@ -38,9 +38,10 @@ const status = new Map<string, boolean | null>();
  * Pass actif (active_until dans le futur) ouvre l'écoute SANS publicité.
  * `ready` reste faux tant que le statut n'est pas lu, ou si la lecture
  * échoue : ni pub ni bouton Rivendy+ dans le doute (un abonné ne voit
- * jamais une pub « clignoter »).
+ * jamais une pub « clignoter »). `settled` : la lecture est finie, réussie
+ * ou non (l'accueil sait alors s'il attend encore une affiche).
  */
-export function useMusicPlus(): { ready: boolean; active: boolean } {
+export function useMusicPlus(): { ready: boolean; active: boolean; settled: boolean } {
   const { user, loading } = useAuth();
   const uid = user?.id ?? null;
   const [read, setRead] = useState<{ uid: string; active: boolean | null } | null>(null);
@@ -57,8 +58,9 @@ export function useMusicPlus(): { ready: boolean; active: boolean } {
     return () => { alive = false; };
   }, [uid]);
 
-  if (loading) return { ready: false, active: false };
-  if (!uid) return { ready: true, active: false };
+  if (loading) return { ready: false, active: false, settled: false };
+  if (!uid) return { ready: true, active: false, settled: true };
+  const settled = status.has(uid) || read?.uid === uid;
   const active = status.has(uid) ? status.get(uid) ?? null : read?.uid === uid ? read.active : null;
-  return active === null ? { ready: false, active: false } : { ready: true, active };
+  return active === null ? { ready: false, active: false, settled } : { ready: true, active, settled };
 }
