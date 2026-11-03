@@ -335,7 +335,12 @@ export function CheckoutForm() {
 
       // 📋 Ordonnance : envoyée AVANT toute commande — si elle échoue, rien
       // n'est commandé (l'acheteur l'avait jointe, il compte dessus).
-      let prescriptionUrl: string | null = null;
+      // Donnée de SANTÉ (audit 21 APPBOUTIQUES-4, audit des paramètres
+      // 2026-11-03 M-07) : plus aucun lien signé dans la note. Seul le CHEMIN
+      // du fichier (dossier privé de l'acheteur) est rattaché à la commande par
+      // attach_prescription ; le dashboard signe un lien court à la demande.
+      // Même parcours que l'app (order_bottom_sheet).
+      let prescriptionPath: string | null = null;
       if (prescription && hasPharmacyItems) {
         if (!user) throw new Error("Connectez-vous pour joindre une ordonnance.");
         const compressed = await compressImage(prescription, 1600, 0.85);
@@ -344,12 +349,7 @@ export function CheckoutForm() {
           .from("ordonnances")
           .upload(path, compressed, { contentType: "image/jpeg", upsert: true });
         if (upErr) throw new Error("L'ordonnance n'a pas pu être envoyée. Réessayez — aucune commande n'a été passée.");
-        // 604 800 s = 7 jours : le temps du traitement par l'agence.
-        const { data: signed, error: signErr } = await supabase.storage
-          .from("ordonnances")
-          .createSignedUrl(path, 604800);
-        if (signErr || !signed?.signedUrl) throw new Error("L'ordonnance n'a pas pu être envoyée. Réessayez — aucune commande n'a été passée.");
-        prescriptionUrl = signed.signedUrl;
+        prescriptionPath = path;
       }
 
       // Rafraîchir les données produit depuis Supabase
@@ -466,7 +466,7 @@ export function CheckoutForm() {
           .map((i) => `• ${i.product.title} — ${[i.selectedSize && `Taille ${i.selectedSize}`, i.selectedColor && `Couleur ${i.selectedColor}`].filter(Boolean).join(", ")}`);
         const groupHasPharmacy = group.items.some((i) => i.product.category === "pharmacie");
         const noteParts = [
-          prescriptionUrl && groupHasPharmacy ? `📋 Ordonnance : ${prescriptionUrl} (lien valable 7 jours)` : null,
+          prescriptionPath && groupHasPharmacy ? "📋 Ordonnance jointe (voir la pièce dans la commande)." : null,
           variantLines.length ? `Variantes choisies :\n${variantLines.join("\n")}` : null,
           orderNote.trim() || null,
         ].filter(Boolean);
@@ -549,6 +549,19 @@ export function CheckoutForm() {
         if (structuredAddress || zoneFee > 0) deliveryFeeAssigned = true;
         orderIds.push(id);
         orderedGroups.push(group);
+
+        // Ordonnance rattachée APRÈS création (la commande doit exister), à la
+        // seule commande qui contient de la pharmacie. Best-effort comme l'app :
+        // un échec n'annule pas la commande, l'équipe la redemande.
+        if (prescriptionPath && groupHasPharmacy) {
+          const { data: attached, error: attachError } = await supabase.rpc("attach_prescription", {
+            p_order_id: id,
+            p_path: prescriptionPath,
+          });
+          if (attachError || (attached as { success?: boolean } | null)?.success === false) {
+            console.warn("attach_prescription", attachError?.message ?? attached);
+          }
+        }
       }
 
       // Aucune commande créée : panier conservé, l'acheteur peut réessayer.
