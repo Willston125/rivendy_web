@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { MessageCircle, ShieldCheck, Store } from "lucide-react";
+import { Bell, ShieldCheck, Store } from "lucide-react";
 import { LoginForm } from "@/features/auth/login-form";
 
 export const metadata: Metadata = {
@@ -39,12 +39,12 @@ export default function LoginPage() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#25D366]/20">
-                <MessageCircle className="h-4 w-4 text-[#25D366]" />
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#007168]/30">
+                <Bell className="h-4 w-4 text-[#00C4B4]" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Via WhatsApp</p>
-                <p className="text-xs text-slate-400">Confirmation instantanée sur votre numéro, simple et rapide.</p>
+                <p className="text-sm font-bold text-white">Suivi dans votre compte</p>
+                <p className="text-xs text-slate-400">Chaque étape de votre commande et vos notifications, au même endroit.</p>
               </div>
             </div>
 
