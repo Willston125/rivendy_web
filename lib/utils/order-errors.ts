@@ -61,6 +61,22 @@ export function orderFailureMessage(raw: string | null | undefined, productTitle
       return "Votre panier a changé depuis son ouverture (un article a changé de boutique). Rechargez la page, vérifiez votre panier puis réessayez.";
     case "mixed_markets":
       return "Votre commande mélange des articles de deux pays. Passez une commande par pays.";
+    // Audit 20, lot 1 (20261022_0900_audit20_commande.sql) : mêmes textes que l'app.
+    case "invalid_buyer_phone":
+      return "Numéro de téléphone invalide : Rivendy doit pouvoir vous joindre. Vérifiez-le (7 à 15 chiffres) puis réessayez.";
+    case "neighborhood_locality_mismatch":
+    case "delivery_zone_market_mismatch":
+      return "Adresse de livraison invalide — reprenez la sélection de votre localité et de votre quartier puis réessayez.";
+    case "missing_price_snapshot":
+    case "invalid_price_snapshot":
+      return productTitle
+        ? `Le prix de « ${productTitle} » doit être revu par Rivendy avant la vente. Retirez-le du panier ou réessayez plus tard.`
+        : "Le prix d'un article doit être revu par Rivendy avant la vente. Retirez-le du panier ou réessayez plus tard.";
+    // Audit 21 (20261026_0900_audit21_lot2_frais_dj.sql) : pas encore dans l'app.
+    case "unknown_delivery_zone":
+      return "Zone de livraison inconnue — reprenez la sélection de votre zone puis réessayez.";
+    case "too_many_open_orders":
+      return "Vous avez déjà beaucoup de commandes en attente de prise en charge. Attendez que Rivendy les traite, puis réessayez.";
   }
 
   const suffix = code ? ` (code : ${code.slice(0, 80)})` : "";

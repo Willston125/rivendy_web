@@ -667,6 +667,9 @@ Source : `rivendy-docs/docs/audit-rivendy/20_AUDIT_PRE_DEPLOIEMENT_ECOSYSTEME_20
 - **Déconnexion** : `CartProvider` vide le panier et l'achat immédiat quand le compte passe de
   connecté à déconnecté. Un visiteur garde le sien. Il lit `useAuth()` : il doit rester sous
   `AuthProvider` (`app/providers.tsx`).
+- **Refus du serveur** : tout code de `secure_create_order` a sa phrase dans
+  `lib/utils/order-errors.ts`. Un nouveau code s'ajoute aussi à la liste de
+  `order-errors.test.mjs` (`npm run check:order-errors`), sinon il s'affiche brut.
 - **Écartés** : WEB-6 (le garde de marché revient à la commande), WEB-8 (paramètre ignoré par le
   serveur, l'app envoie la même chose), WEB-12 (changement serveur), WEB-14 (replis sur le marché
   par défaut, à traiter à part), WEB-18 (faible gain, nouvelle interface), WEB-19 (SQL et phrase
