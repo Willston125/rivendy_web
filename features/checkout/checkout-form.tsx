@@ -24,7 +24,7 @@ import { useCountry, usePaymentMethods } from "@/features/country/country-provid
 
 import { formatMoney, isOrderable, orderId } from "@/lib/utils/format";
 import { compressImage } from "@/services/image-upload";
-import { phoneHint } from "@/lib/utils/phone-validator";
+import { phoneHint, validatePhone } from "@/lib/utils/phone-validator";
 import { pricedZonesFor } from "@/lib/utils/delivery-zones";
 import { getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
 import { loadSavedAddresses, saveAddress, type SavedAddress } from "./saved-addresses";
@@ -39,30 +39,30 @@ import {
   shortAddressLabel,
   type DeliveryAddress,
 } from "@/lib/utils/delivery-location";
+import { BUY_NOW_KEY, cartMarkets, hasVariants } from "@/features/cart/cart-logic";
+import { VariantSelects } from "@/features/cart/variant-selects";
 import { DeliveryAddressPicker } from "./delivery-address-picker";
 import type { CartItem, PaymentMethod, SellerCartGroup } from "@/types/rivendy";
 
-/** « Commander maintenant » : l'article voyage hors du panier (sessionStorage). */
-export const BUY_NOW_KEY = "rivendy_buy_now";
-
 /**
- * Moyens de paiement de secours — miroir de `_fallbackPaymentMethods`
- * (country_provider.dart) : DJ et KM seulement. Les autres marchés n'ont PAS
- * de repli (pas de « cash » inventé) : la commande est bloquée tant que
- * Rivendy n'y a pas configuré de moyen de paiement, comme dans l'app.
+ * Moyens de paiement de secours, si la base n'en renvoie aucun : DJ et KM
+ * seulement. Les autres marchés n'ont PAS de repli (pas de « cash » inventé) :
+ * la commande est bloquée tant que Rivendy n'y a pas configuré de moyen de
+ * paiement, comme dans l'app. Seuls les Mobile Money qui ont un numéro de
+ * réception sont proposés (audit 20, WEB-9) : un moyen sans numéro laissait
+ * l'acheteur sans savoir où payer.
  */
 function fallbackPaymentMethods(marketId?: string | null): PaymentMethod[] {
+  if (marketId !== "DJ" && marketId !== "KM") return [];
   const make = (id: number, name: string, type: string, order: number): PaymentMethod => ({
-    id, country_id: marketId ?? "", name, type, logo_icon: null, color_hex: null,
+    id, country_id: marketId, name, type, logo_icon: null, color_hex: null,
     is_active: true, api_ready: false, display_order: order,
   });
-  if (marketId === "DJ") {
-    return [make(1, "Cash à la livraison", "cash", 1), make(2, "D-Money", "mobile_money", 2), make(3, "Waafi", "mobile_money", 3), make(4, "CAC Pay", "mobile_money", 4)];
-  }
-  if (marketId === "KM") {
-    return [make(10, "Cash à la livraison", "cash", 1), make(11, "Mvola", "mobile_money", 2), make(12, "HaloMoney", "mobile_money", 3)];
-  }
-  return [];
+  const mobile = getMobileMoneyForCountry(marketId).filter((m) => m.id !== "cash" && m.enabled && m.number);
+  return [
+    make(1, "Cash à la livraison", "cash", 1),
+    ...mobile.map((m, index) => make(2 + index, m.name, "mobile_money", 2 + index)),
+  ];
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export function CheckoutForm() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const cart = useCart();
-  const { removeItem, revalidateCart } = cart;
+  const { removeItem, revalidateCart, setItemVariant } = cart;
   const {
     country: displayedCountry,
     countries,
@@ -139,6 +139,10 @@ export function CheckoutForm() {
       ? countries.find((c) => c.id === cartMarketId) ?? displayedCountry
       : displayedCountry;
   const otherMarket = !!country && !!displayedCountry && country.id !== displayedCountry.id;
+  // Une commande ne porte que sur un marché, celui du compte : un panier rempli
+  // avant la connexion peut en mélanger deux, et rien ne s'additionne entre
+  // monnaies (audit 20, WEB-2).
+  const severalMarkets = cartMarkets(groups.flatMap((g) => g.items)).length > 1;
   // Moyens de paiement du marché du panier quand il n'est pas le marché affiché.
   const [cartMarketMethods, setCartMarketMethods] = useState<{ market: string; methods: PaymentMethod[] } | null>(null);
   const otherMarketId = otherMarket && country ? country.id : null;
@@ -311,13 +315,39 @@ export function CheckoutForm() {
     return false;
   }, [deliveryMode, buyerZone, usesStructuredAddress, deliveryAddress, pricedZones.length, selectedZone]);
 
+  // Numéros validés pour le marché de la commande (audit 20, WEB-3) : « 12 »
+  // passait, et Rivendy ne pouvait plus rappeler l'acheteur.
+  const buyerPhoneError = buyerPhone.trim() ? validatePhone(buyerPhone, country?.id) : null;
+  const payerPhoneError =
+    selectedMethod && selectedMethod.type !== "cash" && payerPhone.trim()
+      ? validatePhone(payerPhone, country?.id)
+      : null;
+
   // Formulaire complet ?
   const isFormValid =
     buyerName.trim().length > 0 &&
     buyerPhone.trim().length > 0 &&
+    !buyerPhoneError &&
+    !payerPhoneError &&
+    !severalMarkets &&
     isDeliveryReady &&
     selectedMethod !== null &&
     !noPaymentMethod;
+
+  /** Taille ou couleur choisie à la commande (audit 20, WEB-4). */
+  function chooseVariant(productId: string, variant: { size?: string; color?: string }) {
+    if (!buyNow) {
+      setItemVariant(productId, variant);
+      return;
+    }
+    setBuyNow((item) =>
+      item && {
+        ...item,
+        ...(variant.size !== undefined ? { selectedSize: variant.size || undefined } : {}),
+        ...(variant.color !== undefined ? { selectedColor: variant.color || undefined } : {}),
+      },
+    );
+  }
 
   // ── Soumission ────────────────────────────────────────────────────────────
 
@@ -664,12 +694,17 @@ export function CheckoutForm() {
             <p key={id} className="text-sm font-bold text-[#009688]">✅ {id}</p>
           ))}
         </div>
+        {selectedMethod && selectedMethod.type !== "cash" && (
+          <p className="mt-4 text-sm font-semibold text-slate-600">
+            Votre paiement sera vérifié par Rivendy avant la préparation de la commande.
+          </p>
+        )}
         <button
           type="button"
-          onClick={() => router.push("/profile")}
+          onClick={() => router.push("/orders")}
           className="mt-8 inline-flex h-12 items-center rounded-full bg-[#1A1A1A] px-8 text-sm font-black text-white hover:bg-slate-800"
         >
-          Voir mon profil
+          Suivre mes commandes
         </button>
       </div>
     );
@@ -706,9 +741,26 @@ export function CheckoutForm() {
                 <p className="mt-1 text-xs text-slate-500">
                   {group.items.map((i) => `${i.product.title} × ${i.quantity}`).join(", ")}
                 </p>
+                {group.items.filter((i) => hasVariants(i.product)).map((i) => (
+                  <div key={i.product.id} className="mt-2">
+                    <p className="text-xs font-bold text-slate-600">{i.product.title}</p>
+                    <VariantSelects
+                      product={i.product}
+                      size={i.selectedSize}
+                      color={i.selectedColor}
+                      onChange={(variant) => chooseVariant(i.product.id, variant)}
+                    />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
+          {severalMarkets && (
+            <p role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              Ce panier contient des articles de plusieurs pays. Gardez seulement ceux du pays de votre compte.{" "}
+              <Link href="/cart" className="font-black underline">Voir mon panier</Link>
+            </p>
+          )}
         </section>
 
         {/* Sélecteur mode de livraison */}
@@ -896,8 +948,13 @@ export function CheckoutForm() {
                   type="tel"
                   className="pl-9"
                   required
+                  aria-invalid={Boolean(buyerPhoneError)}
+                  aria-describedby={buyerPhoneError ? "buyerPhoneError" : undefined}
                 />
               </div>
+              {buyerPhoneError && (
+                <p id="buyerPhoneError" className="text-xs font-semibold text-red-600">{buyerPhoneError}</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -998,7 +1055,12 @@ export function CheckoutForm() {
                 value={payerPhone}
                 onChange={(e) => setPayerPhone(e.target.value)}
                 placeholder="Votre numéro Mobile Money"
+                aria-invalid={Boolean(payerPhoneError)}
+                aria-describedby={payerPhoneError ? "payerPhoneError" : undefined}
               />
+              {payerPhoneError && (
+                <p id="payerPhoneError" className="text-xs font-semibold text-red-600">{payerPhoneError}</p>
+              )}
               <Label htmlFor="transactionRef" className="text-sm font-bold text-slate-700">
                 Référence de paiement (optionnel)
               </Label>

@@ -6,14 +6,16 @@ import { useEffect } from "react";
 import { MessageCircle, Minus, Plus, ShoppingBag, Store, Trash2, MessageSquare } from "lucide-react";
 import { useCart } from "@/features/cart/cart-provider";
 import { CartNotice } from "@/features/cart/cart-notice";
-import { useCountryOrDefault } from "@/features/country/country-provider";
-import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { canAddMore, cartMarkets } from "@/features/cart/cart-logic";
+import { VariantSelects } from "@/features/cart/variant-selects";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
+import { firstPhoto, formatMoney, formatMoneySums } from "@/lib/utils/format";
 import { useDialogs } from "@/features/ui/dialogs";
+import type { CartItem } from "@/types/rivendy";
 
 export function CartView() {
   const {
     groups,
-    totalAmount,
     totalItems,
     sellerCount,
     increment,
@@ -23,8 +25,8 @@ export function CartView() {
     setItemVariant,
     revalidateCart,
   } = useCart();
-  const csv = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const country = useCountryOrDefault();
+  const { countries } = useCountry();
   const dialogs = useDialogs();
 
   // Ouvrir le panier relit ses articles en base : un article supprimé, vendu
@@ -59,6 +61,16 @@ export function CartView() {
 
   if (!country) return null;
 
+  // Chaque article s'affiche dans la monnaie de SON marché, et rien ne
+  // s'additionne entre monnaies (audit 20, WEB-2) : un panier des Comores vu
+  // depuis Djibouti s'affichait en FDJ, sans conversion.
+  const marketOf = (item: CartItem) => countries.find((c) => c.id === item.product.country_id) ?? country;
+  const sumOf = (items: CartItem[]) =>
+    formatMoneySums(items.map((item) => [item.product.price * item.quantity, marketOf(item)]), country);
+  const allItems = groups.flatMap((group) => group.items);
+  const total = sumOf(allItems);
+  const severalMarkets = cartMarkets(allItems).length > 1;
+
   return (
     <>
       <div className="mx-auto max-w-5xl px-4 pb-32 pt-6 md:pb-10 md:px-6 md:py-10">
@@ -91,15 +103,18 @@ export function CartView() {
 
         <CartNotice />
 
+        {severalMarkets && (
+          <p role="status" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            Ce panier contient des articles de plusieurs pays. Une commande ne se passe que dans le pays de
+            votre compte : retirez les autres articles avant de commander.
+          </p>
+        )}
+
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
 
           {/* ── ITEMS PAR GROUPE VENDEUR ───────────────────────────────── */}
           <div className="space-y-4">
             {groups.map((group) => {
-              const groupTotal = group.items.reduce(
-                (sum, item) => sum + item.product.price * item.quantity,
-                0,
-              );
               return (
                 <section key={group.sellerId} className="overflow-hidden rounded-2xl bg-white shadow-sm">
 
@@ -113,7 +128,7 @@ export function CartView() {
                       {group.sellerName}
                     </Link>
                     <span className="text-sm font-black text-[#009688]">
-                      {formatMoney(groupTotal, country)}
+                      {sumOf(group.items)}
                     </span>
                   </div>
 
@@ -149,44 +164,21 @@ export function CartView() {
                               </Link>
                               {/* Sous-total ligne — visible partout */}
                               <span className="shrink-0 text-sm font-black text-[#1A1A1A]">
-                                {formatMoney(lineTotal, country)}
+                                {formatMoney(lineTotal, marketOf(item))}
                               </span>
                             </div>
 
                             <p className="text-xs text-slate-400">
-                              {formatMoney(item.product.price, country)} / unité
+                              {formatMoney(item.product.price, marketOf(item))} / unité
                             </p>
 
                             {/* Sélection de variante (une ligne par produit — parity app) */}
-                            {(() => {
-                              const sizes = csv(item.product.extra_attributes?.sizes);
-                              const colors = csv(item.product.extra_attributes?.colors);
-                              if (sizes.length === 0 && colors.length === 0) return null;
-                              return (
-                                <div className="mt-1.5 flex flex-wrap gap-2">
-                                  {sizes.length > 0 && (
-                                    <select
-                                      value={item.selectedSize ?? ""}
-                                      onChange={(e) => setItemVariant(item.product.id, { size: e.target.value })}
-                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 focus:border-[#009688] focus:outline-none"
-                                    >
-                                      <option value="">Taille…</option>
-                                      {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                  )}
-                                  {colors.length > 0 && (
-                                    <select
-                                      value={item.selectedColor ?? ""}
-                                      onChange={(e) => setItemVariant(item.product.id, { color: e.target.value })}
-                                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 focus:border-[#009688] focus:outline-none"
-                                    >
-                                      <option value="">Couleur…</option>
-                                      {colors.map((c) => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                  )}
-                                </div>
-                              );
-                            })()}
+                            <VariantSelects
+                              product={item.product}
+                              size={item.selectedSize}
+                              color={item.selectedColor}
+                              onChange={(variant) => setItemVariant(item.product.id, variant)}
+                            />
 
                             {/* Contrôles quantité + supprimer */}
                             <div className="mt-2 flex items-center gap-3">
@@ -207,7 +199,9 @@ export function CartView() {
                                   type="button"
                                   onClick={() => increment(item.product.id)}
                                   aria-label="Augmenter"
-                                  className="flex h-8 w-8 items-center justify-center text-slate-500 transition hover:bg-slate-100 active:bg-slate-200"
+                                  disabled={!canAddMore(item.product, item.quantity)}
+                                  title={canAddMore(item.product, item.quantity) ? undefined : "Stock atteint"}
+                                  className="flex h-8 w-8 items-center justify-center text-slate-500 transition hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                   <Plus className="h-3 w-3" />
                                 </button>
@@ -241,15 +235,11 @@ export function CartView() {
               {/* Détail par boutique */}
               <div className="mt-4 space-y-2">
                 {groups.map((group) => {
-                  const groupTotal = group.items.reduce(
-                    (sum, item) => sum + item.product.price * item.quantity,
-                    0,
-                  );
                   return (
                     <div key={group.sellerId} className="flex justify-between text-sm">
                       <span className="truncate pr-2 text-slate-500">{group.sellerName}</span>
                       <span className="shrink-0 font-bold text-[#1A1A1A]">
-                        {formatMoney(groupTotal, country)}
+                        {sumOf(group.items)}
                       </span>
                     </div>
                   );
@@ -259,8 +249,8 @@ export function CartView() {
               {/* Total */}
               <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
                 <span className="text-sm font-bold text-slate-500">Total</span>
-                <span className="text-xl font-black text-[#1A1A1A]">
-                  {formatMoney(totalAmount, country)}
+                <span className="text-right text-xl font-black text-[#1A1A1A]">
+                  {total}
                 </span>
               </div>
 
@@ -276,7 +266,7 @@ export function CartView() {
                 className="mt-4 flex h-14 items-center justify-center gap-2.5 rounded-2xl bg-[#25D366] text-sm font-black text-white transition hover:bg-[#1da853]"
               >
                 <MessageSquare className="h-5 w-5 fill-white" />
-                Commander · {formatMoney(totalAmount, country)}
+                Commander · {total}
               </Link>
             </div>
           </aside>
@@ -291,7 +281,7 @@ export function CartView() {
               {totalItems} article{totalItems > 1 ? "s" : ""}
             </p>
             <p className="text-base font-black text-[#1A1A1A]">
-              {formatMoney(totalAmount, country)}
+              {total}
             </p>
           </div>
           <Link

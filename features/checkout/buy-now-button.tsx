@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
+import { BUY_NOW_KEY } from "@/features/cart/cart-logic";
 import { useCart } from "@/features/cart/cart-provider";
 import { useForeignMarketGuard } from "@/features/checkout/foreign-market-order";
-import { BUY_NOW_KEY } from "@/features/checkout/checkout-form";
 import type { Product } from "@/types/rivendy";
 
 export function BuyNowButton({ product }: { product: Product }) {

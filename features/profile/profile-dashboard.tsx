@@ -113,7 +113,7 @@ export function ProfileDashboard() {
          le numéro saisi au checkout différait de celui du profil. */
       const { data: orderRows } = await supabase
         .from("orders")
-        .select("*, order_items(*)")
+        .select("id, status, country_id, created_at, seller_name, total_price, order_items(product_title)")
         .eq("buyer_id", user.id)
         .order("created_at", { ascending: false })
         .limit(30);

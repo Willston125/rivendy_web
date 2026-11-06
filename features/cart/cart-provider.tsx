@@ -10,6 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/features/auth/auth-provider";
+import { BUY_NOW_KEY, cappedQuantity } from "@/features/cart/cart-logic";
 import { supabase } from "@/lib/supabase/client";
 import { isOrderable } from "@/lib/utils/format";
 import type { CartItem, Product, SellerCartGroup } from "@/types/rivendy";
@@ -206,12 +208,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_KEY, JSON.stringify(items));
   }, [items]);
 
+  // Déconnexion : le panier part avec le compte, comme dans l'app (audit 20,
+  // WEB-15). Un visiteur jamais connecté garde le sien.
+  const { user } = useAuth();
+  const wasSignedIn = useRef(false);
+  useEffect(() => {
+    if (user) {
+      wasSignedIn.current = true;
+      return;
+    }
+    if (!wasSignedIn.current) return;
+    wasSignedIn.current = false;
+    setItems([]);
+    try {
+      sessionStorage.removeItem(BUY_NOW_KEY);
+    } catch {
+      /* stockage indisponible : rien à retirer */
+    }
+  }, [user]);
+
   const addItem = useCallback((product: Product, quantity = 1) => {
     setItems((current) => {
       const index = current.findIndex((item) => item.product.id === product.id);
-      if (index === -1) return [...current, { product, quantity }];
+      if (index === -1) {
+        const allowed = cappedQuantity(product, quantity);
+        return allowed > 0 ? [...current, { product, quantity: allowed }] : current;
+      }
       return current.map((item, i) =>
-        i === index ? { ...item, quantity: item.quantity + quantity } : item,
+        i === index ? { ...item, quantity: cappedQuantity(product, item.quantity + quantity) } : item,
       );
     });
   }, []);
@@ -223,7 +247,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const increment = useCallback((productId: string) => {
     setItems((current) =>
       current.map((item) =>
-        item.product.id === productId ? { ...item, quantity: item.quantity + 1 } : item,
+        item.product.id === productId
+          ? { ...item, quantity: cappedQuantity(item.product, item.quantity + 1) }
+          : item,
       ),
     );
   }, []);

@@ -15,7 +15,8 @@ export function formatMoney(value: number | null | undefined, country?: Pick<Cou
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(amount);
-  return `${formatted} ${country?.currency_symbol || country?.currency_code || "FDJ"}`;
+  // Marché inconnu : le montant seul, jamais une monnaie inventée (audit 20, WEB-13).
+  return `${formatted} ${country?.currency_symbol || country?.currency_code || ""}`.trim();
 }
 
 /**

@@ -41,6 +41,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl("/music/explore"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
     { url: absoluteUrl("/music/artists"), lastModified: now, changeFrequency: "weekly", priority: 0.5 },
     // Rivendy Play (Omnicanal lot C, 2026-10-22).
+    { url: absoluteUrl("/plus"), lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: absoluteUrl("/play"), lastModified: now, changeFrequency: "daily", priority: 0.7 },
     { url: absoluteUrl("/play/movies"), lastModified: now, changeFrequency: "daily", priority: 0.5 },
     { url: absoluteUrl("/play/series"), lastModified: now, changeFrequency: "daily", priority: 0.5 },

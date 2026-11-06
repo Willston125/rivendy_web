@@ -6,6 +6,10 @@
  * Tant qu'elles sont vides, la bannière pointe vers la page d'accueil.
  */
 export const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL || "";
+
+/** Page Google Play de l'app, toujours renseignée (audit 20, WEB-20). */
+export const PLAY_STORE_PAGE_URL =
+  PLAY_STORE_URL || "https://play.google.com/store/apps/details?id=com.rivendy.app";
 export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || "";
 
 /** Au moins un lien store est-il configuré ? */

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Download, Smartphone, Clapperboard } from "lucide-react";
 import { ProductVideoPlayer } from "@/features/products/product-video-player";
+import { PLAY_STORE_PAGE_URL } from "@/lib/config/app-links";
 
 /**
  * Rivendy Play — page de repli d'un lien partagé (lot K de l'audit 16,
@@ -16,7 +17,7 @@ import { ProductVideoPlayer } from "@/features/products/product-video-player";
  * Android (règle Google Play) — la page renvoie seulement vers Google Play.
  */
 
-export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.rivendy.app";
+export const PLAY_STORE_URL = PLAY_STORE_PAGE_URL;
 const APP_PACKAGE = "com.rivendy.app";
 
 /** Ouvre l'app si elle est installée (Android), sinon la fiche Google Play. */

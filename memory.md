@@ -638,3 +638,31 @@ données, aux routes, au compte, à la lecture ni à Supabase.
   (écritures interceptées) — 1 seul manifeste chargé sur tout le parcours.
 
 *Dernière mise à jour : 31 octobre 2026 (mini-lecteur vidéo de Play)*
+
+## Lot 4 de l'audit 20 (2026-11-06, branche `fix/audit20-lot-4`)
+
+Source : `rivendy-docs/docs/audit-rivendy/20_AUDIT_PRE_DEPLOIEMENT_ECOSYSTEME_2026-10-22.md`. Aucun SQL.
+
+- **Panier et commande** : règles pures dans `features/cart/cart-logic.ts` (`npm run check:cart`).
+  Chaque article s'affiche dans la monnaie de SON marché (`formatMoneySums`), jamais d'addition
+  entre monnaies. Un panier de plusieurs pays est signalé, puis bloqué à la commande. Un seul
+  bouton Commander suffit : on ne commande que dans le marché d'origine (`foreign_market`).
+- **Stock** : `cappedQuantity` suit le verrou de `secure_create_order`. Stock non renseigné : pas
+  de plafond.
+- **Variantes** : `VariantSelects`, au panier et à la commande, « Commander maintenant » compris.
+- **Numéros** : `validatePhone` sur l'acheteur, et sur le payeur quand le moyen choisi n'est pas
+  le cash.
+- **Mes commandes** : `ORDER_COLUMNS` liste ce que la page affiche, sans commission ni part
+  vendeur. Un champ affiché plus tard dans `OrderCard` s'y ajoute en même temps, sinon il reste
+  vide sans erreur. Le tableau de bord du profil a sa propre liste, tout aussi courte.
+- **Recherche** : `ilikeOrFilter` (`features/search/search-logic.ts`, `npm run check:search`) met
+  la valeur entre guillemets dans `.or()`, seule façon d'accepter `( ) , .`.
+- **Déconnexion** : `CartProvider` vide le panier et l'achat immédiat quand le compte passe de
+  connecté à déconnecté. Un visiteur garde le sien. Il lit `useAuth()` : il doit rester sous
+  `AuthProvider` (`app/providers.tsx`).
+- **Écartés** : WEB-6 (le garde de marché revient à la commande), WEB-8 (paramètre ignoré par le
+  serveur, l'app envoie la même chose), WEB-12 (changement serveur), WEB-14 (replis sur le marché
+  par défaut, à traiter à part), WEB-18 (faible gain, nouvelle interface), WEB-19 (SQL et phrase
+  d'autorisation).
+- **Parité** : le repli de paiement de l'app garde HaloMoney sans numéro (`payment_method.dart`,
+  zone protégée).

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { PLAY_STORE_URL } from "@/lib/config/app-links";
+import { PLAY_STORE_PAGE_URL } from "@/lib/config/app-links";
 
 // Sérialisation JSON-LD sûre (anti-XSS). Vit dans un fichier pur sans import
 // pour rester testable sous `node --test` ; réexportée ici pour que les pages
@@ -28,8 +28,7 @@ export const SITE_URL =
 
 /** Fiche Google Play — publiée sous `com.rivendy.app`. La variable Vercel
  *  reste prioritaire (même source que la bannière de téléchargement). */
-export const PLAY_LISTING_URL =
-  PLAY_STORE_URL || "https://play.google.com/store/apps/details?id=com.rivendy.app";
+export const PLAY_LISTING_URL = PLAY_STORE_PAGE_URL;
 
 /**
  * Marché servi sur l'accueil nu `/` (et donc lu par Google en premier).

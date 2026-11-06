@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { useCountryOrDefault } from "@/features/country/country-provider";
 import { ProductCard } from "@/features/products/product-card";
+import { ilikeOrFilter } from "@/features/search/search-logic";
 import { supabase } from "@/lib/supabase/client";
 import { CATEGORIES, SUBCATEGORIES, type CategoryId, type Product } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
@@ -34,6 +35,7 @@ export function SearchView({
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [failed, setFailed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Audit 17 (WEB-23) : numéro de la dernière recherche lancée — une réponse
@@ -60,13 +62,13 @@ export function SearchView({
       dbQuery = dbQuery.eq("country_id", country.id);
     if (cat) dbQuery = dbQuery.eq("category", cat);
     if (sub?.trim()) dbQuery = dbQuery.eq("subcategory", sub.trim());
-    if (q.trim()) {
-      const term = q.trim().replace(/[%,]/g, "");
-      dbQuery = dbQuery.or(`title.ilike.%${term}%,description.ilike.%${term}%`);
-    }
+    const textFilter = ilikeOrFilter(["title", "description"], q);
+    if (textFilter) dbQuery = dbQuery.or(textFilter);
 
-    const { data } = await dbQuery;
+    const { data, error } = await dbQuery;
     if (requestId !== requestRef.current) return; // une recherche plus récente est partie
+    // Une panne n'est pas « aucun résultat » (audit 20, WEB-17).
+    setFailed(Boolean(error));
     setProducts((data as Product[]) ?? []);
     setSearched(true);
     setLoading(false);
@@ -227,7 +229,13 @@ export function SearchView({
         )}
 
         {/* Aucun résultat */}
-        {!loading && searched && products.length === 0 && (
+        {!loading && searched && failed && (
+          <p role="alert" className="py-16 text-center text-sm font-semibold text-slate-500">
+            La recherche n&apos;a pas abouti. Vérifiez votre connexion, puis réessayez.
+          </p>
+        )}
+
+        {!loading && searched && !failed && products.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <p className="text-5xl">😕</p>
             <p className="mt-4 text-base font-black text-slate-700">Aucun résultat</p>

@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -107,6 +107,17 @@ function stepIndex(status: OrderStatus): number {
 
 /* ── Filtres ────────────────────────────────────────────────────── */
 type Filter = "all" | "active" | "delivered" | "cancelled";
+/** Commandes chargées à la fois. */
+const ORDERS_PAGE = 30;
+
+/**
+ * Ce que cette page affiche, et rien d'autre (audit 20, WEB-11) : ni les
+ * commissions ni la part du vendeur. Un champ affiché plus tard dans
+ * `OrderCard` s'ajoute ici en même temps.
+ */
+const ORDER_COLUMNS =
+  "id, status, country_id, created_at, seller_name, payment_method, total_price, delivery_fee_kmf, delivery_region_name, delivery_locality_name, delivery_neighborhood_name, order_items(product_title, product_type, delivery_days)";
+
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all",       label: "Toutes" },
   { key: "active",    label: "En cours" },
@@ -570,17 +581,27 @@ export function OrdersView() {
   // `order_cancellation_requests` est en lecture seule pour l’acheteur (RLS
   // `ocr_select_own_or_staff`) : il ne voit que ses propres demandes.
   const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set());
-
+  const [limit, setLimit] = useState(ORDERS_PAGE);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    setLoading(true);
+    // Squelette au premier chargement seulement : « Voir plus » et le
+    // rechargement après une action gardent la liste et la position.
+    if (!loadedOnce.current) setLoading(true);
     try {
-      const { data } = await supabase
+      // Colonnes nommées et page limitée (audit 20, WEB-11) : `select("*")`
+      // chargeait tout l'historique, commissions et part vendeur comprises.
+      const { data, error } = await supabase
         .from("orders")
-        .select("*, order_items(*)")
+        .select(ORDER_COLUMNS)
         .eq("buyer_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      loadedOnce.current = true;
+      setLoadFailed(false);
       setOrders(
         ((data ?? []) as Array<Record<string, unknown>>).map(
           (row) => ({ ...row, items: row.order_items }) as AppOrder,
@@ -596,11 +617,12 @@ export function OrdersView() {
         new Set(((reqs ?? []) as Array<{ order_id: string }>).map((r) => r.order_id)),
       );
     } catch {
-      // ne pas bloquer l'UI
+      // Dit à l'acheteur, sinon une panne ressemble à « aucune commande ».
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, limit]);
 
   /* Chargement initial */
   useEffect(() => { load(); }, [load]);
@@ -707,6 +729,16 @@ export function OrdersView() {
       {/* Contenu */}
       {loading || !country ? (
         <OrdersSkeleton />
+      ) : loadFailed && orders.length === 0 ? (
+        <div role="alert" className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center">
+          <Package className="h-8 w-8 text-slate-200" />
+          <p className="mt-3 text-sm font-semibold text-slate-500">
+            Vos commandes n&apos;ont pas pu être chargées. Vérifiez votre connexion.
+          </p>
+          <button type="button" onClick={() => void load()} className="mt-3 text-sm font-black text-[#009688] underline">
+            Réessayer
+          </button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center">
           <Package className="h-8 w-8 text-slate-200" />
@@ -731,6 +763,17 @@ export function OrdersView() {
             />
           ))}
         </div>
+      )}
+
+      {/* Hors de la liste filtrée : un filtre vide peut cacher des commandes plus anciennes. */}
+      {!loading && orders.length >= limit && (
+        <button
+          type="button"
+          onClick={() => setLimit((current) => current + ORDERS_PAGE)}
+          className="mt-3 h-11 w-full rounded-2xl border border-slate-200 bg-white text-sm font-black text-[#009688] transition hover:bg-slate-50"
+        >
+          Voir plus de commandes
+        </button>
       )}
     </div>
   );
