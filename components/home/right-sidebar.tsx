@@ -11,8 +11,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCart } from "@/features/cart/cart-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
-import { firstPhoto, formatMoney } from "@/lib/utils/format";
+import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
+import { firstPhoto, formatMoney, formatMoneySums } from "@/lib/utils/format";
 import { inMarket } from "@/lib/utils/market-phrase";
 
 /* Les compteurs vitrine (« 5 842 produits en ligne », « 24 350+ clients
@@ -21,7 +21,8 @@ import { inMarket } from "@/lib/utils/market-phrase";
    sur de vrais comptages. */
 
 export function RightSidebar() {
-  const { items, totalAmount, removeItem } = useCart();
+  const { items, removeItem } = useCart();
+  const { countries } = useCountry();
   const countryNullable = useCountryOrDefault();
   // Colonne vide plutôt que `null` pendant la résolution du marché — même
   // raison que dans left-sidebar.tsx : la grille de l'accueil a des pistes
@@ -30,6 +31,14 @@ export function RightSidebar() {
     return <aside className="hidden w-[300px] lg:flex" aria-hidden="true" />;
   }
   const country = countryNullable;
+
+  // Comme la page panier (audit 20, WEB-2) : chaque article dans la monnaie de
+  // SON marché, rien ne s'additionne entre monnaies.
+  const marketOf = (countryId?: string | null) => countries.find((c) => c.id === countryId) ?? country;
+  const subtotal = formatMoneySums(
+    items.map(({ product, quantity }) => [product.price * quantity, marketOf(product.country_id)]),
+    country,
+  );
 
   const previewItems = items.slice(0, 3);
 
@@ -77,13 +86,13 @@ export function RightSidebar() {
                     <p className="text-[11px] text-slate-400">
                       {product.size && `Taille ${product.size} · `}
                       {quantity > 1 ? `${quantity}x ` : ""}
-                      {formatMoney(product.price, country)}
+                      {formatMoney(product.price, marketOf(product.country_id))}
                     </p>
                   )}
                   {!product.size && (
                     <p className="text-[11px] text-slate-400">
                       {quantity > 1 ? `${quantity}x ` : ""}
-                      {formatMoney(product.price, country)}
+                      {formatMoney(product.price, marketOf(product.country_id))}
                     </p>
                   )}
                 </div>
@@ -103,7 +112,7 @@ export function RightSidebar() {
             <div className="flex items-center justify-between bg-slate-50 px-4 py-3">
               <p className="text-xs font-semibold text-slate-500">Sous-total</p>
               <p className="text-sm font-black text-slate-900">
-                {formatMoney(totalAmount, country)}
+                {subtotal}
               </p>
             </div>
           </div>

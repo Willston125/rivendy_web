@@ -645,8 +645,15 @@ Source : `rivendy-docs/docs/audit-rivendy/20_AUDIT_PRE_DEPLOIEMENT_ECOSYSTEME_20
 
 - **Panier et commande** : règles pures dans `features/cart/cart-logic.ts` (`npm run check:cart`).
   Chaque article s'affiche dans la monnaie de SON marché (`formatMoneySums`), jamais d'addition
-  entre monnaies. Un panier de plusieurs pays est signalé, puis bloqué à la commande. Un seul
-  bouton Commander suffit : on ne commande que dans le marché d'origine (`foreign_market`).
+  entre monnaies, sur la page panier comme dans le panneau latéral de l'accueil
+  (`right-sidebar.tsx`). Un panier de plusieurs pays est signalé, puis bloqué à la commande. Un
+  seul bouton Commander suffit : on ne commande que dans le marché d'origine (`foreign_market`).
+- **Piège d'essai** : en `npm run dev`, le panier se vide à chaque rechargement complet. StrictMode
+  rejoue la restauration après que la première écriture a mis `[]` dans localStorage. Ce n'est pas
+  un bug de production : essayer le panier en naviguant dans le site, sans recharger.
+- **Relectures au retour sur l'onglet** : chaque passage de masqué à visible émet `SIGNED_IN`, donc
+  un nouvel objet `user`, et relance les écrans qui dépendent de `[user]`, Mes commandes compris.
+  Ce n'est pas une boucle : dans le panneau navigateur de Claude, ces passages s'enchaînent.
 - **Stock** : `cappedQuantity` suit le verrou de `secure_create_order`. Stock non renseigné : pas
   de plafond.
 - **Variantes** : `VariantSelects`, au panier et à la commande, « Commander maintenant » compris.

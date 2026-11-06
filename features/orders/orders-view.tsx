@@ -650,9 +650,11 @@ export function OrdersView() {
   }, [user]);
 
   const filtered = filterOrders(orders, filter);
+  // Une panne sans liste à montrer ne doit pas passer pour « Aucune commande ».
+  const failedEmpty = loadFailed && orders.length === 0;
 
   /* ── État vide global ─────────────────────────────────────────── */
-  if (!loading && orders.length === 0) {
+  if (!loading && orders.length === 0 && !failedEmpty) {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-center">
         <span className="flex h-20 w-20 mx-auto items-center justify-center rounded-full bg-slate-100">
@@ -681,7 +683,7 @@ export function OrdersView() {
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Historique</p>
           <h1 className="mt-1 text-3xl font-black text-slate-900">Mes commandes</h1>
-          {!loading && (
+          {!loading && !failedEmpty && (
             <p className="mt-1 text-sm text-slate-500">
               {orders.length} commande{orders.length > 1 ? "s" : ""} au total
             </p>
@@ -729,7 +731,7 @@ export function OrdersView() {
       {/* Contenu */}
       {loading || !country ? (
         <OrdersSkeleton />
-      ) : loadFailed && orders.length === 0 ? (
+      ) : failedEmpty ? (
         <div role="alert" className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center">
           <Package className="h-8 w-8 text-slate-200" />
           <p className="mt-3 text-sm font-semibold text-slate-500">

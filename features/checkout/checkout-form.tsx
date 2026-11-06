@@ -329,7 +329,6 @@ export function CheckoutForm() {
     buyerPhone.trim().length > 0 &&
     !buyerPhoneError &&
     !payerPhoneError &&
-    !severalMarkets &&
     isDeliveryReady &&
     selectedMethod !== null &&
     !noPaymentMethod;
@@ -710,6 +709,26 @@ export function CheckoutForm() {
     );
   }
 
+  // Ce panier ne peut pas être commandé : ni lignes ni total, car rien ne
+  // s'additionne entre monnaies (audit 20, WEB-2).
+  if (severalMarkets) {
+    return (
+      <div role="alert" className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-black text-slate-950">Plusieurs pays dans ce panier</h1>
+        <p className="mt-3 text-sm text-slate-500">
+          Une commande ne se passe que dans le pays de votre compte. Gardez seulement ses articles,
+          puis revenez commander.
+        </p>
+        <Link
+          href="/cart"
+          className="mt-6 inline-flex h-12 items-center rounded-full bg-[#009688] px-6 text-sm font-black text-white hover:bg-[#00796B]"
+        >
+          Voir mon panier
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
 
@@ -755,12 +774,6 @@ export function CheckoutForm() {
               </div>
             ))}
           </div>
-          {severalMarkets && (
-            <p role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-              Ce panier contient des articles de plusieurs pays. Gardez seulement ceux du pays de votre compte.{" "}
-              <Link href="/cart" className="font-black underline">Voir mon panier</Link>
-            </p>
-          )}
         </section>
 
         {/* Sélecteur mode de livraison */}
