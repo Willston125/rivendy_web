@@ -522,6 +522,23 @@ export function rythmeTagline(genreName: string): string {
 /** Le Rivendy Hit de l'accueil : les trois premiers titres (« Les titres du moment »). */
 export const HOME_HIT = 3;
 
+/** Haut de l'accueil : une place d'attente, l'affiche sponsorisée, ou la bannière « La sélection Rivendy ». */
+export type HomeTop = "wait" | "ad" | "selection";
+
+/**
+ * Une seule grande bannière en haut de l'accueil (2026-11-03, visuel validé
+ * par le propriétaire) : l'affiche sponsorisée quand il y en a une en ligne,
+ * sinon la bannière « La sélection Rivendy ». Abonné Rivendy+, ou statut
+ * illisible : jamais de pub. Tant que l'on ne sait pas, une place d'attente :
+ * la bannière verte n'apparaît jamais pour être remplacée par la pub.
+ */
+export function homeTop(p: { plusSettled: boolean; plusReady: boolean; plusActive: boolean; adLoading: boolean; hasAd: boolean }): HomeTop {
+  if (!p.plusSettled) return "wait";
+  if (!p.plusReady || p.plusActive) return "selection";
+  if (p.adLoading) return "wait";
+  return p.hasAd ? "ad" : "selection";
+}
+
 /** Tuiles de genre (page Explorer) : une couleur par position (jetons --rvm-genre-* de site.css), texte blanc lisible. */
 export const GENRE_TONES = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `var(--rvm-genre-${n})`);
 

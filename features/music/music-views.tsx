@@ -10,7 +10,6 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
 import { appIntentUrl } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
-import type { Advertisement } from "@/types/rivendy";
 import { fetchMusicBanners, useMusicPlus } from "./music-ads";
 import {
   fetchArtistTopTracks, fetchArtistsByIds, fetchArtistsWithMusic, fetchFeatured, fetchFollowedArtists, fetchGenres,
@@ -19,9 +18,9 @@ import {
 } from "./music-api";
 import { CollectionPage, IconTile, MetaLine, useCoverTint } from "./music-collection";
 import { useMusicLibrary } from "./music-library";
-import { MusicAdBanner, SelectionHero, SelectionHeroSkeleton } from "./music-home-hero";
+import { HomeTopSkeleton, MusicAdBanner, SelectionButton, SelectionHero } from "./music-home-hero";
 import {
-  HOME_GRID, HOME_HIT, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, genreTone, hitMovement,
+  HOME_GRID, HOME_HIT, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, genreTone, hitMovement, homeTop,
   releaseKindLabel, releaseYear, rythmeTagline, searchable, totalDurationLabel, uniqueReleases, usefulRubrics,
   type HomeRubric, type MusicRelease, type MusicTrack,
 } from "./music-logic";
@@ -59,10 +58,12 @@ type HomeFiller = { kind: "genre"; id: string; name: string; tone: string } | { 
 /**
  * Accueil de la Musique, style « fraîcheur » (2026-10-29, 2e référence du
  * propriétaire) puis réglages du même jour (sa maquette et sa vidéo) :
- * « Bonjour » et un soleil, la bannière « La sélection Rivendy », les
+ * « Bonjour » et un soleil, UNE grande bannière en haut (2026-11-03,
+ * `homeTop`) : l'affiche sponsorisée s'il y en a une (jamais pour un
+ * abonné Rivendy+), le bouton « Lancer la sélection Rivendy » juste dessous
+ * en tête des filtres ; sinon la bannière « La sélection Rivendy ». Puis les
  * filtres (tous restent sur la page), quatre grandes nouveautés, le
- * Rivendy Hit et « À chaque envie, son rythme » côte à côte, puis l'affiche
- * sponsorisée (jamais pour un abonné Rivendy+) et les artistes à
+ * Rivendy Hit et « À chaque envie, son rythme » côte à côte et les artistes à
  * découvrir. Le lecteur n'est jamais vide : le dernier titre écouté (ou le
  * n° 1 du Hit) y est prêt, sans démarrer seul. Tout suit le catalogue
  * réel : rien n'est inventé pour remplir.
@@ -89,7 +90,10 @@ export function MusicHomeView() {
     const ads = await fetchMusicBanners(market);
     return ads.length ? ads[Math.floor(Math.random() * ads.length)] : null;
   });
-  const ad = plus.ready && !plus.active ? banner.data : null;
+  const top = homeTop({
+    plusSettled: plus.settled, plusReady: plus.ready, plusActive: plus.active, adLoading: banner.loading, hasAd: !!banner.data,
+  });
+  const ad = top === "ad" ? banner.data : null;
 
   const data = home.data;
   const genres = useMemo(() => (data ? availableGenres(data.all, data.genres) : []), [data]);
@@ -169,7 +173,7 @@ export function MusicHomeView() {
         <div className="mt-5"><ErrorState onRetry={home.reload} /></div>
       ) : !data ? (
         <>
-          <div className="mt-3"><SelectionHeroSkeleton /></div>
+          <div className="mt-3"><HomeTopSkeleton /></div>
           <div className="mt-8"><CoverGridSkeleton /></div>
         </>
       ) : data.all.length === 0 && data.hit.length === 0 ? (
@@ -179,20 +183,33 @@ export function MusicHomeView() {
         </div>
       ) : (
         <>
-          <div className="mt-3"><SelectionHero releases={selection} /></div>
-          <div role="group" aria-label="Filtrer l’accueil" className="no-scrollbar -mx-4 mt-4 flex gap-2.5 overflow-x-auto px-4 @2xl:mx-0 @2xl:flex-wrap @2xl:px-0">
-            {chips.map((c) => (
-              <button key={c.key} type="button" onClick={c.pick} aria-pressed={c.on}
-                className={cn("h-9 shrink-0 rounded-full px-5 text-sm font-semibold transition-colors",
-                  c.on ? "bg-rvm-deep text-white" : "bg-rvm-raised text-rvm-on-accent hover:bg-rvm-raised-hover")}>
-                {c.label}
-              </button>
-            ))}
+          <div className="mt-3">
+            {top === "wait" ? <HomeTopSkeleton /> : ad ? <MusicAdBanner ad={ad} /> : <SelectionHero releases={selection} />}
+          </div>
+          {/* Avec l'affiche, le bouton de la sélection ouvre la ligne des filtres (téléphone : sur sa ligne). */}
+          <div className="mt-4 @2xl:flex @2xl:items-start @2xl:gap-2.5">
+            {ad ? (
+              <>
+                <SelectionButton releases={selection} />
+                <span aria-hidden className="mx-1.5 mt-2 hidden h-7 w-px shrink-0 bg-rvm-line @2xl:block" />
+              </>
+            ) : null}
+            <div role="group" aria-label="Filtrer l’accueil"
+              className={cn("no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 @2xl:mx-0 @2xl:min-w-0 @2xl:flex-1 @2xl:flex-wrap @2xl:px-0",
+                ad && "mt-3 @2xl:mt-1")}>
+              {chips.map((c) => (
+                <button key={c.key} type="button" onClick={c.pick} aria-pressed={c.on}
+                  className={cn("h-9 shrink-0 rounded-full px-5 text-sm font-semibold transition-colors",
+                    c.on ? "bg-rvm-deep text-white" : "bg-rvm-raised text-rvm-on-accent hover:bg-rvm-raised-hover")}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
           {!user && !authLoading ? <div className="mt-6"><VisitorWelcome /></div> : null}
           <HomeSections fresh={fresh} genreName={genres.find((g) => g.id === genre)?.name} hit={hit}
             tiles={genre ? [] : focus === "moods" ? allTiles : allTiles.slice(0, 3)} fillers={fillers}
-            artists={artists} rubrics={rubrics} genre={genre} focus={focus} ad={ad} />
+            artists={artists} rubrics={rubrics} genre={genre} focus={focus} />
         </>
       )}
     </div>
@@ -222,7 +239,7 @@ function VisitorWelcome() {
 /** Pastels des « rythmes » (référence) : jetons --rvm-rythme-* de site.css. */
 const RYTHME_TONES = [1, 2, 3].map((n) => ({ bg: `var(--rvm-rythme-${n}-bg)`, fg: `var(--rvm-rythme-${n}-fg)` }));
 
-function HomeSections({ fresh, genreName, hit, tiles, fillers, artists, rubrics, genre, focus, ad }: {
+function HomeSections({ fresh, genreName, hit, tiles, fillers, artists, rubrics, genre, focus }: {
   /** Nouveautés (filtrées par le genre choisi). */
   fresh: MusicRelease[];
   genreName?: string;
@@ -237,7 +254,6 @@ function HomeSections({ fresh, genreName, hit, tiles, fillers, artists, rubrics,
   genre: string | null;
   /** « Nouveautés » ou « Ambiances » : cette rubrique seule. */
   focus: HomeFocus;
-  ad: Advertisement | null;
 }) {
   const explore = genre ? `/music/explore?genre=${genre}` : "/music/explore";
   const shown = fresh.slice(0, focus === "new" ? HOME_SHOWS.releases : HOME_GRID);
@@ -304,8 +320,6 @@ function HomeSections({ fresh, genreName, hit, tiles, fillers, artists, rubrics,
           ) : null}
         </div>
       ) : null}
-
-      {!focus && ad ? <div className="mt-8"><MusicAdBanner ad={ad} className="max-w-4xl" /></div> : null}
 
       {!focus && artists.length > 0 ? (
         <Section title="Artistes à découvrir" href={rubrics.includes("artists") || artists.length > HOME_SHOWS.artists ? "/music/artists" : undefined}>

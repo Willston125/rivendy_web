@@ -19,18 +19,14 @@ const noSubscribe = () => () => {};
 const SOURCE = { label: "La sélection Rivendy", href: "/music" };
 
 /**
- * Bannière « La sélection Rivendy » (style « fraîcheur », 2026-10-29,
- * référence du propriétaire) : vert lagon à gauche, photo joyeuse à droite,
- * « Lancer la sélection » joue les sorties de la sélection (ordre du
- * dashboard), sinon les dernières sorties. La photo vient de la maquette du
- * propriétaire (public/music/une-danse.webp) ; en économie de données, elle
- * est épargnée et la bannière reste en vert plein.
+ * Lecture de la sélection, partagée par la bannière et par le bouton posé
+ * sous l'affiche sponsorisée : les sorties de la sélection (ordre du
+ * dashboard), sinon les dernières sorties ; un 2e clic met en pause.
  */
-export function SelectionHero({ releases }: { releases: MusicRelease[] }) {
+function useSelectionPlay(releases: MusicRelease[]) {
   const player = useMusicPlayer();
   const market = useHomeMarket();
   const [busy, setBusy] = useState(false);
-  const light = useSyncExternalStore(noSubscribe, lightData, () => false);
   const isThis = player.source?.label === SOURCE.label && !!player.current;
   const playing = isThis && player.playing;
 
@@ -47,6 +43,27 @@ export function SelectionHero({ releases }: { releases: MusicRelease[] }) {
       setBusy(false);
     }
   }
+
+  return { play, busy, isThis, playing, disabled: releases.length === 0 };
+}
+
+function SelectionIcon({ busy, playing, className }: { busy: boolean; playing: boolean; className: string }) {
+  if (busy) return <LoaderCircle className={cn(className, "motion-safe:animate-spin")} aria-hidden />;
+  return playing ? <Pause className={cn(className, "fill-current")} aria-hidden /> : <Play className={cn(className, "fill-current")} aria-hidden />;
+}
+
+/**
+ * Bannière « La sélection Rivendy » (style « fraîcheur », 2026-10-29,
+ * référence du propriétaire) : vert lagon à gauche, photo joyeuse à droite,
+ * « Lancer la sélection » joue la sélection. Elle tient le haut de l'accueil
+ * quand aucune affiche sponsorisée n'est montrée (abonné Rivendy+, aucune pub
+ * en ligne). La photo vient de la maquette du propriétaire
+ * (public/music/une-danse.webp) ; en économie de données, elle est épargnée
+ * et la bannière reste en vert plein.
+ */
+export function SelectionHero({ releases }: { releases: MusicRelease[] }) {
+  const { play, busy, isThis, playing, disabled } = useSelectionPlay(releases);
+  const light = useSyncExternalStore(noSubscribe, lightData, () => false);
 
   return (
     <section aria-labelledby="rvm-hero-title"
@@ -68,10 +85,9 @@ export function SelectionHero({ releases }: { releases: MusicRelease[] }) {
         </h2>
         <p className="mt-3 text-[15px] font-semibold @2xl:text-lg">Les talents d’ici. L’énergie de partout.</p>
         <div className="mt-5">
-          <button type="button" onClick={play} disabled={releases.length === 0}
+          <button type="button" onClick={play} disabled={disabled}
             className="inline-flex h-12 items-center gap-2.5 rounded-full bg-rvm-accent px-6 text-base font-extrabold text-rvm-on-accent shadow-lg shadow-black/25 transition hover:bg-rvm-accent-hover active:bg-rvm-accent-pressed disabled:cursor-not-allowed disabled:opacity-50">
-            {busy ? <LoaderCircle className="h-5 w-5 motion-safe:animate-spin" aria-hidden />
-              : playing ? <Pause className="h-5 w-5 fill-current" aria-hidden /> : <Play className="h-5 w-5 fill-current" aria-hidden />}
+            <SelectionIcon busy={busy} playing={playing} className="h-5 w-5" />
             {isThis ? (playing ? "Pause" : "Reprendre") : "Lancer la sélection"}
           </button>
         </div>
@@ -80,29 +96,55 @@ export function SelectionHero({ releases }: { releases: MusicRelease[] }) {
   );
 }
 
-/** Attente de la bannière : sa place et sa couleur, sans photo. */
-export function SelectionHeroSkeleton() {
-  return <div aria-hidden className="h-80 rounded-3xl bg-rvm-deep/90 motion-safe:animate-pulse @2xl:h-[17.5rem]" />;
+/**
+ * Le bouton de la sélection quand l'affiche sponsorisée tient le haut : posé
+ * sous l'affiche, en tête des filtres, jamais sur l'image (elle appartient à
+ * l'annonceur et un clic dessus ouvre son lien).
+ */
+export function SelectionButton({ releases, className }: { releases: MusicRelease[]; className?: string }) {
+  const { play, busy, isThis, playing, disabled } = useSelectionPlay(releases);
+  return (
+    <button type="button" onClick={play} disabled={disabled}
+      aria-label={isThis ? (playing ? "Mettre en pause la sélection Rivendy" : "Reprendre la sélection Rivendy") : undefined}
+      className={cn("inline-flex h-11 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full bg-rvm-accent pl-4 pr-5 text-[15px] font-extrabold text-rvm-on-accent shadow-md shadow-rvm-deep/20 transition hover:bg-rvm-accent-hover active:bg-rvm-accent-pressed disabled:cursor-not-allowed disabled:opacity-50", className)}>
+      <SelectionIcon busy={busy} playing={playing} className="h-[18px] w-[18px]" />
+      {isThis ? (playing ? "Pause" : "Reprendre") : "Lancer la sélection Rivendy"}
+    </button>
+  );
+}
+
+/**
+ * Attente du haut de l'accueil : une place neutre au format de l'affiche,
+ * ni verte ni pub, tant que l'on ne sait pas laquelle des deux viendra.
+ */
+export function HomeTopSkeleton() {
+  return <div aria-hidden className="aspect-[1600/600] max-h-[21rem] w-full rounded-2xl bg-rvm-raised motion-safe:animate-pulse @2xl:rounded-3xl" />;
 }
 
 /**
  * Affiche sponsorisée de la Musique (format 2,7:1 du dashboard, onglet
- * « Musique »), toujours marquée « Sponsorisé », pleine image (couleurs
- * d'origine, rien posé dessus), jamais montrée aux abonnés Rivendy+ (le
- * parent ne la rend pas). Une vue comptée par affiche et par session.
+ * « Musique »), en haut de l'accueil à la place de la bannière de la
+ * sélection (2026-11-03) : jamais rognée — sa hauteur s'arrête à 336 px et,
+ * sur un écran plus large, les côtés reprennent la même affiche, floutée
+ * (même adresse et même `sizes` : aucun téléchargement de plus). Toujours
+ * marquée « Sponsorisé », jamais montrée aux abonnés Rivendy+ (le parent ne
+ * la rend pas). Une vue comptée par affiche et par session.
  */
 export function MusicAdBanner({ ad, className }: { ad: Advertisement; className?: string }) {
   useEffect(() => { trackAdView(ad.id); }, [ad.id]);
   const href = ad.link_type === "none" ? null : hrefForAd(ad);
+  const sizes = "(min-width: 1024px) 900px, 100vw";
   const body = (
     <>
-      <Image src={ad.image_url} alt={ad.title || "Publicité"} fill sizes="(min-width: 1024px) 900px, 100vw" className="object-cover" />
-      <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-extrabold text-rvm-text shadow-sm">
+      <Image src={ad.image_url} alt="" aria-hidden fill sizes={sizes}
+        className="scale-110 object-cover blur-2xl brightness-[0.62] saturate-[1.1]" />
+      <Image src={ad.image_url} alt={ad.title || "Publicité"} fill sizes={sizes} className="object-contain" />
+      <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-extrabold text-rvm-text shadow-sm @2xl:left-4 @2xl:top-4">
         Sponsorisé
       </span>
     </>
   );
-  const box = cn("relative block aspect-[1600/600] w-full overflow-hidden rounded-2xl bg-rvm-raised shadow-lg shadow-rvm-deep/15", className);
+  const box = cn("relative block aspect-[1600/600] max-h-[21rem] w-full overflow-hidden rounded-2xl bg-rvm-deep shadow-xl shadow-rvm-deep/20 @2xl:rounded-3xl", className);
   if (!href) return <div className={box}>{body}</div>;
   return isExternalAd(ad) ? (
     <a href={href} target="_blank" rel="noopener noreferrer sponsored" onClick={() => trackAdClick(ad.id)} className={box}>{body}</a>
