@@ -686,3 +686,19 @@ Source : `rivendy-docs/docs/audit-rivendy/20_AUDIT_PRE_DEPLOIEMENT_ECOSYSTEME_20
   d'autorisation).
 - **Parité** : le repli de paiement de l'app garde HaloMoney sans numéro (`payment_method.dart`,
   zone protégée).
+
+---
+
+## Cartes publicitaires de Rivendy Musique (2026-11-06)
+
+Maquette validée par le propriétaire. La même règle que l'application, avec le même compte.
+
+- **Accueil** : `MusicAdCarousel` (music-home-hero.tsx) : les bannières `web_category_banner` ciblées `musique` défilent
+  toutes les 4 s en haut de l'accueil, jamais pour un abonné.
+- **Pendant l'écoute** : `MusicPosterHost` (music-poster.tsx), monté dans `MusicShell` : compte gratuit, carte blanche centrée
+  sur un voile gris, croix tout de suite, se ferme seule. Le voile ne couvre jamais le lecteur du bas. Il écoute le lecteur et
+  ne lui parle jamais : le son ne dépend pas de la carte.
+- **Qui voit quoi** : le serveur décide (`music_poster_plan`, position `web_music_poster`). Rien pour un abonné, rien en cas de panne.
+- **Rythme** : `posterSlots` (music-logic.ts), compté sur le temps écouté (`addListened`). Miroirs à garder alignés :
+  `musique_poster_logic.dart` (app) et `lib/music-poster.ts` (dashboard), mêmes exemples dans leurs tests.
+- **Chaque affichage compte** (`trackAdDisplay`) : pas de limite d'une vue par session, une carte peut revenir sur un autre titre.

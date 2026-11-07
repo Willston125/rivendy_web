@@ -17,6 +17,7 @@ import { useSearchDraft } from "./music-ui";
 import { MusicLayoutProvider, RIGHT_MAX, RIGHT_MIN, useMusicLayout } from "./music-layout";
 import { AppSwitcher, ARTIST_SPACE_PATH, ArtistSpaceCard, LibraryLinks, MusicNav } from "./music-nav";
 import { NowPlayingPanel } from "./music-now-playing";
+import { MusicPosterHost } from "./music-poster";
 import { MobileMiniPlayer, MusicPlayerBar } from "./player/mini-player";
 import { useMusicPlayer } from "./player/music-player-provider";
 
@@ -89,6 +90,7 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
           </div>
         ) : null}
         {!layout.wide && layout.drawerOpen && player.current ? <RightDrawer /> : null}
+        <MusicPosterHost />
       </div>
       <MusicPlayerBar />
       <MobileMiniPlayer />

@@ -329,3 +329,68 @@ test("rythmeTagline : une phrase d’envie par genre, jamais un nombre", () => {
   assert.equal(rythmeTagline("Zoùk"), "Pour danser à deux.");
   assert.equal(rythmeTagline("Salegy"), "Les sorties Salegy du moment.");
 });
+
+import {
+  EMPTY_POSTER_PLAN, nextPoster, parsePosterPlan, posterCta, posterHasLink, posterPlanIsEmpty, posterSlots, posterStep,
+} from "./music-logic.ts";
+
+const RHYTHM = { enabled: true, maxPerTrack: 3, firstAfter: 30, minGap: 60, showSeconds: 15, minTrack: 60 };
+
+test("cartes : moments d'une chanson, les mêmes que l'application", () => {
+  assert.deepEqual(posterSlots(150, RHYTHM), [30, 130]);
+  assert.deepEqual(posterSlots(210, RHYTHM), [30, 110, 190]);
+  assert.deepEqual(posterSlots(422, RHYTHM), [30, 216, 402]);
+  assert.equal(posterSlots(169, RHYTHM).length, 2);
+  assert.equal(posterSlots(170, RHYTHM).length, 3);
+  assert.deepEqual(posterSlots(90, RHYTHM), [30]);
+  assert.deepEqual(posterSlots(59, RHYTHM), []);
+  assert.deepEqual(posterSlots(30, RHYTHM), []);
+  assert.deepEqual(posterSlots(422, { ...RHYTHM, maxPerTrack: 1 }), [30]);
+  assert.deepEqual(posterSlots(422, { ...RHYTHM, enabled: false }), []);
+  assert.deepEqual(posterSlots(70, { ...RHYTHM, firstAfter: 60 }), []);
+});
+
+test("cartes : une fois par moment, un saut n'en montre qu'une", () => {
+  assert.deepEqual(posterStep([30, 110], 0, 29), { due: false, next: 0 });
+  assert.deepEqual(posterStep([30, 110], 0, 30), { due: true, next: 1 });
+  assert.deepEqual(posterStep([30, 110], 1, 31), { due: false, next: 1 });
+  assert.deepEqual(posterStep([30, 110, 190], 0, 200), { due: true, next: 3 });
+  assert.deepEqual(posterStep([30, 110, 190], 3, 400), { due: false, next: 3 });
+});
+
+test("cartes : rotation, jamais deux fois la même sur un titre", () => {
+  assert.equal(nextPoster(["a", "b"], new Set(), 0), 0);
+  assert.equal(nextPoster(["a", "b"], new Set(), 3), 1);
+  assert.equal(nextPoster(["a", "b"], new Set(["a"]), 0), 1);
+  assert.equal(nextPoster(["a", "b"], new Set(["a", "b"]), 0), -1);
+  assert.equal(nextPoster([], new Set(), 0), -1);
+});
+
+test("cartes : réponse du serveur, rien dans le doute", () => {
+  const plan = parsePosterPlan({
+    enabled: true, max_per_track: 2, first_after_s: 40, min_gap_s: 90, show_s: 12, min_track_s: 80,
+    posters: [
+      { id: "x", title: "Titre", body: "Texte", image_url: "https://img", cta_label: "Réserver", link_type: "store", link_value: "s" },
+      { id: "sans-image", title: "T", image_url: "" },
+    ],
+  });
+  assert.equal(plan.rhythm.maxPerTrack, 2);
+  assert.equal(plan.rhythm.minTrack, 80);
+  assert.equal(plan.posters.length, 1);
+  assert.equal(posterPlanIsEmpty(plan), false);
+  assert.equal(posterPlanIsEmpty(parsePosterPlan({ enabled: true, posters: [] })), true);
+  assert.equal(posterPlanIsEmpty(parsePosterPlan(null)), true);
+  assert.equal(posterPlanIsEmpty(parsePosterPlan("erreur")), true);
+  assert.equal(posterPlanIsEmpty(EMPTY_POSTER_PLAN), true);
+});
+
+test("cartes : bouton seulement avec un lien qui s'ouvre partout", () => {
+  assert.ok(posterHasLink({ link_type: "store", link_value: "s" }));
+  assert.ok(posterHasLink({ link_type: "external", link_value: "https://x" }));
+  assert.ok(!posterHasLink({ link_type: "none", link_value: "" }));
+  assert.ok(!posterHasLink({ link_type: "category", link_value: "Femme" }));
+  assert.ok(!posterHasLink({ link_type: "whatsapp", link_value: "77" }));
+  assert.ok(!posterHasLink({ link_type: "product", link_value: "" }));
+  assert.equal(posterCta({ cta_label: "  " }), "Voir l’offre");
+  assert.equal(posterCta({ cta_label: " Réserver " }), "Réserver");
+});

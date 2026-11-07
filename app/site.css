@@ -399,6 +399,15 @@ body {
   @keyframes rvm-glow { from { opacity: 0.35; } to { opacity: 0.9; } }
   @keyframes rvm-wait { 50% { opacity: 0.15; } }
   @keyframes rvm-cassette-in { from { transform: translateY(-14%); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* Carte publicitaire pendant l'écoute (2026-11-06) : elle monte, puis le trait
+     du haut montre le temps qu'il reste avant qu'elle se ferme seule. */
+  @keyframes rvm-poster-in { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes rvm-poster-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  .rvm-poster-in { animation: rvm-poster-in 300ms ease-out; }
+  .rvm-poster-time { animation: rvm-poster-time linear forwards; }
+  @media (prefers-reduced-motion: reduce) {
+    .rvm-poster-in, .rvm-poster-time { animation: none; }
+  }
   .rvm-reel {
     transform-box: fill-box;
     transform-origin: center;

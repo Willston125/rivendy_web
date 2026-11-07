@@ -40,4 +40,6 @@ export const trackAdView = (adId: string) => {
   if (!adId || alreadyCounted(adId)) return;
   track(adId, "view");
 };
+/** Une carte Musique peut revenir sur un autre titre : chaque passage compte, sans la limite d'une vue par session. */
+export const trackAdDisplay = (adId: string) => track(adId, "view");
 export const trackAdClick = (adId: string) => track(adId, "click");

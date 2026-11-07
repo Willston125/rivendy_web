@@ -130,7 +130,7 @@ export function HomeTopSkeleton() {
  * marquée « Sponsorisé », jamais montrée aux abonnés Rivendy+ (le parent ne
  * la rend pas). Une vue comptée par affiche et par session.
  */
-export function MusicAdBanner({ ad, className }: { ad: Advertisement; className?: string }) {
+function MusicAdBanner({ ad, className }: { ad: Advertisement; className?: string }) {
   useEffect(() => { trackAdView(ad.id); }, [ad.id]);
   const href = ad.link_type === "none" ? null : hrefForAd(ad);
   const sizes = "(min-width: 1024px) 900px, 100vw";
@@ -150,5 +150,39 @@ export function MusicAdBanner({ ad, className }: { ad: Advertisement; className?
     <a href={href} target="_blank" rel="noopener noreferrer sponsored" onClick={() => trackAdClick(ad.id)} className={box}>{body}</a>
   ) : (
     <Link href={href} prefetch={false} onClick={() => trackAdClick(ad.id)} className={box}>{body}</Link>
+  );
+}
+
+/**
+ * Bannières sponsorisées du haut de l'accueil (2026-11-06) : plusieurs en ligne
+ * défilent toutes les 4 s, comme dans les autres onglets, avec une pause au
+ * survol et sans mouvement si le visiteur a demandé moins d'animations.
+ */
+export function MusicAdCarousel({ ads }: { ads: Advertisement[] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const count = ads.length;
+  const current = index % count;
+
+  useEffect(() => {
+    if (count <= 1 || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => setIndex((i) => (i + 1) % count), 4000);
+    return () => window.clearInterval(id);
+  }, [count, paused]);
+
+  return (
+    <div className="relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <MusicAdBanner ad={ads[current]} />
+      {count > 1 ? (
+        <div className="absolute inset-x-0 bottom-1 flex justify-center">
+          {ads.map((ad, i) => (
+            <button key={ad.id} type="button" onClick={() => setIndex(i)} aria-label={`Bannière ${i + 1} sur ${count}`}
+              aria-current={i === current} className="flex h-7 w-7 items-center justify-center">
+              <span className={cn("block h-[7px] rounded-full shadow-sm transition-all", i === current ? "w-5 bg-white" : "w-[7px] bg-white/60")} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }

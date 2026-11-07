@@ -5,13 +5,15 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { isAdLive } from "@/features/ads/ad-window";
 import { supabase } from "@/lib/supabase/client";
 import type { Advertisement } from "@/types/rivendy";
+import { EMPTY_POSTER_PLAN, parsePosterPlan, type MusicPosterPlan } from "./music-logic";
 
 /**
  * Publicité de la Musique (style « fraîcheur », 2026-10-29) : l'affiche
  * sponsorisée de l'accueil réutilise la position EXISTANTE « bannière
  * d'onglet » du site, ciblée sur l'onglet « musique » (dashboard →
  * Publicités) — aucune table ni position nouvelle. Ciblage par marché, vues
- * et clics comptés par les mêmes fonctions que la marketplace.
+ * et clics comptés par les mêmes fonctions que la marketplace. Les cartes
+ * pendant l'écoute, elles, viennent du serveur (`music_poster_plan`).
  */
 
 export const MUSIC_BANNER_POSITION = "web_category_banner";
@@ -28,6 +30,12 @@ export async function fetchMusicBanners(market: string | null): Promise<Advertis
   if (error) return [];
   const now = Date.now();
   return ((data ?? []) as Advertisement[]).filter((ad) => !!ad.image_url && isAdLive(ad, now));
+}
+
+/** Cartes et rythme du marché pour le compte connecté : rien pour un abonné, rien non plus en cas de panne. */
+export async function fetchPosterPlan(market: string): Promise<MusicPosterPlan> {
+  const { data, error } = await supabase.rpc("music_poster_plan", { p_market: market, p_surface: "web" });
+  return error ? EMPTY_POSTER_PLAN : parsePosterPlan(data);
 }
 
 /** Statut Rivendy+ lu une fois par compte et par chargement de page. */

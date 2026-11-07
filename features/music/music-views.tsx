@@ -18,7 +18,7 @@ import {
 } from "./music-api";
 import { CollectionPage, IconTile, MetaLine, useCoverTint } from "./music-collection";
 import { useMusicLibrary } from "./music-library";
-import { HomeTopSkeleton, MusicAdBanner, SelectionButton, SelectionHero } from "./music-home-hero";
+import { HomeTopSkeleton, MusicAdCarousel, SelectionButton, SelectionHero } from "./music-home-hero";
 import {
   HOME_GRID, HOME_HIT, HOME_SHOWS, artistName, availableGenres, distinctArtistIds, filterByGenre, genreTone, hitMovement, homeTop,
   releaseKindLabel, releaseYear, rythmeTagline, searchable, totalDurationLabel, uniqueReleases, usefulRubrics,
@@ -85,15 +85,13 @@ export function MusicHomeView() {
     const artists = await fetchArtistsByIds(distinctArtistIds(all).slice(0, 18)).catch(() => [] as MusicArtist[]);
     return { featured, fresh, hit, genres, artists, all };
   });
-  // Une affiche au hasard parmi celles en ligne, et seulement sans Rivendy+ (statut lu, jamais deviné).
-  const banner = useLoad(plus.ready && !plus.active && market ? `music-ad:${market}` : null, async () => {
-    const ads = await fetchMusicBanners(market);
-    return ads.length ? ads[Math.floor(Math.random() * ads.length)] : null;
-  });
+  // Les affiches en ligne, seulement sans Rivendy+ (statut lu, jamais deviné) : plusieurs défilent.
+  const banner = useLoad(plus.ready && !plus.active && market ? `music-ad:${market}` : null, () => fetchMusicBanners(market));
   const top = homeTop({
-    plusSettled: plus.settled, plusReady: plus.ready, plusActive: plus.active, adLoading: banner.loading, hasAd: !!banner.data,
+    plusSettled: plus.settled, plusReady: plus.ready, plusActive: plus.active, adLoading: banner.loading, hasAd: !!banner.data?.length,
   });
-  const ad = top === "ad" ? banner.data : null;
+  const ads = top === "ad" ? banner.data ?? [] : [];
+  const ad = ads.length > 0;
 
   const data = home.data;
   const genres = useMemo(() => (data ? availableGenres(data.all, data.genres) : []), [data]);
@@ -184,7 +182,7 @@ export function MusicHomeView() {
       ) : (
         <>
           <div className="mt-3">
-            {top === "wait" ? <HomeTopSkeleton /> : ad ? <MusicAdBanner ad={ad} /> : <SelectionHero releases={selection} />}
+            {top === "wait" ? <HomeTopSkeleton /> : ad ? <MusicAdCarousel ads={ads} /> : <SelectionHero releases={selection} />}
           </div>
           {/* Avec l'affiche, le bouton de la sélection ouvre la ligne des filtres (téléphone : sur sa ligne). */}
           <div className="mt-4 @2xl:flex @2xl:items-start @2xl:gap-2.5">

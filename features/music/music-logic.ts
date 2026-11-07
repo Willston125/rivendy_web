@@ -595,3 +595,118 @@ export function installHint(p: { ua: string; standalone: boolean; touchPoints: n
   if (/Android/.test(p.ua)) return "android";
   return null;
 }
+
+// ── Cartes publicitaires pendant l'écoute (2026-11-06) ─────────────────────
+// Miroirs à garder alignés : l'application (musique_poster_logic.dart) et le
+// dashboard (lib/music-poster.ts).
+
+/** Rythme réglé au dashboard (page « Affiches Musique »), en secondes. */
+export type PosterRhythm = {
+  enabled: boolean;
+  maxPerTrack: number;
+  firstAfter: number;
+  minGap: number;
+  showSeconds: number;
+  minTrack: number;
+};
+
+/** Une carte en ligne pour ce marché. */
+export type MusicPoster = {
+  id: string;
+  title: string;
+  body: string;
+  image_url: string;
+  cta_label: string;
+  link_type: string;
+  link_value: string;
+};
+
+export type MusicPosterPlan = { rhythm: PosterRhythm; posters: MusicPoster[] };
+
+/** Pas de nouvelle carte dans les 20 dernières secondes d'un titre. */
+export const POSTER_TAIL_SECONDS = 20;
+
+/** Dans le doute (panne, réponse illisible) : rien. Un abonné ne doit jamais voir une carte par erreur. */
+export const EMPTY_POSTER_PLAN: MusicPosterPlan = {
+  rhythm: { enabled: false, maxPerTrack: 3, firstAfter: 30, minGap: 60, showSeconds: 15, minTrack: 60 },
+  posters: [],
+};
+
+/** Réponse de `music_poster_plan` : liste vide pour un abonné, sans carte en ligne, ou réglage coupé. */
+export function parsePosterPlan(raw: unknown): MusicPosterPlan {
+  if (!raw || typeof raw !== "object") return EMPTY_POSTER_PLAN;
+  const m = raw as Record<string, unknown>;
+  const read = (key: string, fallback: number) => (typeof m[key] === "number" ? (m[key] as number) : fallback);
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const posters = (Array.isArray(m.posters) ? m.posters : []).map((p) => {
+    const e = (p ?? {}) as Record<string, unknown>;
+    return {
+      id: text(e.id), title: text(e.title), body: text(e.body), image_url: text(e.image_url),
+      cta_label: text(e.cta_label), link_type: text(e.link_type) || "none", link_value: text(e.link_value),
+    };
+  }).filter((p) => p.id && p.image_url);
+  return {
+    rhythm: {
+      enabled: m.enabled === true,
+      maxPerTrack: read("max_per_track", 3),
+      firstAfter: read("first_after_s", 30),
+      minGap: read("min_gap_s", 60),
+      showSeconds: read("show_s", 15),
+      minTrack: read("min_track_s", 60),
+    },
+    posters,
+  };
+}
+
+export function posterPlanIsEmpty(plan: MusicPosterPlan): boolean {
+  return !plan.rhythm.enabled || plan.posters.length === 0;
+}
+
+/**
+ * Moments d'un titre où une carte peut passer, en secondes ÉCOUTÉES : la
+ * première à `firstAfter`, les autres réparties jusqu'à 20 s de la fin, jamais
+ * plus proches que `minGap`.
+ */
+export function posterSlots(duration: number, r: PosterRhythm): number[] {
+  if (!r.enabled || r.maxPerTrack < 1 || duration < r.minTrack) return [];
+  const room = duration - r.firstAfter - POSTER_TAIL_SECONDS;
+  if (room < 0) return [];
+  const fit = r.minGap > 0 ? Math.floor(room / r.minGap) + 1 : r.maxPerTrack;
+  const count = Math.min(fit, r.maxPerTrack);
+  if (count <= 1) return [r.firstAfter];
+  const step = room / (count - 1);
+  return Array.from({ length: count }, (_, i) => Math.round(r.firstAfter + i * step));
+}
+
+/**
+ * Avance dans les moments d'un titre : `due` une seule fois par moment
+ * atteint. Tous les moments déjà passés sont consommés, qu'une carte s'ouvre
+ * ou non : un saut en avant n'en montre qu'une, et rien ne surgit au retour
+ * sur la page.
+ */
+export function posterStep(slots: number[], next: number, listened: number): { due: boolean; next: number } {
+  let i = next;
+  while (i < slots.length && listened >= slots[i]) i += 1;
+  return { due: i > next, next: i };
+}
+
+/** Prochaine carte à partir de `cursor`, sans celles déjà vues sur ce titre. -1 : il n'en reste aucune. */
+export function nextPoster(ids: string[], shownOnTrack: Set<string>, cursor: number): number {
+  const n = ids.length;
+  if (n === 0) return -1;
+  const start = ((cursor % n) + n) % n;
+  for (let k = 0; k < n; k += 1) {
+    const i = (start + k) % n;
+    if (!shownOnTrack.has(ids[i])) return i;
+  }
+  return -1;
+}
+
+/** Pas de bouton sans lien : une catégorie ne s'ouvre pas dans l'application, le dashboard ne la propose pas. */
+export function posterHasLink(p: Pick<MusicPoster, "link_type" | "link_value">): boolean {
+  return !!p.link_value && ["product", "store", "external"].includes(p.link_type);
+}
+
+export function posterCta(p: Pick<MusicPoster, "cta_label">): string {
+  return p.cta_label.trim() || "Voir l’offre";
+}
