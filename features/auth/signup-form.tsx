@@ -168,6 +168,18 @@ export function SignupForm() {
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Création…" : "Créer mon compte"}
       </Button>
+      {/* Liens légaux (demande du 2026-11-08), ouverts dans un nouvel onglet : le formulaire rempli reste là. */}
+      <p className="text-center text-xs leading-relaxed text-slate-500">
+        En vous inscrivant, vous acceptez nos{" "}
+        <Link href="/legal?tab=terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#007168] underline underline-offset-2">
+          Conditions d’utilisation
+        </Link>{" "}
+        et notre{" "}
+        <Link href="/legal?tab=privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#007168] underline underline-offset-2">
+          Politique de confidentialité
+        </Link>
+        .
+      </p>
       <p className="text-center text-sm text-slate-500">
         Déjà inscrit ?{" "}
         <Link href="/auth/login" className="font-bold text-[#009688]">
