@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  Bell, ChartColumn, ChevronDown, Download, House, Library, LogOut, Music, Search, Smartphone, Sparkles, UserRound,
+  Bell, ChartColumn, ChevronDown, Download, House, Library, LogOut, Music, Radio as RadioIcon, Search, Smartphone, Sparkles,
+  UserRound,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
@@ -20,6 +21,7 @@ import { NowPlayingPanel } from "./music-now-playing";
 import { MusicPosterHost } from "./music-poster";
 import { MobileMiniPlayer, MusicPlayerBar } from "./player/mini-player";
 import { useMusicPlayer } from "./player/music-player-provider";
+import { RadioBar, useRadioPlayer } from "./radio/radio-player";
 
 /**
  * Coque de l'espace Musique — mise en page « application » du 2026-10-22
@@ -45,6 +47,7 @@ export function MusicShell({ fontClassName, children }: { fontClassName?: string
 function ShellFrame({ fontClassName, children }: { fontClassName?: string; children: ReactNode }) {
   const layout = useMusicLayout();
   const player = useMusicPlayer();
+  const radio = useRadioPlayer();
   const pathname = usePathname() || "/music";
   const center = useRef<HTMLDivElement>(null);
 
@@ -92,8 +95,13 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
         {!layout.wide && layout.drawerOpen && player.current ? <RightDrawer /> : null}
         <MusicPosterHost />
       </div>
-      <MusicPlayerBar />
-      <MobileMiniPlayer />
+      {/* Une radio choisie prend la place du lecteur de musique (2026-11-11). */}
+      {radio.station ? <RadioBar /> : (
+        <>
+          <MusicPlayerBar />
+          <MobileMiniPlayer />
+        </>
+      )}
       <MobileNav />
     </div>
   );
@@ -340,12 +348,13 @@ function MobileNav() {
     { href: "/music", label: "Découvrir", icon: House, active: pathname === "/music" },
     { href: "/music/explore", label: "Rechercher", icon: Search, active: pathname.startsWith("/music/explore") },
     { href: "/music/hit", label: "Le Hit", icon: ChartColumn, active: pathname.startsWith("/music/hit") },
+    { href: "/music/radio", label: "Radio", icon: RadioIcon, active: pathname.startsWith("/music/radio") },
     { href: "/music/library", label: "Bibliothèque", icon: Library,
       active: ["/music/library", "/music/playlist", "/music/favorites", "/music/history", ARTIST_SPACE_PATH].some((p) => pathname.startsWith(p)) },
   ];
   return (
     <nav aria-label="Navigation Musique" className="rvm-deep shrink-0 pb-[env(safe-area-inset-bottom)] md:hidden">
-      <ul className="grid h-16 grid-cols-4">
+      <ul className="grid h-16 grid-cols-5">
         {items.map((it) => (
           <li key={it.label}>
             <Link href={it.href} aria-current={it.active ? "page" : undefined}

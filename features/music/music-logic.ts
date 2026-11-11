@@ -549,7 +549,7 @@ export function genreTone(index: number): string {
 
 // ── Navigation et espace artiste (lot 2, 2026-10-29) ───────────────────────
 
-export type MusicNavKey = "discover" | "search" | "hit";
+export type MusicNavKey = "discover" | "search" | "hit" | "radio";
 
 /** Entrée de la navigation active pour une adresse ; Rivendy Play, hors de la Musique, ne l'est jamais. */
 export function musicNavActive(pathname: string): MusicNavKey | null {
@@ -557,6 +557,7 @@ export function musicNavActive(pathname: string): MusicNavKey | null {
   if (p === "/music") return "discover";
   if (p.startsWith("/music/explore") || p.startsWith("/music/search")) return "search";
   if (p.startsWith("/music/hit")) return "hit";
+  if (p.startsWith("/music/radio")) return "radio";
   return null;
 }
 

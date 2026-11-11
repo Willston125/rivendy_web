@@ -31,7 +31,12 @@ const csp = [
   `img-src 'self' data: blob: ${SUPABASE_HOST} ${STREAM_HOST}`,
   // Notes vocales (Storage Supabase), préécoute d'un enregistrement (blob:) et
   // Rivendy Music (Omnicanal lot D) : liens audio signés du stockage R2.
-  `media-src 'self' blob: ${SUPABASE_HOST} https://*.r2.cloudflarestorage.com ${STREAM_HOST}`,
+  // Radios en direct (2026-11-11, phrase du propriétaire « … le lecteur et la
+  // règle de sécurité du site pour la radio en direct ») : le flux de chaque
+  // station vient de SON serveur, d'où `https:` — pour le SON seulement (un
+  // média n'exécute aucun code) ; scripts, cadres et appels restent fermés.
+  // Jamais `http:` : une page https ne joue pas de son non chiffré.
+  `media-src 'self' blob: ${SUPABASE_HOST} https://*.r2.cloudflarestorage.com ${STREAM_HOST} https:`,
   `frame-src ${STREAM_HOST}`,
   "style-src 'self' 'unsafe-inline'",
   scriptSources,

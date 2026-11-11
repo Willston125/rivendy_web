@@ -16,7 +16,7 @@
     "check:order-errors": "node --test lib/utils/order-errors.test.mjs",
     "check:commission": "node scripts/check-commission-grid.mjs",
     "check:offers": "node scripts/check-seller-offer-prices.mjs",
-    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission && npm run check:offers && npm run check:listings && npm run check:preorder && npm run check:plus && npm run check:music && npm run check:playweb && npm run check:clips && npm run check:phone && npm run check:wallet && npm run check:cart && npm run check:search && npm run check:order-errors",
+    "check": "npm run typecheck && npm run lint && npm run check:categories && npm run check:security && npm run check:classes && npm run check:commission && npm run check:offers && npm run check:listings && npm run check:preorder && npm run check:plus && npm run check:music && npm run check:radio && npm run check:playweb && npm run check:clips && npm run check:phone && npm run check:wallet && npm run check:cart && npm run check:search && npm run check:order-errors",
     "check:listings": "node scripts/sync-listings-from-app.mjs --check",
     "check:preorder": "node scripts/check-preorder-mirror.mjs",
     "check:plus": "node --test features/plus/plus-logic.test.mjs",
@@ -24,7 +24,8 @@
     "check:playweb": "node --test features/play/play-logic.test.mjs",
     "check:clips": "node --test features/play/clips/clips-logic.test.mjs",
     "check:phone": "node --test lib/utils/phone-validator.test.mjs",
-    "check:wallet": "node --test features/wallet/wallet-markets.test.mjs"
+    "check:wallet": "node --test features/wallet/wallet-markets.test.mjs",
+    "check:radio": "node --test features/music/radio/radio-logic.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

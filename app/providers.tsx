@@ -12,6 +12,7 @@ import { DialogsProvider } from "@/features/ui/dialogs";
 import { MusicPlayerProvider } from "@/features/music/player/music-player-provider";
 import { MiniPlayer } from "@/features/music/player/mini-player";
 import { MusicLibraryProvider } from "@/features/music/music-library";
+import { RadioDock, RadioPlayerProvider } from "@/features/music/radio/radio-player";
 import { PlayDockProvider } from "@/features/play/player/play-dock";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -31,6 +32,9 @@ export function Providers({ children }: { children: ReactNode }) {
             {/* Rivendy Music (Omnicanal lot D) : un seul lecteur pour tout le site,
                 monté ici pour que la navigation interne ne coupe pas le son. */}
             <MusicPlayerProvider>
+              {/* Radios en direct (2026-11-11) : leur propre lecteur, monté ici
+                  aussi ; il se coupe avec la musique et la vidéo (MEDIA_PLAY_EVENT). */}
+              <RadioPlayerProvider>
               {/* Favoris, playlists et partage du compte, communs aux pages
                   Musique et au lecteur (refonte du 2026-10-22). */}
               <MusicLibraryProvider>
@@ -39,8 +43,10 @@ export function Providers({ children }: { children: ReactNode }) {
                 <PlayDockProvider>
                   {children}
                   <MiniPlayer />
+                  <RadioDock />
                 </PlayDockProvider>
               </MusicLibraryProvider>
+              </RadioPlayerProvider>
             </MusicPlayerProvider>
           </CartProvider>
         </FavoritesProvider>

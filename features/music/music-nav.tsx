@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ArrowRight, ChartColumn, ChevronRight, Clock, Film, Heart, House, ListMusic, Music, Play, Plus, Search, ShoppingBag,
+  ArrowRight, ChartColumn, ChevronRight, Clock, Film, Heart, House, ListMusic, Music, Play, Plus, Radio, Search, ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -25,6 +25,7 @@ const ITEMS: Array<{ key: MusicNavKey | "clips"; href: string; label: string; ic
   { key: "discover", href: "/music", label: "Découvrir", icon: House },
   { key: "search", href: "/music/explore", label: "Rechercher", icon: Search },
   { key: "hit", href: "/music/hit", label: "Le Hit Rivendy", icon: ChartColumn },
+  { key: "radio", href: "/music/radio", label: "Radio en direct", icon: Radio },
   { key: "clips", href: CLIPS_HREF, label: "Clips", icon: Film },
 ];
 

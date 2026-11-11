@@ -702,3 +702,23 @@ Maquette validée par le propriétaire. La même règle que l'application, avec 
 - **Rythme** : `posterSlots` (music-logic.ts), compté sur le temps écouté (`addListened`). Miroirs à garder alignés :
   `musique_poster_logic.dart` (app) et `lib/music-poster.ts` (dashboard), mêmes exemples dans leurs tests.
 - **Chaque affichage compte** (`trackAdDisplay`) : pas de limite d'une vue par session, une carte peut revenir sur un autre titre.
+
+## Radios en direct de Rivendy Musique (2026-11-11, branche `feat/radio-direct`)
+
+Vraies stations (Comores, océan Indien, monde) sur `/music/radio`, et un aperçu privé par station sur
+`/music/radio/apercu/<jeton>` (noindex, interdit dans robots.ts, aucun compte demandé, aucune écoute comptée). Phrase du
+propriétaire : « Je t'autorise à toucher le lecteur et la règle de sécurité du site pour la radio en direct ».
+
+- **Données** : `music_radio_list(marché)` et `music_radio_preview(jeton)` seulement (SQL `20261111_1200_radio_direct.sql`,
+  dépôt dashboard) : radios en ligne AVEC la lettre signée de la station ; la base refuse « en ligne » sans elle.
+- **Lecteur à part** (`features/music/radio/radio-player.tsx`) : son propre `<audio>`, monté dans `app/providers.tsx` ; le
+  lecteur des titres (`music-player-provider.tsx`) n'est PAS touché. Les deux se coupent par `MEDIA_PLAY_EVENT`
+  (« radio » / « music »), comme la vidéo de Play. Dans la coque Musique, `RadioBar` prend la place de la barre de musique
+  tant qu'une radio est choisie ; ailleurs, `RadioDock` flotte en bas (jamais une radio qu'on ne peut plus arrêter).
+- **Direct** : pas de barre ; reprendre après une pause repart au direct ; coupure retentée 3 fois (2, 5, 10 s), puis
+  « ne répond pas » ; 15 s sans son = coupure. Compteur `music_radio_listen` au début puis toutes les 60 s (comptes connectés).
+- **CSP** : `media-src … https:` (SON seulement, 2026-11-11) ; `connect-src`, scripts et cadres restent fermés. Jamais `http:`.
+  Une radio HLS ne joue que si le navigateur lit le HLS lui-même (sinon : « écoutez-la dans l'application »).
+- **Écouter demande un compte** (comme la musique) : `inviteLogin`, sauf l'aperçu privé.
+- Règles pures : `radio-logic.ts`, tests `radio-logic.test.mjs` (`npm run check:radio`, dans `npm run check`) — mêmes
+  exemples que l'app (`musique_radio_test.dart`).

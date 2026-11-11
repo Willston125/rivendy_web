@@ -25,6 +25,8 @@ export default function robots(): MetadataRoute.Robots {
           "/music/favorites",
           "/music/history",
           "/music/search",
+          // Aperçu privé d'une radio : réservé à la station (2026-11-11).
+          "/music/radio/apercu",
           // Rivendy Play (Omnicanal lot C) : lecteur et pages du compte.
           "/play/watch",
           "/play/my-list",
