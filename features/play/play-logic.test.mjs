@@ -277,6 +277,9 @@ test("barre du haut : la rubrique d'après l'adresse", () => {
   assert.equal(sectionLabel("/play/history"), "Récents");
   assert.equal(sectionLabel("/play/search"), "Recherche");
   assert.equal(sectionLabel("/play/watch/movie/abc"), "Lecture");
+  assert.equal(sectionLabel("/play/shorts/nouveau"), "Créer");
+  assert.equal(sectionLabel("/play/mes-shorts"), "Mes Shorts");
+  assert.equal(sectionLabel("/play/short/public/abc"), "Short");
   assert.equal(sectionLabel("/play/autre"), "Rivendy Play");
 });
 

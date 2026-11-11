@@ -7,6 +7,8 @@ import {
   ArrowLeft, Bookmark, Flame, History, House, MicVocal, Plus, Search, UsersRound, X, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { PlayCreateButton } from "../create/create-menu";
+import { CLIP_NEW_PATH, CLIP_SPACE_PATH } from "../create/create-paths";
 import { Wordmark } from "../play-brand";
 import { AccountMenu, BAR_SCROLLED, NotificationsLink } from "../play-header";
 import { motion } from "../play-theme";
@@ -61,6 +63,10 @@ export function ClipsSidebar({ pathname }: { pathname: string }) {
             <MicVocal className="h-5 w-5" aria-hidden />
           </span>
         </Link>
+        {/* « Créer » (lot 4, 2026-11-11), comme dans la colonne de Play. */}
+        <div className="mt-6 xl:mt-7">
+          <PlayCreateButton variant="rail" />
+        </div>
         <Suspense fallback={<SideNav pathname={pathname} f={null} />}>
           <SideNavWithParams pathname={pathname} />
         </Suspense>
@@ -142,12 +148,15 @@ export function ClipsHeader({ scrolled }: { scrolled: boolean }) {
   );
 }
 
-/** « Publier un clip » pour un artiste validé, sinon « Espace artiste » : les deux mènent à l'espace artiste. */
+/**
+ * « Publier un clip » pour un artiste validé (directement le formulaire
+ * d'envoi depuis le lot 3, 2026-11-11), sinon « Espace artiste ».
+ */
 function ArtistButton({ compact }: { compact?: boolean }) {
   const { artist } = useClips();
   const label = artistCta(artist.status ?? "none");
   return (
-    <Link href="/play/clips/artiste" prefetch={false} aria-label={compact ? label : undefined}
+    <Link href={artist.status === "approved" ? CLIP_NEW_PATH : CLIP_SPACE_PATH} prefetch={false} aria-label={compact ? label : undefined}
       className={cn("flex h-11 items-center gap-2 rounded-rvp border border-rvp-accent/70 px-3 text-[14px] font-semibold text-rvp-text hover:bg-rvp-accent/10 lg:px-4", motion)}>
       <Plus className="h-[18px] w-[18px] text-rvp-accent" aria-hidden />
       <span className={compact ? "sr-only" : "hidden lg:inline"}>{label}</span>
@@ -239,6 +248,8 @@ export function ClipsMobileTopBar({ scrolled }: { scrolled: boolean }) {
           <ClipsWordmark size="sm" />
         </Link>
         <div className="ml-auto flex items-center">
+          {/* « Créer » (lot 4, 2026-11-11) : la barre du bas a déjà 5 onglets. */}
+          <PlayCreateButton variant="top" />
           <button type="button" aria-label="Rechercher un clip ou un artiste"
             onClick={() => {
               search.requestFocus();

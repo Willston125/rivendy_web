@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, Disc3, Lock, Plus, Tag, X } from "lucide-react";
+import { ChevronRight, Clapperboard, Disc3, Lock, Plus, Smartphone, Tag, X } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { fetchMyMusicArtist, type MyMusicArtist } from "@/features/music/music-api";
 import { ARTIST_SPACE, NEW_RELEASE_PATH } from "@/features/music/studio/studio-paths";
 import { artistStatusOf } from "@/features/play/clips/clips-logic";
+import { CLIP_NEW_PATH, SHORT_NEW_PATH } from "@/features/play/create/create-paths";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -17,8 +18,9 @@ import { cn } from "@/lib/utils/cn";
  * un utilisateur d'iPhone (pas d'application iOS) ne savait pas qu'il pouvait
  * publier ici. Sur téléphone, une feuille en bas de l'écran ; au-dessus, un
  * menu sous le bouton. Seulement ce qui marche sur le site (aucun faux
- * bouton) : un article (/sell) et une sortie musicale (studio, ou demande de
- * compte artiste). Clips, Shorts et stories s'ajouteront avec leurs lots.
+ * bouton) : un article (/sell), un Short (lot 4), une sortie musicale
+ * (studio, ou demande de compte artiste) et un clip (lot 3, artiste validé).
+ * Les stories s'ajouteront avec leur lot.
  */
 export function PublishMenu() {
   const { user, loading } = useAuth();
@@ -61,6 +63,8 @@ export function PublishMenu() {
   const status = artistStatusOf(artist?.status);
   const canPublishMusic = status === "approved" && artist?.music_enabled !== false;
   const musicHref = canPublishMusic ? NEW_RELEASE_PATH : ARTIST_SPACE;
+  // Les clips restent ouverts à un artiste validé en « clips seulement ».
+  const canPublishClip = status === "approved";
   const close = () => setOpen(false);
 
   return (
@@ -107,10 +111,17 @@ export function PublishMenu() {
             <nav aria-label="Publier" className="flex flex-col gap-2 md:gap-1">
               <PublishEntry href="/sell" onClick={close} tone="market" icon={<Tag className="h-[22px] w-[22px]" aria-hidden />}
                 title="Un article à vendre" text="Photos, prix et vidéo de 15 s. Vérifié par Rivendy sous 24 h." />
+              <PublishEntry href={SHORT_NEW_PATH} onClick={close} tone="play" icon={<Smartphone className="h-[22px] w-[22px]" aria-hidden />}
+                title="Un Short" text="Une vidéo de 30 s au plus : pour un de vos articles, ou un Short libre." />
               <PublishEntry href={musicHref} onClick={close} tone="music" icon={<Disc3 className="h-[22px] w-[22px]" aria-hidden />}
                 title="Une sortie musicale"
                 text={canPublishMusic ? "Single, EP ou album, vérifié par Rivendy avant la mise en ligne." : "Single, EP ou album. Demandez d’abord votre compte artiste."}
                 locked={!canPublishMusic} />
+              <PublishEntry href={canPublishClip ? CLIP_NEW_PATH : ARTIST_SPACE} onClick={close} tone="clips"
+                icon={<Clapperboard className="h-[22px] w-[22px]" aria-hidden />}
+                title="Un clip musical"
+                text={canPublishClip ? "Jusqu’à 10 min, gratuit pour tous sur Rivendy Clips." : "Jusqu’à 10 min. Demandez d’abord votre compte artiste."}
+                locked={!canPublishClip} />
             </nav>
 
             {user ? (
@@ -126,14 +137,20 @@ export function PublishMenu() {
   );
 }
 
+const TONES = {
+  market: "bg-[#E0F2F1] text-[#009688]",
+  music: "bg-[#EEFFB5] text-[#063F3B]",
+  play: "bg-[#04120D] text-[#00D6A3]",
+  clips: "bg-[#161E22] text-[#1CC8B4]",
+} as const;
+
 function PublishEntry({ href, onClick, tone, icon, title, text, locked = false }: {
-  href: string; onClick: () => void; tone: "market" | "music"; icon: ReactNode; title: string; text: string; locked?: boolean;
+  href: string; onClick: () => void; tone: keyof typeof TONES; icon: ReactNode; title: string; text: string; locked?: boolean;
 }) {
   return (
     <Link href={href} onClick={onClick}
       className="flex min-h-[68px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 transition hover:border-[#B2DFDB] hover:bg-slate-50 md:min-h-0 md:rounded-[14px] md:border-transparent md:p-2.5">
-      <span aria-hidden className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl md:h-10 md:w-10",
-        tone === "market" ? "bg-[#E0F2F1] text-[#009688]" : "bg-[#EEFFB5] text-[#063F3B]")}>
+      <span aria-hidden className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl md:h-10 md:w-10", TONES[tone])}>
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">

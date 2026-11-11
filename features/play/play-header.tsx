@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/features/auth/auth-provider";
 import { useNotifications } from "@/features/notifications/use-notifications";
 import { cn } from "@/lib/utils/cn";
+import { PlayCreateButton } from "./create/create-menu";
 import { PlayMark, Wordmark, useHomeHref } from "./play-brand";
 import { firstNameOf, initialsOf, sectionLabel } from "./play-logic";
 import { usePlaySearch } from "./play-search";
@@ -59,6 +60,8 @@ export function MobileTopBar({ pathname, scrolled }: { pathname: string; scrolle
           <PlayMark className="text-[11px] tracking-[0.3em]" />
         </Link>
         <div className="ml-auto flex items-center gap-0.5">
+          {/* « Créer » (lot 4, 2026-11-11) : la barre du bas a déjà 5 onglets. */}
+          <PlayCreateButton variant="top" />
           <Link href="/play/search" aria-label="Rechercher dans Rivendy Play" aria-current={onSearch ? "page" : undefined}
             className={cn("grid h-11 w-11 place-items-center rounded-full hover:bg-white/[0.06]", motion, onSearch ? "text-rvp-accent" : "text-rvp-text")}>
             <Search className="h-5 w-5" aria-hidden />

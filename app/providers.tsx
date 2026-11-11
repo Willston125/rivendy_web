@@ -14,6 +14,7 @@ import { MiniPlayer } from "@/features/music/player/mini-player";
 import { MusicLibraryProvider } from "@/features/music/music-library";
 import { RadioDock, RadioPlayerProvider } from "@/features/music/radio/radio-player";
 import { PlayDockProvider } from "@/features/play/player/play-dock";
+import { VideoUploadBanner } from "@/features/play/create/video-upload-banner";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -44,6 +45,8 @@ export function Providers({ children }: { children: ReactNode }) {
                   {children}
                   <MiniPlayer />
                   <RadioDock />
+                  {/* Envoi d'un clip ou d'un Short (2026-11-11) : suivi sur tout le site. */}
+                  <VideoUploadBanner />
                 </PlayDockProvider>
               </MusicLibraryProvider>
               </RadioPlayerProvider>

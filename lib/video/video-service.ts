@@ -67,9 +67,17 @@ export function readVideoDuration(file: File): Promise<number> {
   });
 }
 
-/** URL d'envoi à usage unique — le serveur vérifie forfait et quota. */
-export async function createUploadTicket(kind: "product" | "store_cover" = "product") {
-  const { data, error } = await supabase.functions.invoke("create-video-upload", { body: { kind } });
+/**
+ * URL d'envoi à usage unique — le serveur vérifie forfait et quota.
+ * `fromPlay` (2026-11-11, miroir de `createUploadTicket(fromPlay:)` de l'app) :
+ * vidéo d'article préparée avec « Publier un Short » — la fonction accorde
+ * alors 30 s quelle que soit la formule (`context: 'play'`). Sans lui, la
+ * demande est inchangée.
+ */
+export async function createUploadTicket(kind: "product" | "store_cover" = "product", opts: { fromPlay?: boolean } = {}) {
+  const body: Record<string, unknown> = { kind };
+  if (opts.fromPlay && kind === "product") body.context = "play";
+  const { data, error } = await supabase.functions.invoke("create-video-upload", { body });
   if (error) {
     const { code, limit } = await errorCodeOf(error);
     throw new VideoError(messageForCode(code, limit));
@@ -124,9 +132,10 @@ export async function uploadProductVideo(
   file: File,
   productId: string,
   onProgress?: (ratio: number) => void,
+  opts: { fromPlay?: boolean } = {},
 ): Promise<string | null> {
   try {
-    const { uploadUrl, cfUid } = await createUploadTicket("product");
+    const { uploadUrl, cfUid } = await createUploadTicket("product", opts);
     await uploadVideoFile(uploadUrl, file, onProgress);
     const attached = await attachVideoToProduct(cfUid, productId);
     if (!attached) {

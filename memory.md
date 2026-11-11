@@ -754,3 +754,33 @@ MÊMES fonctions que l'app.
 - **CSP** : `https://*.r2.cloudflarestorage.com` ajouté à `connect-src` (dépôt des fichiers audio).
 - ⚠️ **Prérequis Cloudflare** : le CORS du compartiment R2 `rivendy-musique` n'acceptait que `https://admin.rivendy.com` (réglage du
   2026-10-16) ; y ajouter `https://www.rivendy.com` (PUT, HEAD, en-tête Content-Type), sinon l'envoi des titres échoue depuis le site.
+
+## Publier des vidéos depuis le site : clips et Shorts (2026-11-11, branche `feat/publier-videos`)
+
+Suite de la publication depuis le site (lots 3 et 4, canevas validé). Aucun SQL, aucune fonction serveur modifiée
+(PROTECTED_ZONES §1.9) : le site appelle les MÊMES fonctions que l'app, telles quelles.
+
+- **Entrées** : « + Publier » de la marketplace gagne « Un Short » et « Un clip musical » (cadenas « Artiste » sans compte
+  validé) ; Rivendy Play et Rivendy Clips gagnent « Créer » (`features/play/create/create-menu.tsx`, play_create_sheet.dart sans
+  « Faire un live ») : en tête de colonne sur tablette et ordinateur, rond « + » dans la barre du haut sur téléphone (la barre du
+  bas a déjà 5 onglets). Sans compte : la connexion.
+- **Envoi** (`create/create-api.ts`) : `create-video-upload` avec `resumable` + `upload_length` → adresse **tus** ; le navigateur
+  envoie DIRECTEMENT chez Cloudflare Stream par morceaux de 5 Mio (PATCH), relit la position (HEAD → `Upload-Offset`) après une
+  coupure et reprend, 5 fois au plus (1, 2, 4, 8, 16 s) — miroir du TusUploader. CORS de Cloudflare vérifié le 11/11 (`*`,
+  PATCH/HEAD, `Upload-Offset` exposé) ; la CSP autorisait déjà upload.cloudflarestream.com et upload.videodelivery.net. Un envoi
+  raté ou annulé rend sa place du quota (delete-video). UN envoi vidéo à la fois pour tout le site (`create/video-uploads.ts`,
+  comme PlayUploadManager) : bandeau `VideoUploadBanner` monté dans `app/providers.tsx`, masqué quand la page montre l'envoi
+  (`VideoUploadCard`) ; fermer l'onglet pendant l'envoi demande confirmation ; « Renvoyer » relance le même fichier.
+- **Lot 3 · clips** (`clips/clips-artist-space.tsx`, `clips/clip-form.tsx`, /play/clips/artiste/[id], « nouveau » = envoi) :
+  artiste validé, 10 min, 200 Mo, 10 par mois, vidéo entière ; adresse demandée AVANT (quota affiché dans la page), puis
+  `play_submit_clip` et `play_clip_link_track` ; Mes clips : Voir, Modifier (texte seul : `play_update_my_clip`),
+  Désactiver/Activer, Qui peut commenter (`play_set_comments_mode` 'title'), Supprimer.
+- **Lot 4 · Shorts** (`create/short-flow.tsx` sur /play/shorts/nouveau, `create/my-shorts.tsx` sur /play/mes-shorts) : pour quoi
+  → article (recherche, « Sans vidéo », remplacement confirmé) → vidéo de 30 s → légende et règles (Short libre). Short libre :
+  `play_submit_short` (règles acceptées, vérifié avant publication, réponse perdue → vérifié avant suppression) ; article :
+  `create-video-upload` kind product + `context: 'play'` puis `attach-video` ; nouvel article : la vidéo passe à /sell
+  (`create/sell-handoff.ts`, le formulaire accepte alors 30 s et envoie avec `context: 'play'`). Pas d'outil de coupe sur le
+  site : il explique comment couper la vidéo sur le téléphone. Pas de fil Shorts sur le site (app + lien partagé).
+- **Règles pures** : `create/create-logic.ts` (miroir d'artist_models, play_create_service, shorts_service, video_service) ;
+  `npm run check:create`.
+- Pages personnelles noindex et exclues de robots.ts (/play/shorts, /play/mes-shorts, /play/clips/artiste/…).

@@ -34,6 +34,10 @@ export default function robots(): MetadataRoute.Robots {
           "/play/my-list",
           "/play/history",
           "/play/search",
+          // Publier des vidéos depuis le site (2026-11-11) : pages du compte.
+          "/play/shorts",
+          "/play/mes-shorts",
+          "/play/clips/artiste/",
         ],
       },
     ],

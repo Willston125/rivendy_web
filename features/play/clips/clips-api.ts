@@ -295,6 +295,8 @@ export type MyClip = {
   id: string; title: string; status: string; review_status: string | null; review_reason: string | null;
   video_status: string | null; thumbnail_url: string | null; duration_seconds: number | null;
   views: number; likes: number; comments_count: number; created_at: string;
+  /** Texte modifiable depuis le site (lot 3, 2026-11-11), comme MyClip.description / genre de l'app. */
+  description: string; genre: string;
 };
 
 /** Clips de l'artiste (tous statuts), par la même fonction que l'app. */
@@ -306,5 +308,6 @@ export async function fetchMyClips(): Promise<MyClip[]> {
     review_reason: c.review_reason ?? null, video_status: c.video_status ?? null, thumbnail_url: c.thumbnail_url ?? null,
     duration_seconds: c.duration_seconds ?? null, views: Number(c.views ?? 0), likes: Number(c.likes ?? 0),
     comments_count: Number(c.comments_count ?? 0), created_at: c.created_at ?? "",
+    description: (c.description ?? "").trim(), genre: (c.genre ?? "").trim(),
   }));
 }

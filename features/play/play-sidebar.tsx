@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Bookmark, Clock, Film, Info, LayoutGrid, Music, Tv, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { cn } from "@/lib/utils/cn";
+import { PlayCreateButton } from "./create/create-menu";
 import { PlayMark, Wordmark, useHomeHref } from "./play-brand";
 import { usePlayList } from "./play-list";
 import { motion } from "./play-theme";
@@ -49,7 +50,12 @@ export function PlaySidebar({ pathname, onAbout }: { pathname: string; onAbout: 
           </Link>
         </div>
 
-        <SideGroup label="Explorer" className="mt-9 xl:mt-11">
+        {/* « Créer » (lot 4, 2026-11-11) : le bouton du milieu de l'app, en tête de colonne. */}
+        <div className="relative mt-7 xl:mt-8">
+          <PlayCreateButton variant="rail" />
+        </div>
+
+        <SideGroup label="Explorer" className="mt-7 xl:mt-8">
           {EXPLORE.map((it) => <SideLink key={it.href} item={it} active={it.match(pathname)} />)}
         </SideGroup>
         <SideGroup label="Votre espace" className="mt-5 xl:mt-8" separated>

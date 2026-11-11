@@ -36,6 +36,7 @@ import {
   phaseBCategoryFor,
 } from "@/lib/listings";
 import { MAX_VIDEO_SECONDS, readVideoDuration, uploadProductVideo } from "@/lib/video/video-service";
+import { PLAY_VIDEO_SECONDS, takeSellVideo } from "@/features/play/create/sell-handoff";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import {
@@ -125,6 +126,18 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   const [existingPhotos, setExistingPhotos] = useState<string[]>(product?.photos ?? []);
   const [video, setVideo]               = useState<File | null>(null);
   const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  // « Publier un Short » → « Pour un nouvel article » (2026-11-11) : la vidéo
+  // arrive prête et vaut 30 s, comme une vidéo créée depuis Play dans l'app
+  // (`context: 'play'`, la durée reste décidée par create-video-upload).
+  const [videoFromPlay, setVideoFromPlay] = useState(false);
+  const videoMaxSeconds = videoFromPlay ? PLAY_VIDEO_SECONDS : MAX_VIDEO_SECONDS;
+  useEffect(() => {
+    if (isEdit) return;
+    const handed = takeSellVideo();
+    if (!handed) return;
+    setVideo(handed);
+    setVideoFromPlay(true);
+  }, [isEdit]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [success, setSuccess]           = useState("");
@@ -218,8 +231,8 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     if (!file) return;
     try {
       const duration = await readVideoDuration(file);
-      if (!Number.isFinite(duration) || duration > MAX_VIDEO_SECONDS + 0.5) {
-        setError(`Vidéo de ${MAX_VIDEO_SECONDS} secondes maximum : raccourcissez-la avant de l'envoyer.`);
+      if (!Number.isFinite(duration) || duration > videoMaxSeconds + 0.5) {
+        setError(`Vidéo de ${videoMaxSeconds} secondes maximum : raccourcissez-la avant de l'envoyer.`);
         return;
       }
       setError("");
@@ -506,7 +519,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         const newId = (inserted as { id?: string } | null)?.id;
         if (video && newId) {
           setVideoProgress(0);
-          videoWarning = await uploadProductVideo(video, newId, (r) => setVideoProgress(r));
+          videoWarning = await uploadProductVideo(video, newId, (r) => setVideoProgress(r), { fromPlay: videoFromPlay });
           setVideoProgress(null);
         }
         setSuccess(publishesPreorder
@@ -515,7 +528,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
         if (videoWarning) setNotice(videoWarning);
 
         setTitle(""); setDescription(""); setSellerPrice("");
-        setSize(""); setFiles([]); setExistingPhotos([]); setVideo(null);
+        setSize(""); setFiles([]); setExistingPhotos([]); setVideo(null); setVideoFromPlay(false);
         setSubcategory(""); setPhaseBTypeKey(""); setPhaseBValues({});
         setConstructionKey(""); setConstructionValues({});
         setVariantSizes([]); setVariantColors(""); setStock("1");
@@ -975,7 +988,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             </div>
           )}
           <p className="text-xs text-slate-400">
-            {MAX_VIDEO_SECONDS} secondes maximum. Selon votre formule (Gratuit 3, Certifié 15, Pro illimité par mois).
+            {videoFromPlay
+              ? `${PLAY_VIDEO_SECONDS} secondes maximum : vidéo préparée avec « Publier un Short ».`
+              : `${MAX_VIDEO_SECONDS} secondes maximum.`}{" "}
+            Selon votre formule (Gratuit 3, Certifié 15, Pro illimité par mois).
             Si l&apos;envoi échoue, l&apos;article est publié avec ses photos.
           </p>
         </div>

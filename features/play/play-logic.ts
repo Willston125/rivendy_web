@@ -530,6 +530,9 @@ export function sectionLabel(pathname: string | null | undefined): string {
   if (p.startsWith("/play/history")) return "Récents";
   if (p.startsWith("/play/search")) return "Recherche";
   if (p.startsWith("/play/watch")) return "Lecture";
+  // Publier depuis le site (lot 4, 2026-11-11).
+  if (p.startsWith("/play/shorts/nouveau")) return "Créer";
+  if (p.startsWith("/play/mes-shorts")) return "Mes Shorts";
   if (p.startsWith("/play/short")) return "Short";
   return "Rivendy Play";
 }
