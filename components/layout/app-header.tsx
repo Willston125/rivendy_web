@@ -26,6 +26,7 @@ import { useCountry } from "@/features/country/country-provider";
 import { notificationDestination, useNotifications } from "@/features/notifications/use-notifications";
 import type { AppNotification } from "@/features/notifications/use-notifications";
 import { useDialogs } from "@/features/ui/dialogs";
+import { PublishMenu } from "@/features/publish/publish-menu";
 import { marketHomePath } from "@/lib/seo";
 
 const navItems = [
@@ -131,17 +132,11 @@ export function AppHeader() {
         <div className="hidden flex-1 2xl:block" />
 
         {/* ── Icônes d'action ─────────────────────────────────────── */}
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1">
 
-          {/* Bouton Vendre — CTA proéminent (desktop) */}
-          <Link
-            href="/sell"
-            aria-label="Vendre un article"
-            className="mr-1.5 hidden h-10 items-center gap-1.5 rounded-full bg-[#009688] px-3 text-sm font-bold text-white shadow-sm shadow-[#009688]/20 transition hover:bg-[#00796B] xl:flex 2xl:px-4"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden 2xl:inline">Vendre</span>
-          </Link>
+          {/* « + Publier » à toutes les tailles (lot 0, 2026-11-11) : article,
+              sortie musicale. Avant : « Vendre » au-dessus de 1280 px seulement. */}
+          <PublishMenu />
 
           {/* Sélecteur de pays — desktop */}
           <div className="relative hidden items-center xl:flex mr-1.5">

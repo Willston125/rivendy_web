@@ -722,3 +722,35 @@ propriétaire : « Je t'autorise à toucher le lecteur et la règle de sécurit�
 - **Écouter demande un compte** (comme la musique) : `inviteLogin`, sauf l'aperçu privé.
 - Règles pures : `radio-logic.ts`, tests `radio-logic.test.mjs` (`npm run check:radio`, dans `npm run check`) — mêmes
   exemples que l'app (`musique_radio_test.dart`).
+
+## Publier depuis le site : bouton Publier, espace artiste, studio Musique (2026-11-11, branche `feat/publier-site`)
+
+Demande du propriétaire : sans application iOS, les utilisateurs d'iPhone ne pouvaient ni demander un compte artiste ni
+publier de musique (le site renvoyait vers Google Play). Canevas validé (lots 0 à 2). Aucun SQL : le site appelle les
+MÊMES fonctions que l'app.
+
+- **Lot 0 · Publier partout** : `PublishMenu` (features/publish/publish-menu.tsx) remplace « Vendre » dans l'en-tête de la
+  marketplace, visible à toutes les tailles (avant : au-dessus de 1280 px seulement) ; feuille en bas sur téléphone, menu
+  au-dessus. Entrées : article (/sell), sortie musicale (studio, ou espace artiste si le compte n'est pas validé). Musique :
+  `MusicPublishButton` (studio/music-publish.tsx), bouton en haut de la colonne et, sur téléphone, rond citron « + » dans
+  la barre du haut (choix du propriétaire, 11/11 : la barre du bas garde ses 5 onglets avec la Radio, un 6e ne tient pas
+  sur 375 px) ; feuille = musique_publish_sheet.dart (mêmes cas, mêmes libellés, `publishPhase`). Clips, Shorts et stories : pas
+  d'entrée tant que leur lot n'est pas livré (aucun faux bouton).
+- **Lot 1 · Espace artiste** (`music-artist-space.tsx`, `studio/artist-profile-form.tsx`) : demande, « Modifier ma demande »,
+  « Corriger et renvoyer », profil d'un artiste validé (nom verrouillé → `play_artist_request_name`, « Publier aussi sur Rivendy
+  Musique » → `play_artist_set_music`, origine → `music_artist_set_origin`), tout par `play_artist_save`. Photo carrée et
+  bannière 16:9 recadrées au centre et compressées (`cropToAspect`, services/image-upload.ts : 1080 px, JPEG 75 %), envoyées
+  dans `avatars/<uid>/` et `banners/<uid>/` (la seule adresse que le serveur accepte).
+- **Lot 2 · Studio** : /music/studio (`StudioReleasesView`) et /music/studio/[id] (`ReleaseEditor`, « nouvelle » = création),
+  noindex et exclus de robots. Appels de studio_service.dart : `music_artist_release_save|submit|withdraw|delete`,
+  `music_artist_track_save|delete`, `music_artist_tracks_reorder`, `music_my_release_stats` ; pochette dans
+  `music-images/artists/<artist_id>/`. Fichiers audio : `musique-artist-upload` (url → PUT direct vers R2 → confirm), file
+  unique hors des écrans (`studio/upload-manager.ts`, comme PlayUploadManager) : on peut quitter l'éditeur, l'envoi continue ;
+  fermer l'onglet demande confirmation ; coupure réseau → « Renvoyer » sans rechoisir le fichier. Ordre des titres par
+  flèches Monter/Descendre (le glisser-déposer tactile n'existe pas sur iPhone). En plus de l'app : la liste « Avant l'envoi »
+  montre tout ce qui manque d'un coup.
+- **Règles pures** : `studio/studio-logic.ts`, miroir de studio_models.dart, artist_models.dart, musique_publish_sheet.dart et
+  musique_origins.dart ; `npm run check:studio` (mêmes cas que les tests de l'app).
+- **CSP** : `https://*.r2.cloudflarestorage.com` ajouté à `connect-src` (dépôt des fichiers audio).
+- ⚠️ **Prérequis Cloudflare** : le CORS du compartiment R2 `rivendy-musique` n'acceptait que `https://admin.rivendy.com` (réglage du
+  2026-10-16) ; y ajouter `https://www.rivendy.com` (PUT, HEAD, en-tête Content-Type), sinon l'envoi des titres échoue depuis le site.

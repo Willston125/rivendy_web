@@ -22,6 +22,8 @@ import { MusicPosterHost } from "./music-poster";
 import { MobileMiniPlayer, MusicPlayerBar } from "./player/mini-player";
 import { useMusicPlayer } from "./player/music-player-provider";
 import { RadioBar, useRadioPlayer } from "./radio/radio-player";
+import { MusicPublishButton } from "./studio/music-publish";
+import { STUDIO_PATH } from "./studio/studio-paths";
 
 /**
  * Coque de l'espace Musique — mise en page « application » du 2026-10-22
@@ -73,6 +75,8 @@ function ShellFrame({ fontClassName, children }: { fontClassName?: string; child
             Fenêtre trop basse : la colonne entière défile, jamais une liste écrasée. */}
         <aside aria-label="Navigation et bibliothèque" style={{ width: layout.shownLib }}
           className="rvm-deep @container relative hidden min-h-0 shrink-0 flex-col overflow-y-auto overscroll-contain [scrollbar-width:thin] md:flex">
+          {/* « Publier » (lot 0, 2026-11-11) : le bouton du milieu de l'app, en tête de colonne. */}
+          <MusicPublishButton variant="rail" />
           <MusicNav />
           <span aria-hidden className="mx-5 my-3 block h-px shrink-0 bg-rvm-line [@media(max-height:760px)]:my-2" />
           <LibraryLinks />
@@ -210,9 +214,10 @@ function MusicTopBar() {
           className="hidden h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-rvm-text transition-colors hover:bg-rvm-raised xl:flex">
           <Download className="h-[18px] w-[18px]" aria-hidden /> Installer l’appli
         </a>
-        <Link href="/music/explore" aria-label="Rechercher de la musique" className="grid h-11 w-11 place-items-center rounded-full text-rvm-text hover:bg-rvm-text/10 md:hidden">
-          <Search className="h-5 w-5" aria-hidden />
-        </Link>
+        {/* Téléphone : « Publier » prend la place de la loupe (2026-11-11). « Rechercher » est déjà
+            dans la barre du bas, et la barre du bas garde ses 5 onglets : un 6e ne tient pas sur 375 px,
+            la loupe en plus non plus (44 px de trop pour un compte connecté). */}
+        <MusicPublishButton variant="top" />
         {user ? (
           <Link href="/notifications" prefetch={false} aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} non lues` : "Notifications"}
             className="relative grid h-11 w-11 place-items-center rounded-full text-rvm-text transition-colors hover:bg-rvm-raised">
@@ -340,7 +345,9 @@ function SearchBox() {
 
 /**
  * Téléphone (vert lagon, style « fraîcheur ») : Découvrir, Rechercher, le
- * Hit, Bibliothèque. La marketplace reste au logo, en haut à gauche.
+ * Hit, Radio, Bibliothèque. « Publier » est dans la barre du haut (un 6e
+ * onglet ne tient pas sur 375 px, choix du propriétaire du 2026-11-11). La
+ * marketplace reste au logo, en haut à gauche.
  */
 function MobileNav() {
   const pathname = usePathname() || "/music";
@@ -350,7 +357,7 @@ function MobileNav() {
     { href: "/music/hit", label: "Le Hit", icon: ChartColumn, active: pathname.startsWith("/music/hit") },
     { href: "/music/radio", label: "Radio", icon: RadioIcon, active: pathname.startsWith("/music/radio") },
     { href: "/music/library", label: "Bibliothèque", icon: Library,
-      active: ["/music/library", "/music/playlist", "/music/favorites", "/music/history", ARTIST_SPACE_PATH].some((p) => pathname.startsWith(p)) },
+      active: ["/music/library", "/music/playlist", "/music/favorites", "/music/history", ARTIST_SPACE_PATH, STUDIO_PATH].some((p) => pathname.startsWith(p)) },
   ];
   return (
     <nav aria-label="Navigation Musique" className="rvm-deep shrink-0 pb-[env(safe-area-inset-bottom)] md:hidden">

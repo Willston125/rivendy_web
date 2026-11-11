@@ -27,6 +27,38 @@ export async function compressImage(file: File, maxSize = 1400, quality = 0.82) 
   });
 }
 
+/**
+ * Recadre au centre au rapport voulu (largeur / hauteur), puis compresse en
+ * JPEG : les réglages de l'app (ImageService : pochette et photo carrées,
+ * bannière 16:9, 1080 px, qualité 75 %). Utilisé par l'espace artiste et le
+ * studio Musique (2026-11-11) ; le fichier part ensuite directement vers le
+ * stockage, jamais par une route Vercel.
+ */
+export async function cropToAspect(file: File, aspect: number, maxSide = 1080, quality = 0.75): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  let sw = bitmap.width;
+  let sh = bitmap.height;
+  if (sw / sh > aspect) sw = Math.round(sh * aspect);
+  else sh = Math.round(sw / aspect);
+  const sx = Math.round((bitmap.width - sw) / 2);
+  const sy = Math.round((bitmap.height - sh) / 2);
+  const scale = Math.min(1, maxSide / Math.max(sw, sh));
+  const width = Math.max(1, Math.round(sw * scale));
+  const height = Math.max(1, Math.round(sh * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas indisponible");
+  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, width, height);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  if (!blob) throw new Error("compression impossible");
+  return blob;
+}
+
 export async function uploadProductPhotos(userId: string, files: File[]) {
   const urls: string[] = [];
 

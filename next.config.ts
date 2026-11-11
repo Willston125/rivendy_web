@@ -41,7 +41,9 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   scriptSources,
   "font-src 'self' data:",
-  `connect-src 'self' ${SUPABASE_HOST} wss://eiifosnczbgymcbhycwe.supabase.co ${STREAM_UPLOAD} ${STREAM_HOST}`,
+  // R2 : dépôt direct des fichiers audio des artistes par lien signé
+  // (studio Musique sur le site, 2026-11-11, fonction musique-artist-upload).
+  `connect-src 'self' ${SUPABASE_HOST} wss://eiifosnczbgymcbhycwe.supabase.co ${STREAM_UPLOAD} ${STREAM_HOST} https://*.r2.cloudflarestorage.com`,
   "worker-src 'self' blob:",
   "frame-ancestors 'self'",
   "base-uri 'self'",

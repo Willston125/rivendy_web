@@ -1,40 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight, Check, CircleCheck, Clock, Disc3, Download, MicVocal, ShieldAlert, Smartphone } from "lucide-react";
+import { ArrowRight, Check, CircleCheck, Clock, Film, MicVocal, Plus, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { artistStatusOf, type ArtistStatus } from "@/features/play/clips/clips-logic";
-import { PLAY_STORE_URL } from "@/features/play/play-link-page";
 import { cn } from "@/lib/utils/cn";
-import { fetchMyMusicArtist, fetchMyReleases, type MyMusicArtist } from "./music-api";
-import { RELEASE_STATE_LABEL, addedAtLabel, releaseKindLabel, releaseState, type ReleaseState } from "./music-logic";
-import { ARTIST_SPACE_PATH } from "./music-nav";
 import { loginHref } from "./music-pending";
-import { Cover, EmptyState, ListSkeleton, primaryButton, secondaryButton, useLoad } from "./music-ui";
+import { Cover, ListSkeleton, primaryButton, secondaryButton, useLoad } from "./music-ui";
+import { ArtistProfileForm } from "./studio/artist-profile-form";
+import { fetchMyArtist, type MyArtist } from "./studio/studio-api";
+import { ARTIST_SPACE, NEW_RELEASE_PATH, STUDIO_PATH } from "./studio/studio-paths";
+import { StudioReleaseList } from "./studio/studio-releases";
 
 /**
- * Espace artiste de la Musique (lot 2, 2026-10-29), jumeau de celui de Clips
- * (/play/clips/artiste). La demande de compte artiste et la publication
- * (fichiers audio, pochettes, stories) existent dans l'application Rivendy —
- * elles ne sont PAS refaites ici. Le site montre l'état réel du compte et de
- * ses sorties, et dit exactement où aller dans l'app : Musique → Publier
- * (`musique_publish_sheet.dart`, mêmes libellés).
+ * Espace artiste de la Musique (lot 2 du 2026-10-29 ; publication sur le
+ * site, lot 1 du 2026-11-11, canevas validé). Avant : la demande de compte et
+ * la publication renvoyaient vers l'application Android — une impasse pour un
+ * iPhone. Maintenant tout se fait ici, avec les fonctions de l'app : demande
+ * de compte (play_artist_save), profil, « clips seulement », changement de
+ * nom ; puis le studio (/music/studio) pour les sorties. Mêmes états et
+ * libellés que l'app (artist_space_screen.dart, musique_publish_sheet.dart).
  */
-
-/** Ce que la carte « Dans l'application » explique, selon le compte. */
-type Phase = "create" | "follow" | "enable" | "publish";
-
 export function MusicArtistSpaceView() {
   const { user, loading } = useAuth();
-  const pathname = usePathname() || ARTIST_SPACE_PATH;
-  const me = useLoad(user ? `my-artist:${user.id}` : null, () => (user ? fetchMyMusicArtist(user.id) : Promise.resolve(null)));
-  const profile = me.data;
-  const status = artistStatusOf(profile?.status);
-  const music = status === "approved" && profile?.music_enabled !== false;
-  const phase: Phase = status === "approved" ? (music ? "publish" : "enable") : status === "none" ? "create" : "follow";
+  const pathname = usePathname() || ARTIST_SPACE;
+  const me = useLoad(user ? `my-artist:${user.id}` : null, () => (user ? fetchMyArtist(user.id) : Promise.resolve(null)));
+  const artist = me.data;
+  const status = artistStatusOf(artist?.status);
+  const music = status === "approved" && artist?.music_enabled !== false;
   const known = !!user && !me.loading && !me.error;
+  const [editing, setEditing] = useState(false);
+
+  // Lien « #demande » ou « #profil » (feuille « Publier ») : la section arrive après la lecture du compte.
+  useEffect(() => {
+    if (!known) return;
+    const id = window.location.hash.slice(1);
+    if (id === "demande" || id === "profil") document.getElementById(id)?.scrollIntoView({ block: "start" });
+  }, [known]);
+
+  const saved = () => { setEditing(false); me.reload(); };
 
   return (
     <div className="pb-10">
@@ -45,19 +51,18 @@ export function MusicArtistSpaceView() {
         </h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-rvm-soft @2xl:text-base">
           {known && music
-            ? "Vos sorties et leur statut, sur le site. La publication se fait dans l’application."
-            : "Publiez vos singles, EP et albums sur Rivendy Musique. Chaque compte artiste est vérifié par Rivendy avant la première sortie."}
+            ? "Vos sorties, votre profil et vos écoutes. Tout se publie ici, comme dans l’application, avec le même compte."
+            : "Publiez vos singles, EP et albums sur Rivendy Musique, depuis le site ou l’application. Chaque compte artiste est vérifié par Rivendy avant la première sortie."}
         </p>
       </header>
 
-      <div className="grid gap-6 px-4 pt-2 @2xl:px-8 @4xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-6 px-4 pt-5 @2xl:px-8 @4xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-6">
           {loading || me.loading ? <ListSkeleton rows={3} />
             : !user ? (
               <>
                 <SignInCard path={pathname} />
                 <AboutArtists />
-                <Steps />
               </>
             ) : me.error ? (
               <div role="alert" className="rounded-2xl border border-rvm-line bg-rvm-panel p-5">
@@ -65,21 +70,52 @@ export function MusicArtistSpaceView() {
                 <p className="mt-1 text-sm text-rvm-soft">Vérifiez votre connexion, puis réessayez.</p>
                 <button type="button" onClick={me.reload} className={cn(secondaryButton, "mt-4 h-10")}>Réessayer</button>
               </div>
-            ) : status === "none" || !profile ? (
+            ) : status === "none" || !artist ? (
               <>
                 <AboutArtists />
-                <Steps />
+                <FormSection id="demande" title="Devenir artiste">
+                  <ArtistProfileForm artist={null} onSaved={saved} />
+                </FormSection>
               </>
             ) : status === "approved" ? (
               <>
-                <ArtistCard profile={profile} music={music} />
-                {music ? <MyReleases artistId={profile.id} /> : null}
+                <ArtistCard artist={artist} music={music} />
+                {music ? (
+                  <section aria-labelledby="rvm-my-releases">
+                    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <h2 id="rvm-my-releases" className="font-rvm-display text-xl font-extrabold sm:text-2xl">Mes sorties</h2>
+                      <Link href={STUDIO_PATH} className="ml-auto text-sm font-bold text-rvm-ink-accent hover:underline">Tout voir</Link>
+                    </div>
+                    <StudioReleaseList artistId={artist.id} limit={5} />
+                  </section>
+                ) : null}
+                <FormSection id="profil" title="Mon profil artiste">
+                  <ArtistProfileForm key={`${artist.id}:${artist.music_enabled}:${artist.name_request ?? ""}`} artist={artist} onSaved={saved} />
+                </FormSection>
               </>
-            ) : <RequestCard status={status} name={profile.name} reason={profile.review_reason} />}
+            ) : (
+              <>
+                <RequestCard status={status} artist={artist} editing={editing} onEdit={() => setEditing(true)} />
+                {editing && status !== "suspended" ? (
+                  <FormSection id="demande" title={status === "rejected" ? "Corriger ma demande" : "Modifier ma demande"}>
+                    <ArtistProfileForm artist={artist} onSaved={saved} />
+                  </FormSection>
+                ) : null}
+              </>
+            )}
         </div>
-        <AppCard phase={known ? phase : "create"} />
+        <Aside />
       </div>
     </div>
+  );
+}
+
+function FormSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-titre`} className="scroll-mt-4">
+      <h2 id={`${id}-titre`} className="mb-3 font-rvm-display text-xl font-extrabold sm:text-2xl">{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -100,7 +136,7 @@ function SignInCard({ path }: { path: string }) {
 const ABOUT = [
   "Un compte Rivendy suffit : pas besoin d’être vendeur.",
   "Rivendy vérifie votre profil : votre nom d’artiste, votre photo et vos droits sur votre musique.",
-  "Ensuite : singles, EP et albums, vérifiés par Rivendy avant la mise en ligne, et des stories de 24 h.",
+  "Ensuite : singles, EP et albums, vérifiés par Rivendy avant la mise en ligne.",
   "Vos titres s’écoutent sur le site et dans l’application, avec le même compte.",
 ];
 
@@ -117,158 +153,112 @@ function AboutArtists() {
   );
 }
 
-const STEPS = [
-  { title: "Installez l’application", text: "Rivendy, sur Google Play, avec votre compte habituel." },
-  { title: "Demandez votre compte artiste", text: "Musique → Publier → « Devenir artiste »." },
-  { title: "Publiez après validation", text: "Rivendy vérifie votre profil, vous êtes prévenu dans l’application, puis vous publiez." },
-];
-
-function Steps() {
-  return (
-    <section aria-labelledby="rvm-artist-steps">
-      <h2 id="rvm-artist-steps" className="mb-3 font-rvm-display text-xl font-extrabold sm:text-2xl">En trois étapes</h2>
-      <ol className="grid gap-3 @2xl:grid-cols-3">
-        {STEPS.map((s, i) => (
-          <li key={s.title} className="rounded-2xl bg-rvm-text/[0.05] p-4">
-            <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full bg-rvm-accent font-extrabold text-rvm-on-accent">{i + 1}</span>
-            <p className="mt-2.5 text-[15px] font-bold">{s.title}</p>
-            <p className="mt-1 text-[13.5px] leading-snug text-rvm-soft">{s.text}</p>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-/** Demande en vérification, refusée ou compte suspendu : ce qui se passe, et le motif s'il existe. */
-function RequestCard({ status, name, reason }: { status: Exclude<ArtistStatus, "none" | "approved">; name: string | null; reason: string | null }) {
-  const Icon = status === "pending" ? Clock : ShieldAlert;
-  const title = status === "pending" ? "Demande en vérification" : status === "rejected" ? "Demande non retenue" : "Compte artiste suspendu";
+/**
+ * Demande en vérification, refusée ou compte suspendu : ce qui se passe, le
+ * motif s'il existe, et l'action de l'app (« Modifier ma demande »,
+ * « Corriger et renvoyer »), désormais sur le site. Couleurs lisibles sur le
+ * fond clair (l'ancien ambre pâle ne l'était pas).
+ */
+function RequestCard({ status, artist, editing, onEdit }: {
+  status: Exclude<ArtistStatus, "none" | "approved">; artist: MyArtist; editing: boolean; onEdit: () => void;
+}) {
+  const pending = status === "pending";
+  const Icon = pending ? Clock : ShieldAlert;
+  const title = pending ? "Demande en vérification" : status === "rejected" ? "Demande non retenue" : "Compte artiste suspendu";
   return (
     <section className="rounded-2xl border border-rvm-line bg-rvm-panel p-5">
-      <p className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-wide text-amber-300"><Icon className="h-4 w-4" aria-hidden /> {title}</p>
-      {status === "pending" ? (
-        <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">
-          Rivendy vérifie votre profil d’artiste{name ? ` « ${name} »` : ""}. Vous serez prévenu dans l’application, puis vous pourrez publier.
+      <p className={cn("inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-extrabold",
+        pending ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700")}>
+        <Icon className="h-4 w-4" aria-hidden /> {title}
+      </p>
+      {pending ? (
+        <p className="mt-3 text-[15px] leading-relaxed text-rvm-soft">
+          Rivendy vérifie votre profil d’artiste « {artist.name} ». Vous serez prévenu par une notification, puis vous pourrez publier.
         </p>
       ) : null}
-      {status !== "pending" && reason ? <p className="mt-2 text-[15px] text-rvm-soft">Motif : {reason}</p> : null}
-      {status === "rejected" ? (
-        <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">Corrigez votre profil depuis l’application, puis renvoyez-le à la vérification.</p>
+      {!pending && artist.review_reason ? (
+        <p className="mt-3 text-[15px] text-rvm-soft"><strong className="text-rvm-text">Motif :</strong> {artist.review_reason}</p>
       ) : null}
+      {status === "rejected" ? <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">Corrigez votre demande, puis renvoyez-la.</p> : null}
       {status === "suspended" ? (
         <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">
           La publication est fermée pour le moment.{" "}
           <Link href="/help" prefetch={false} className="font-semibold text-rvm-ink-accent hover:underline">Contactez Rivendy depuis l’Aide</Link> pour en savoir plus.
         </p>
       ) : null}
+      {status !== "suspended" && !editing ? (
+        <button type="button" onClick={onEdit} className={cn(pending ? secondaryButton : primaryButton, "mt-4")}>
+          {pending ? "Modifier ma demande" : "Corriger et renvoyer"}
+        </button>
+      ) : null}
     </section>
   );
 }
 
-function ArtistCard({ profile, music }: { profile: MyMusicArtist; music: boolean }) {
+function ArtistCard({ artist, music }: { artist: MyArtist; music: boolean }) {
   return (
     <section aria-labelledby="rvm-artist-name" className="flex flex-col gap-4 rounded-2xl border border-rvm-line bg-rvm-panel p-5 @xl:flex-row @xl:items-center">
-      {profile.avatar_url ? (
-        <Cover url={profile.avatar_url} size={160} alt="" rounded="rounded-full" className="h-16 w-16 shrink-0" />
+      {artist.avatar_url ? (
+        <Cover url={artist.avatar_url} size={160} alt="" rounded="rounded-full" className="h-16 w-16 shrink-0" />
       ) : (
         <span aria-hidden className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rvm-brand/45 to-rvm-raised font-rvm-display text-2xl font-black">
-          {profile.name.trim().charAt(0).toUpperCase() || "?"}
+          {artist.name.trim().charAt(0).toUpperCase() || "?"}
         </span>
       )}
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-rvm-ink-accent">
           <CircleCheck className="h-4 w-4" aria-hidden /> Compte artiste validé
         </p>
-        <h2 id="rvm-artist-name" className="mt-1 truncate font-rvm-display text-2xl font-extrabold">{profile.name}</h2>
+        <h2 id="rvm-artist-name" className="mt-1 truncate font-rvm-display text-2xl font-extrabold">{artist.name}</h2>
         <p className="mt-0.5 text-sm leading-relaxed text-rvm-soft">
           {music ? "Rivendy Musique activée : singles, EP, albums et stories."
             : "Vous avez choisi « clips seulement » : activez Rivendy Musique dans votre profil d’artiste pour publier singles, EP, albums et stories."}
         </p>
       </div>
-      <Link href={`/artist/${profile.id}`} className={cn(secondaryButton, "shrink-0 self-start @xl:self-center")}>
-        Voir ma page publique <ArrowRight className="h-4 w-4" aria-hidden />
-      </Link>
+      <div className="flex shrink-0 flex-wrap gap-2 self-start @xl:self-center">
+        {music ? (
+          <Link href={NEW_RELEASE_PATH} className={primaryButton}><Plus className="h-4 w-4" strokeWidth={2.8} aria-hidden /> Nouvelle sortie</Link>
+        ) : null}
+        <Link href={`/artist/${artist.id}`} className={secondaryButton}>
+          Ma page publique <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+      </div>
     </section>
   );
 }
 
-const CHIP: Record<ReleaseState, string> = {
-  published: "bg-rvm-accent/15 text-rvm-ink-accent",
-  approved: "bg-rvm-accent/15 text-rvm-ink-accent",
-  pending: "bg-amber-300/[0.12] text-amber-300",
-  rejected: "bg-amber-300/[0.12] text-amber-300",
-  draft: "bg-rvm-text/10 text-rvm-soft",
-  archived: "bg-rvm-text/10 text-rvm-soft",
-};
+const STEPS = [
+  { title: "Demandez votre compte", text: "Ici ou dans l’application : c’est le même compte Rivendy." },
+  { title: "Rivendy vérifie", text: "Votre nom, votre photo et vos droits. Vous êtes prévenu par une notification." },
+  { title: "Publiez", text: "Singles, EP et albums, vérifiés par Rivendy avant la mise en ligne." },
+];
 
-/** Mes sorties, en lecture seule : leur état, et le motif d'un refus. */
-function MyReleases({ artistId }: { artistId: string }) {
-  const list = useLoad(`my-releases:${artistId}`, () => fetchMyReleases(artistId));
-  const [now] = useState(() => Date.now());
+/** Colonne de droite : les étapes, les clips et les droits d'auteur (plus de renvoi vers Google Play). */
+function Aside() {
   return (
-    <section aria-labelledby="rvm-my-releases">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id="rvm-my-releases" className="font-rvm-display text-xl font-extrabold sm:text-2xl">Mes sorties</h2>
-        <p className="text-[13px] text-rvm-muted">Brouillons, en vérification, en ligne — comme dans l’application.</p>
-      </div>
-      {list.error ? (
-        <div role="alert" className="rounded-2xl border border-rvm-line bg-rvm-panel p-5">
-          <p className="font-semibold">Impossible de charger vos sorties.</p>
-          <button type="button" onClick={list.reload} className={cn(secondaryButton, "mt-3 h-10")}>Réessayer</button>
+    <aside className="h-fit space-y-4">
+      <section aria-labelledby="rvm-artist-steps" className="rounded-2xl border border-rvm-line bg-rvm-panel p-5">
+        <h2 id="rvm-artist-steps" className="font-rvm-display text-lg font-extrabold">En trois étapes</h2>
+        <ol className="mt-3 space-y-3">
+          {STEPS.map((s, i) => (
+            <li key={s.title} className="flex gap-3">
+              <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-rvm-accent text-[13px] font-extrabold text-rvm-on-accent">{i + 1}</span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-bold">{s.title}</span>
+                <span className="block text-[13.5px] leading-snug text-rvm-soft">{s.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section className="rounded-2xl border border-rvm-line bg-rvm-panel p-5">
+        <p className="flex items-center gap-2 font-semibold"><Film className="h-5 w-5 text-rvm-ink-accent" aria-hidden /> Vos clips vidéo</p>
+        <p className="mt-2 text-sm leading-relaxed text-rvm-soft">Le même compte artiste sert pour Rivendy Clips. La publication des clips se fait pour le moment depuis l’application Android.</p>
+        <div className="mt-3 flex flex-col gap-2 text-sm font-semibold">
+          <Link href="/play/clips/artiste" prefetch={false} className="text-rvm-ink-accent hover:underline">Mes clips sur Rivendy Play →</Link>
+          <Link href="/droits-auteur" prefetch={false} className="text-rvm-ink-accent hover:underline">Droits d’auteur sur Rivendy →</Link>
         </div>
-      ) : !list.data ? <ListSkeleton rows={3} /> : list.data.length === 0 ? (
-        <EmptyState icon={Disc3} title="Aucune sortie envoyée pour l’instant"
-          text="Préparez la première dans l’application : Musique → Publier → Nouvelle sortie." />
-      ) : (
-        <ul className="divide-y divide-rvm-line overflow-hidden rounded-2xl border border-rvm-line">
-          {list.data.map((r) => {
-            const state = releaseState(r.status, r.review_status);
-            const added = addedAtLabel(r.created_at, now);
-            const when = state === "published"
-              ? (r.release_date ?? r.published_at ?? "").slice(0, 4)
-              : added ? `créée ${/^\d/.test(added) ? `le ${added}` : added}` : "";
-            return (
-              <li key={r.id} className="flex items-center gap-3.5 px-4 py-3">
-                <Cover url={r.cover_url} size={160} alt="" rounded="rounded-lg" className="h-14 w-14 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  {state === "published" ? (
-                    <Link href={`/music/album/${r.id}`} className="block truncate text-[15px] font-bold hover:underline">{r.title}</Link>
-                  ) : <p className="truncate text-[15px] font-bold">{r.title || "Sans titre"}</p>}
-                  <p className="truncate text-[13px] text-rvm-soft">{[releaseKindLabel(r.kind), when].filter(Boolean).join(" · ")}</p>
-                  {state === "rejected" && r.review_reason ? <p className="mt-0.5 text-[13px] text-amber-300">Motif : {r.review_reason}</p> : null}
-                </div>
-                <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-[12.5px] font-bold", CHIP[state])}>{RELEASE_STATE_LABEL[state]}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** Où se fait la publication : l'application (aucun faux bouton sur le site). */
-function AppCard({ phase }: { phase: Phase }) {
-  const strong = (t: string) => <strong className="text-rvm-text">{t}</strong>;
-  const how = {
-    create: <>Pour créer votre compte artiste : ouvrez {strong("Musique")}, touchez {strong("Publier")}, puis {strong("Devenir artiste")}.</>,
-    follow: <>Pour suivre ou corriger votre demande : ouvrez {strong("Musique")}, touchez {strong("Publier")}, puis {strong("Mon espace artiste")}.</>,
-    enable: <>Pour activer Rivendy Musique : ouvrez {strong("Musique")}, touchez {strong("Publier")}, puis {strong("Mon profil artiste")}.</>,
-    publish: <>Pour publier une sortie ou une story, ou reprendre un brouillon : ouvrez {strong("Musique")} et touchez {strong("Publier")}.</>,
-  }[phase];
-  return (
-    <aside aria-label="Dans l’application Rivendy" className="h-fit rounded-2xl border border-rvm-ink-accent/35 bg-rvm-accent/[0.07] p-5">
-      <p className="flex items-center gap-2 font-semibold"><Smartphone className="h-5 w-5 text-rvm-ink-accent" aria-hidden /> Dans l’application Rivendy</p>
-      <p className="mt-2 text-[15px] leading-relaxed text-rvm-soft">{how}</p>
-      <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className={cn(secondaryButton, "mt-4 w-full")}>
-        <Download className="h-4 w-4" aria-hidden /> L’application sur Google Play
-      </a>
-      <p className="mt-3 text-[12.5px] leading-snug text-rvm-muted">Les fichiers audio et les pochettes s’envoient depuis l’application, qui les prépare.</p>
-      <div className="mt-4 flex flex-col gap-2 border-t border-rvm-text/[0.08] pt-4 text-sm font-semibold">
-        <Link href="/play/clips/artiste" prefetch={false} className="text-rvm-ink-accent hover:underline">Vous publiez aussi des clips vidéo ? Rivendy Play →</Link>
-        <Link href="/droits-auteur" prefetch={false} className="text-rvm-ink-accent hover:underline">Droits d’auteur sur Rivendy →</Link>
-      </div>
+      </section>
     </aside>
   );
 }

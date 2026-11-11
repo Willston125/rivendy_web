@@ -16,11 +16,13 @@ import { ClipsPage } from "./clips-shell";
 import { useClips } from "./clips-store";
 
 /**
- * Espace artiste sur le site (refonte Clips du 2026-10-26). La création du
- * compte artiste, la publication et la gestion des clips (modifier, activer,
- * désactiver, supprimer) existent dans l'application Rivendy — elles ne sont
- * PAS refaites ici. Le site montre l'état réel du compte et de ses clips, et
- * dit exactement où aller : Play → « Créer » → « Espace artiste ».
+ * Espace artiste sur le site (refonte Clips du 2026-10-26). La demande de
+ * compte artiste et le profil se font sur le site depuis le 2026-11-11
+ * (/music/artiste, le même compte pour la Musique et les Clips). La
+ * publication et la gestion des clips (modifier, activer, désactiver,
+ * supprimer) restent dans l'application jusqu'à leur lot : le site montre
+ * l'état réel du compte et de ses clips, et dit où aller : Play → « Créer »
+ * → « Espace artiste ».
  */
 export function ClipsArtistSpaceView() {
   const { user, loading } = useAuth();
@@ -107,10 +109,28 @@ function StatusCard({ status, name, reason, artistId }: { status: string; name: 
   );
 }
 
-/** Où se fait la gestion : l'application (aucun faux bouton sur le site). */
+/**
+ * Où se fait la gestion. Le compte artiste (demande, profil) se gère sur le
+ * site depuis le 2026-11-11 (espace artiste de la Musique : le même compte
+ * sert aux clips) ; la publication des clips reste dans l'application tant
+ * que son lot n'est pas livré (aucun faux bouton sur le site).
+ */
 function AppCard({ status }: { status: string }) {
-  const action = status === "approved" ? "publier un clip, le modifier, l’activer, le désactiver ou le supprimer"
-    : status === "none" ? "créer votre profil d’artiste" : "suivre et modifier votre profil";
+  if (status !== "approved" && status !== "suspended") {
+    return (
+      <aside className="h-fit rounded-rvp-panel border border-rvp-edge-strong bg-rvp-accent/[0.07] p-5">
+        <p className="flex items-center gap-2 font-semibold text-rvp-text"><MicVocal className="h-5 w-5 text-rvp-accent" aria-hidden /> Votre compte artiste</p>
+        <p className="mt-2 text-[14.5px] leading-6 text-rvp-soft">
+          {status === "none" ? "Demandez votre compte artiste sur le site, sans l’application." : "Suivez et modifiez votre demande sur le site."}{" "}
+          Le même compte sert pour Rivendy Musique et Rivendy Clips.
+        </p>
+        <Link href="/music/artiste" prefetch={false} className={cn(btnPrimary, "mt-4 h-11 w-full")}>
+          {status === "none" ? "Devenir artiste" : "Mon espace artiste"}
+        </Link>
+      </aside>
+    );
+  }
+  const action = status === "approved" ? "publier un clip, le modifier, l’activer, le désactiver ou le supprimer" : "suivre et modifier votre profil";
   return (
     <aside className="h-fit rounded-rvp-panel border border-rvp-edge-strong bg-rvp-accent/[0.07] p-5">
       <p className="flex items-center gap-2 font-semibold text-rvp-text"><Smartphone className="h-5 w-5 text-rvp-accent" aria-hidden /> Dans l’application Rivendy</p>
