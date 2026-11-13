@@ -261,8 +261,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
     if (subcategoryOptions.length > 0 && !subcategory) return "Sous-catégorie requise.";
     if (isPhaseB && !phaseBTypeKey) return "Précisez le type d'annonce.";
     if (isConstruction && !constructionKey && !isEdit) return "Précisez la sous-catégorie Construction.";
-    // Taille exigée à la publication (sell_screen) ; l'édition ne l'impose pas.
-    if (!isEdit && showSize && !size.trim()) return "La taille est requise (« Unique » si elle ne s'applique pas).";
+    // Taille facultative (publication comme édition) : la colonne accepte une valeur vide.
     const stockValue = Number(stock);
     if (!Number.isInteger(stockValue) || stockValue < 1) return "La quantité en stock doit être d'au moins 1.";
     return null;
@@ -739,8 +738,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
                 id="size"
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
-                placeholder="M, 42, Unique…"
-                required={!isEdit}
+                placeholder="M, 42, Unique… (facultatif)"
               />
             </div>
           )}
