@@ -30,6 +30,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base: MetadataRoute.Sitemap = [
     { url: absoluteUrl("/"), lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: absoluteUrl("/vendre-en-ligne"), lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    // Page du QR code « Télécharger Rivendy » (2026-11-14).
+    { url: absoluteUrl("/app"), lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: absoluteUrl(storesPath(HOME_MARKET_ID)), lastModified: now, changeFrequency: "daily", priority: 0.8 },
     { url: absoluteUrl("/help"), lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: absoluteUrl("/legal"), lastModified: now, changeFrequency: "yearly", priority: 0.1 },

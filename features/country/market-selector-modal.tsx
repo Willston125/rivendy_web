@@ -55,7 +55,8 @@ function CountryRow({
  * S'affiche quand needsMarketSelection = true — pas de bouton fermer.
  * Parity Flutter : _CountryPickerSheet (bottom-sheet draggable).
  */
-const MARKET_FREE_PATHS = ["/play", "/musique", "/music", "/artist", "/legal", "/delete-account", "/auth/reset-password"];
+// « /app » (2026-11-14) : la page du QR code « Télécharger Rivendy », vue surtout par des iPhone et des ordinateurs.
+const MARKET_FREE_PATHS = ["/play", "/musique", "/music", "/artist", "/legal", "/delete-account", "/auth/reset-password", "/app"];
 
 export function MarketSelectorModal() {
   const { needsMarketSelection: marketMissing, countries, setCountryId, reloadCountries } = useCountry();

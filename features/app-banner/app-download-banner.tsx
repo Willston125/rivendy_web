@@ -21,7 +21,10 @@ const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 export function AppDownloadBanner() {
   // Le mini-lecteur Rivendy Music occupe le bas de l'écran : le bandeau s'efface.
   const musicPlaying = !!useMusicPlayerOptional()?.current;
-  const playPage = isPlayPath(usePathname());
+  const pathname = usePathname();
+  const playPage = isPlayPath(pathname);
+  // La page /app (2026-11-14) est déjà le bouton « Télécharger » : pas de bandeau par-dessus.
+  const appPage = pathname === "/app";
   const [platform, setPlatform] = useState<"mobile" | "desktop" | null>(null);
   const [storeUrl, setStoreUrl] = useState("/");
 
@@ -50,7 +53,7 @@ export function AppDownloadBanner() {
     setPlatform(null);
   }
 
-  if (!platform || musicPlaying) return null;
+  if (!platform || musicPlaying || appPage) return null;
 
   const AppIcon = (
     <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#009688]">
