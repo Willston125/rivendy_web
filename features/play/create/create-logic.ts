@@ -213,13 +213,31 @@ export function filterShortArticles(all: ShortArticle[], query = "", withoutVide
 
 const RETRY_LATER = "Trop d’envois d’affilée : réessayez dans une minute.";
 
+/**
+ * Quota vidéo atteint (formules simplifiées, 15/11) : `daily` = publications
+ * marketplace avec vidéo du jour (3 en gratuit, sans limite avec Rivendy+) ;
+ * `online` = garde-fou des vidéos en ligne, dont le nombre n'est JAMAIS
+ * affiché (décision du 15/11).
+ */
+export function quotaExceededMessage(quota: string | null | undefined, perDay?: number | null): string {
+  if (quota === "online") {
+    return "Vous avez trop de vidéos en ligne : retirez-en une pour publier celle-ci. Les comptes Rivendy+ peuvent en garder davantage.";
+  }
+  if (quota === "daily") {
+    return perDay
+      ? `Vous avez déjà publié ${perDay} article${perDay > 1 ? "s" : ""} avec vidéo aujourd’hui. Prochaine publication avec vidéo demain, ou sans limite avec Rivendy+.`
+      : "Vous avez atteint les publications avec vidéo du jour. Prochaine publication avec vidéo demain, ou sans limite avec Rivendy+.";
+  }
+  return "Quota vidéo atteint. Rivendy+ permet d’en publier davantage.";
+}
+
 /** Refus de create-video-upload pour une vidéo d'article ou un Short (VideoException.fromCode). */
-export function videoTicketMessage(code: string | null | undefined, limit?: number | null): string {
+export function videoTicketMessage(
+  code: string | null | undefined, limit?: number | null, extra: { quota?: string | null; perDay?: number | null } = {},
+): string {
   switch (code) {
     case "QUOTA_EXCEEDED":
-      return limit != null
-        ? `Quota vidéo atteint (${limit} ce mois-ci). Passez à une formule supérieure pour en publier plus.`
-        : "Quota vidéo atteint. Passez à une formule supérieure pour en publier plus.";
+      return quotaExceededMessage(extra.quota, extra.perDay ?? limit);
     case "UNAUTHENTICATED": return "Connectez-vous pour publier une vidéo.";
     case "RATE_LIMITED": return RETRY_LATER;
     case "BAD_LENGTH": return "Fichier trop lourd pour être envoyé (1 Go au plus).";

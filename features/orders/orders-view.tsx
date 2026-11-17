@@ -43,6 +43,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry, useCountryOrDefault } from "@/features/country/country-provider";
 import { formatMoney } from "@/lib/utils/format";
+import { benefitSentence } from "@/features/checkout/delivery-benefit";
 import { orderCountry, orderReference } from "@/lib/utils/orders";
 import type { AppOrder, Country, OrderStatus } from "@/types/rivendy";
 import { cn } from "@/lib/utils/cn";
@@ -116,7 +117,7 @@ const ORDERS_PAGE = 30;
  * `OrderCard` s'ajoute ici en même temps.
  */
 const ORDER_COLUMNS =
-  "id, status, country_id, created_at, seller_name, payment_method, total_price, delivery_fee_kmf, delivery_region_name, delivery_locality_name, delivery_neighborhood_name, order_items(product_title, product_type, delivery_days)";
+  "id, status, country_id, created_at, seller_name, payment_method, total_price, delivery_fee_kmf, delivery_rivendy_share_kmf, delivery_benefit, delivery_region_name, delivery_locality_name, delivery_neighborhood_name, order_items(product_title, product_type, delivery_days)";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all",       label: "Toutes" },
@@ -434,9 +435,15 @@ function OrderCard({
               {formatMoney(order.total_price, country)}
             </p>
             {/* Livraison : HORS total_price (§1.8), affichée à part. */}
-            {Number(order.delivery_fee_kmf ?? 0) > 0 && (
+            {(Number(order.delivery_fee_kmf ?? 0) > 0 || Number(order.delivery_rivendy_share_kmf ?? 0) > 0) && (
               <p className="text-[11px] font-semibold text-slate-500">
-                + livraison {formatMoney(order.delivery_fee_kmf, country)}
+                + livraison {formatMoney(Number(order.delivery_fee_kmf ?? 0), country)}
+              </p>
+            )}
+            {/* Part payée par Rivendy (formules, lot 3) : le vendeur reçoit toujours son prix. */}
+            {Number(order.delivery_rivendy_share_kmf ?? 0) > 0 && (
+              <p className="text-[11px] font-bold text-[#00695C]">
+                {benefitSentence(order.delivery_benefit, Number(order.delivery_rivendy_share_kmf), (n) => formatMoney(n, country))}
               </p>
             )}
             {[order.delivery_neighborhood_name, order.delivery_locality_name, order.delivery_region_name]

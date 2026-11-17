@@ -12,7 +12,8 @@ import {
 } from "./play-logic";
 import { usePageBackdrop } from "./play-shell";
 import { HERO_SIZES_POSTER, HERO_SIZES_WIDE, HERO_WIDTHS, btnIcon, btnPrimary, btnRound, display, eyebrow } from "./play-theme";
-import { ListButton, PremiumBadge } from "./play-ui";
+import { AccessBadge } from "./pass-ui";
+import { ListButton } from "./play-ui";
 
 /**
  * Bannière de Rivendy Play — « key art » (« Emerald Cinema », 2026-10-24).
@@ -198,7 +199,7 @@ export function HeroMetadata({ title, episodes, className }: { title: PlayTitle;
       {age ? (
         <span className="ml-1 rounded-md border border-white/30 bg-white/[0.06] px-1.5 text-[11px] font-semibold leading-5 text-rvp-text" title="Classification du titre">{age}</span>
       ) : null}
-      {title.is_premium && kindOf(title.kind) !== "clip" ? <PremiumBadge /> : null}
+      {title.is_premium && kindOf(title.kind) !== "clip" ? <AccessBadge title={title} /> : null}
     </div>
   );
 }

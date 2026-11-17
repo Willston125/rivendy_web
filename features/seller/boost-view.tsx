@@ -2,138 +2,70 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, CheckCircle2, Copy, CheckCircle } from "lucide-react";
 import Image from "next/image";
+import { Loader2, Zap } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useCountryOrDefault } from "@/features/country/country-provider";
+import { fetchBoostStatus, type BoostStatus } from "@/features/plus/plus-api";
 import { firstPhoto, formatMoney } from "@/lib/utils/format";
 import { supabase } from "@/lib/supabase/client";
-import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
-import { boostPriceFor } from "@/lib/utils/seller-offer-prices";
-import { generatePaymentReference } from "@/lib/utils/payment-reference";
 import {
   attachPaymentProof,
   fetchPendingPaymentRequest,
   uploadPaymentProof,
   type PendingPaymentRequest,
 } from "@/lib/supabase/payment-proof";
-import { PaymentProofField, PendingPaymentBanner } from "@/features/seller/payment-proof-field";
-import type { BoostPurchaseInput, Product } from "@/types/rivendy";
+import { PendingPaymentBanner } from "@/features/seller/payment-proof-field";
+import type { Product } from "@/types/rivendy";
 
-/* ── Tiers ─────────────────────────────────────────────────── */
+/*
+ * Booster une annonce (formules simplifiées, lot 3, 2026-11-17, d'après le
+ * canevas validé). Grille du 15/11 : les boosts payants à l'unité sont
+ * SUPPRIMÉS ; on ne booste plus qu'avec les boosts inclus — 5 de 3 jours par
+ * mois avec Rivendy+ (ou un ancien Certifié / Pro en cours), aucun en gratuit.
+ * Le décompte vit côté serveur : get_boost_credit_status / use_boost_credit
+ * (fichier 20261115_1100_formules_2_vendeurs.sql). Une demande payante
+ * envoyée avant reste affichée tant que l'équipe ne l'a pas traitée.
+ */
 
-interface BoostTier {
-  id: "bronze" | "argent" | "or";
-  name: string;
-  emoji: string;
-  durationDays: number;
-  color: string;
-  bgColor: string;
-  isPopular?: boolean;
-  benefits: string[];
-}
-
-// Parité app boost_screen.dart — priceForMarket(marketId).
-// Grille par devise (D-1, 2026-10-08) : lib/utils/seller-offer-prices.ts.
-function priceForMarket(tier: BoostTier, countryId: string | null | undefined): number {
-  return boostPriceFor(tier.durationDays, countryId);
-}
-
-const TIERS: BoostTier[] = [
-  {
-    id: "bronze",
-    name: "Bronze",
-    emoji: "🥉",
-    durationDays: 3,
-    color: "#CD7F32",
-    bgColor: "#FFF8F0",
-    benefits: [
-      "Mis en avant pendant 3 jours",
-      "Badge \"Boosté\" sur l'annonce",
-      "Priorité dans les résultats",
-    ],
-  },
-  {
-    id: "argent",
-    name: "Argent",
-    emoji: "🥈",
-    durationDays: 7,
-    color: "#9E9E9E",
-    bgColor: "#F8F8F8",
-    isPopular: true,
-    benefits: [
-      "Mis en avant pendant 7 jours",
-      "Badge \"Boosté\" sur l'annonce",
-      "Top du fil d'actualité",
-      "Notifications push aux acheteurs",
-    ],
-  },
-  {
-    id: "or",
-    name: "Or",
-    emoji: "🥇",
-    durationDays: 15,
-    color: "#FFB800",
-    bgColor: "#FFFBEB",
-    benefits: [
-      "Mis en avant pendant 15 jours",
-      "Badge \"Boosté Or\" sur l'annonce",
-      "Position #1 dans sa catégorie",
-      "Notifications push aux acheteurs",
-      "Statistiques avancées de vues",
-    ],
-  },
-];
-
-/* ── Boost inclus dans l'abonnement (crédits serveur) ──────────
-   Parité app : RPC get_boost_credit_status / use_boost_credit — fichier
-   propriétaire 20260809_subscription_tiers_boost_credits.sql. Le décompte
-   vit ENTIÈREMENT côté serveur ; le client ne fait qu'afficher. */
-
-interface BoostCreditStatus {
-  hasSubscription: boolean;
-  tier: string | null;
-  remaining: number;
-}
-
-const NO_CREDITS: BoostCreditStatus = {
-  hasSubscription: false,
-  tier: null,
-  remaining: 0,
-};
-
-// Codes RAISE EXCEPTION de use_boost_credit → messages métier affichables.
+// Codes RAISE EXCEPTION de use_boost_credit → messages affichables.
 const CREDIT_ERRORS: Record<string, string> = {
-  NO_ACTIVE_SUBSCRIPTION:
-    "Abonnement expiré — renouvelez-le pour retrouver vos boosts inclus.",
+  NO_ACTIVE_SUBSCRIPTION: "Les boosts sont inclus dans Rivendy+ : il faut un abonnement actif pour booster.",
   NOT_PRODUCT_OWNER: "Ce produit n'appartient pas à votre boutique.",
-  PRODUCT_NOT_BOOSTABLE:
-    "Seul un article actif peut recevoir un boost inclus.",
-  NO_CREDITS_LEFT:
-    "0 boost inclus restant ce mois-ci — ils reviennent au prochain cycle.",
+  PRODUCT_NOT_BOOSTABLE: "Seul un article en vente, et pas déjà boosté, peut recevoir un boost.",
+  NO_CREDITS_LEFT: "Vos boosts du mois sont utilisés : ils reviennent au prochain cycle.",
 };
 
-/* ── Component ─────────────────────────────────────────────── */
+const dayMonth = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+const dayMonthHour = (iso: string) =>
+  new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 
 export function BoostView({ product }: { product: Product }) {
   const { user } = useAuth();
   const country = useCountryOrDefault();
-  const [selectedTier, setSelectedTier] = useState<BoostTier | null>(null);
-  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [credits, setCredits] = useState<BoostCreditStatus>(NO_CREDITS);
-  const [confirmCredit, setConfirmCredit] = useState(false);
-  const [usingCredit, setUsingCredit] = useState(false);
-  const [creditMessage, setCreditMessage] =
-    useState<{ ok: boolean; text: string } | null>(null);
-  // Référence COURTE, tirée à l'ouverture de la fenêtre de paiement.
-  const [reference, setReference] = useState("");
-  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<BoostStatus | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [using, setUsing] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [boostedUntil, setBoostedUntil] = useState<string | null>(
+    product.status === "boosted" && product.boost_expires_at && new Date(product.boost_expires_at) > new Date()
+      ? product.boost_expires_at
+      : null,
+  );
+  // Ancienne demande de boost payant, en attente de vérification.
   const [pending, setPending] = useState<PendingPaymentRequest | null>(null);
   const [attaching, setAttaching] = useState(false);
 
-  // Demande déjà envoyée pour cet article, en attente de vérification.
+  const load = useCallback(async () => {
+    if (!user) return;
+    const s = await fetchBoostStatus();
+    setStatus(s);
+    setLoaded(true);
+  }, [user]);
+
+  useEffect(() => { void load(); }, [load]);
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -146,12 +78,12 @@ export function BoostView({ product }: { product: Product }) {
   async function addProofToPending(file: File) {
     if (!user || !pending) return;
     setAttaching(true);
-    setCreditMessage(null);
+    setMessage(null);
     const path = await uploadPaymentProof(user.id, file);
     const err = path ? await attachPaymentProof("boost", pending.id, path) : "upload";
     setAttaching(false);
     if (err || !path) {
-      setCreditMessage({
+      setMessage({
         ok: false,
         text: err === "request_not_pending"
           ? "Cette demande a déjà été traitée par l'équipe Rivendy."
@@ -160,597 +92,137 @@ export function BoostView({ product }: { product: Product }) {
       return;
     }
     setPending({ ...pending, payment_proof_path: path });
-    setCreditMessage({ ok: true, text: "Capture envoyée ✓ — l'équipe Rivendy vérifie votre paiement." });
+    setMessage({ ok: true, text: "Capture envoyée ✓ — l'équipe Rivendy vérifie votre paiement." });
   }
 
-  function openPayment(tier: BoostTier) {
-    setReference(generatePaymentReference());
-    setProofFile(null);
-    setSelectedTier(tier);
-  }
+  // Miroir de la condition serveur : seul un produit 'active' se booste (pas
+  // de produit suspendu ou épuisé, pas d'empilement sur un boost en cours).
+  const boostable = product.status === "active" && !boostedUntil;
+  const allowance = Number(status?.allowance ?? 0);
+  const remaining = Number(status?.remaining ?? 0);
+  const days = Number(status?.boost_days ?? 3) || 3;
+  const legacy = status?.source === "legacy_certified" || status?.source === "legacy_pro";
 
-  const loadCredits = useCallback(async () => {
-    if (!user) return;
+  async function boost() {
+    if (!user || using) return;
+    setUsing(true);
+    setMessage(null);
     try {
-      const { data, error } = await supabase.rpc("get_boost_credit_status");
-      if (error || !data) return;
-      const row = data as Record<string, unknown>;
-      setCredits({
-        hasSubscription: Boolean(row.has_subscription),
-        tier: (row.tier as string) ?? null,
-        remaining: Number(row.remaining ?? 0),
-      });
-    } catch {
-      // Silencieux — sans statut, la carte « boost inclus » ne s'affiche pas.
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadCredits();
-  }, [loadCredits]);
-
-  // Miroir de la condition serveur : seul un produit 'active' est boostable
-  // (pas de produit suspendu/épuisé, pas d'empilement sur un boost en cours).
-  const isProductBoostable = product.status === "active";
-  // Boost PAYANT : article en vente (déjà boosté = prolongation). Miroir du
-  // garde serveur guard_payment_request (PRODUCT_NOT_BOOSTABLE).
-  const isProductSellable = product.status === "active" || product.status === "boosted";
-
-  async function useIncludedBoost() {
-    if (!user || usingCredit) return;
-    setUsingCredit(true);
-    setCreditMessage(null);
-    try {
-      const { data, error } = await supabase.rpc("use_boost_credit", {
-        p_product_id: product.id,
-      });
+      const { data, error } = await supabase.rpc("use_boost_credit", { p_product_id: product.id });
       if (error) throw error;
-      const remaining = Number(
-        (data as Record<string, unknown> | null)?.remaining ?? 0,
-      );
-      setCredits((c) => ({ ...c, remaining }));
-      setConfirmCredit(false);
-      setCreditMessage({
-        ok: true,
-        text: `⚡ Boost 3 jours activé ! ${remaining} restant(s) ce mois-ci.`,
-      });
+      const res = (data ?? {}) as { remaining?: number; boost_expires_at?: string };
+      setConfirm(false);
+      if (res.boost_expires_at) setBoostedUntil(res.boost_expires_at);
+      setStatus((s) => (s ? { ...s, remaining: Number(res.remaining ?? 0), used: Number(s.used ?? 0) + 1 } : s));
+      setMessage({ ok: true, text: `Boost de ${days} jours activé. ${Number(res.remaining ?? 0)} restant${Number(res.remaining ?? 0) > 1 ? "s" : ""} ce mois-ci.` });
     } catch (err) {
       const raw = (err as { message?: string })?.message ?? "";
       const known = Object.keys(CREDIT_ERRORS).find((k) => raw.includes(k));
-      setConfirmCredit(false);
-      setCreditMessage({
-        ok: false,
-        text: known ? CREDIT_ERRORS[known] : "Le boost inclus a échoué, réessayez.",
-      });
-      // Le refus peut venir d'un décompte dépassé : rafraîchir le compteur.
-      loadCredits();
+      setConfirm(false);
+      setMessage({ ok: false, text: known ? CREDIT_ERRORS[known] : "Le boost a échoué, réessayez." });
+      void load();
     } finally {
-      setUsingCredit(false);
+      setUsing(false);
     }
-  }
-
-  // Jamais de numéro en dur — miroir de mobile_money_data.dart (parité app).
-  const paymentMethods = getMobileMoneyForCountry(country?.id ?? "");
-  const selectedMethod =
-    paymentMethods.find((m) => m.id === selectedMethodId && m.enabled) ??
-    paymentMethods.find((m) => m.enabled) ??
-    CASH_METHOD;
-  const isCash = selectedMethod.id === "cash";
-
-  // Même référence que l'app (boost_screen.dart) : `BST-XXXXXX`, tirée à
-  // l'ouverture de la fenêtre (openPayment). L'équipe la rapproche du
-  // paiement au dashboard, quel que soit le canal.
-  function copyReference() {
-    navigator.clipboard.writeText(reference);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  // La demande part dans le DASHBOARD, plus sur WhatsApp (parité
-  // boost_screen.dart, 2026-09-10) : l'INSERT en `pending` déclenche
-  // `notify_admins_new_boost`, qui prévient les admins habilités du marché.
-  async function handlePaid(tier: BoostTier) {
-    if (!user || !country) return;
-    setSubmitting(true);
-    setCreditMessage(null);
-
-    // Capture du paiement (facultative) : envoyée avant la demande. Si l'envoi
-    // échoue, la demande part quand même — la capture se rajoute ensuite
-    // depuis le rappel « demande en attente ».
-    let proofPath: string | null = null;
-    let proofFailed = false;
-    if (!isCash && proofFile) {
-      proofPath = await uploadPaymentProof(user.id, proofFile);
-      proofFailed = proofPath === null;
-    }
-
-    const payload: BoostPurchaseInput = {
-      product_id: product.id,
-      seller_id: user.id,
-      plan: tier.id,
-      price_paid: priceForMarket(tier, country.id),
-      duration_days: tier.durationDays,
-      status: "pending",
-      // Parité subscription : l'id de la méthode choisie (waafi_dj, cash…).
-      payment_method: selectedMethod.id,
-      country_id: country.id,
-      payment_reference: reference,
-      // Clé omise sans capture : la demande ne dépend pas de la colonne.
-      ...(proofPath ? { payment_proof_path: proofPath } : {}),
-    };
-    const { error } = await supabase.from("boost_purchases").insert(payload);
-
-    setSubmitting(false);
-
-    if (error?.message?.includes("PRODUCT_NOT_BOOSTABLE")) {
-      setCreditMessage({
-        ok: false,
-        text: "Cet article n'est plus en vente : il ne peut pas être mis en avant.",
-      });
-      return;
-    }
-    if (error) {
-      // L'enregistrement est désormais le SEUL canal. L'ancien code
-      // enveloppait l'insert dans un try/catch qui n'attrapait RIEN —
-      // `insert()` ne lève pas d'exception, il renvoie `{ error }` — puis
-      // ouvrait WhatsApp quoi qu'il arrive : le vendeur repartait convaincu
-      // que sa demande était transmise.
-      setCreditMessage({
-        ok: false,
-        text: `Votre demande n'a pas pu être enregistrée. Réessayez, ou signalez la référence ${reference} depuis Aide & Support.`,
-      });
-      return;
-    }
-
-    setSelectedTier(null);
-    setProofFile(null);
-    void fetchPendingPaymentRequest("boost_purchases", user.id, product.id).then(setPending);
-    // La référence doit rester LISIBLE : c'est WhatsApp qui en tenait lieu
-    // d'archive. Le serveur en pose aussi une trace dans les notifications.
-    const proofNote = isCash
-      ? ""
-      : proofPath
-        ? " Capture du paiement jointe ✓"
-        : proofFailed
-          ? " La capture n'a pas pu être envoyée : ajoutez-la ci-dessus."
-          : " Ajoutez la capture de votre paiement ci-dessus pour accélérer la validation.";
-    setCreditMessage({
-      ok: true,
-      text: isCash
-        ? `Demande de boost ${tier.name} enregistrée sous la référence ${reference}. L'équipe Rivendy vous contactera pour convenir du règlement en espèces.`
-        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Le boost ${tier.name} démarre après vérification.${proofNote}`,
-    });
   }
 
   if (!country) return null;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
-      {/* Header */}
+    <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
       <div className="mb-6">
-        <p className="text-xs font-black uppercase tracking-wider text-[#009688]">Rivendy</p>
+        <p className="text-xs font-black uppercase tracking-wider text-[#00796B]">Rivendy</p>
         <h1 className="mt-1 text-3xl font-black text-[#1A1A1A]">Booster mon annonce</h1>
       </div>
 
-      {/* Product preview */}
-      <div className="mb-6 flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl bg-white p-4 shadow-sm">
         <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-slate-100">
-          <Image
-            src={firstPhoto(product)}
-            alt={product.title}
-            fill
-            className="object-cover"
-          />
+          <Image src={firstPhoto(product)} alt={product.title} fill className="object-cover" />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-[#1A1A1A]">{product.title}</p>
-          <p className="mt-1 text-base font-black text-[#009688]">
-            {formatMoney(product.price, country)}
-          </p>
+          <p className="mt-1 text-base font-black text-[#00796B]">{formatMoney(product.price, country)}</p>
         </div>
-        <span
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-            isProductSellable ? "bg-[#009688]/10 text-[#009688]" : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          {isProductSellable ? "En vente" : "Hors vente"}
-        </span>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+          <li>Mis en avant {days} jours</li>
+          <li>Badge « Boosté » sur l’annonce</li>
+          <li>Priorité dans les résultats</li>
+        </ul>
       </div>
 
-      {/* Demande déjà envoyée, en attente de vérification */}
       {pending && (
-        <PendingPaymentBanner
-          title="Demande de boost en attente"
-          request={pending}
-          busy={attaching}
-          onAddProof={addProofToPending}
-        />
+        <PendingPaymentBanner title="Demande de boost en attente" request={pending} busy={attaching} onAddProof={addProofToPending} />
       )}
 
-      {/* Info banner */}
-      <div className="mb-6 flex gap-3 rounded-2xl border border-[#009688]/20 bg-[#E8F5E9] p-4">
-        <Zap className="h-6 w-6 shrink-0 text-[#009688]" />
-        <p className="text-sm leading-relaxed text-[#004D40]">
-          Un boost augmente la visibilité de votre annonce et attire plus
-          d&apos;acheteurs potentiels.
+      {message && (
+        <p role="status" className={`mb-4 rounded-xl px-3 py-2 text-sm font-semibold ${message.ok ? "bg-[#E0F2F1] text-[#00695C]" : "bg-red-50 text-red-600"}`}>
+          {message.text}
         </p>
-      </div>
+      )}
 
-      {/* Boost inclus — abonnés Certifié/Pro (parité app) */}
-      {credits.hasSubscription &&
-        (credits.tier === "certified" || credits.tier === "pro") && (
-          <div
-            className={`mb-6 rounded-2xl border-[1.5px] p-4 ${
-              credits.remaining > 0 && isProductBoostable
-                ? "border-[#009688] bg-[#E8F5F3]"
-                : "border-slate-300 bg-slate-100"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚡</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-[#1A1A1A]">
-                  Boost inclus — abonnement{" "}
-                  {credits.tier === "pro" ? "Pro" : "Certifié"}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {credits.remaining > 0
-                    ? `3 jours de mise en avant · ${credits.remaining} restant(s) ce mois-ci`
-                    : "0 restant ce mois-ci — revient au prochain cycle"}
-                </p>
-                {credits.remaining > 0 && !isProductBoostable && (
-                  <p className="mt-1 text-xs font-semibold text-orange-600">
-                    Seul un article actif peut recevoir un boost inclus.
-                  </p>
-                )}
-              </div>
-              {!confirmCredit && (
-                <button
-                  type="button"
-                  disabled={
-                    credits.remaining <= 0 || !isProductBoostable || usingCredit
-                  }
-                  onClick={() => setConfirmCredit(true)}
-                  className="shrink-0 rounded-xl bg-[#009688] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#00796B] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Booster ⚡
-                </button>
-              )}
-            </div>
-            {confirmCredit && (
-              <div className="mt-3 rounded-xl bg-white p-3">
-                <p className="text-sm text-slate-600">
-                  Votre article sera mis en avant pendant 3 jours, sans
-                  paiement. Il vous restera{" "}
-                  <strong>{credits.remaining - 1}</strong> boost(s) inclus ce
-                  mois-ci.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={usingCredit}
-                    onClick={useIncludedBoost}
-                    className="flex-1 rounded-xl bg-[#009688] py-2.5 text-sm font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
-                  >
-                    {usingCredit ? "Activation…" : "Confirmer — Booster ⚡"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={usingCredit}
-                    onClick={() => setConfirmCredit(false)}
-                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </div>
-            )}
-            {creditMessage && (
-              <p
-                className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold ${
-                  creditMessage.ok
-                    ? "bg-[#E0F2F1] text-[#00796B]"
-                    : "bg-red-50 text-red-600"
-                }`}
-              >
-                {creditMessage.text}
+      {!loaded ? (
+        <div className="rounded-2xl bg-white p-8 text-center shadow-sm"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></div>
+      ) : allowance > 0 ? (
+        <div className={`rounded-2xl border-2 bg-white p-5 ${boostable && remaining > 0 ? "border-[#00796B]" : "border-slate-200"}`}>
+          {boostedUntil ? (
+            <>
+              <p className="text-lg font-black text-slate-950">Boosté jusqu’au {dayMonthHour(boostedUntil)}</p>
+              <p className="mt-1 text-sm text-slate-600">Un boost à la fois par article. {remaining} boost{remaining > 1 ? "s" : ""} restant{remaining > 1 ? "s" : ""} ce mois-ci pour vos autres articles.</p>
+            </>
+          ) : remaining > 0 ? (
+            <>
+              <p className="text-3xl font-black text-slate-950">
+                {remaining} <span className="text-base font-bold text-slate-500">boost{remaining > 1 ? "s" : ""} restant{remaining > 1 ? "s" : ""} sur {allowance}</span>
               </p>
-            )}
-          </div>
-        )}
-
-      {/* Message hors carte « boost inclus » (demande payante, capture) */}
-      {creditMessage &&
-        !(credits.hasSubscription && (credits.tier === "certified" || credits.tier === "pro")) && (
-          <p
-            className={`mb-6 rounded-xl px-3 py-2 text-sm font-semibold ${
-              creditMessage.ok ? "bg-[#E0F2F1] text-[#00796B]" : "bg-red-50 text-red-600"
-            }`}
-          >
-            {creditMessage.text}
-          </p>
-        )}
-
-      {/* Tiers */}
-      <h2 className="mb-3 text-lg font-black text-[#1A1A1A]">
-        Choisissez votre boost
-      </h2>
-
-      {!isProductSellable ? (
-        <p className="rounded-2xl bg-slate-100 p-4 text-sm leading-relaxed text-slate-700">
-          {product.status === "epuise"
-            ? "Cet article est épuisé"
-            : product.status === "pending"
-              ? "Cet article est en cours de vérification"
-              : product.status === "rejected"
-                ? "Cet article n'a pas été validé"
-                : "Cet article n'est pas en vente"}{" "}
-          : il ne peut pas être mis en avant. Remettez-le en vente pour pouvoir le booster.
-        </p>
+              <p className="mt-1 text-sm text-slate-600">
+                {status?.cycle_end ? `Jusqu’au ${dayMonth(status.cycle_end)}. Ensuite, ${allowance} nouveaux boosts.` : "Chaque mois, de nouveaux boosts."}
+                {legacy ? ` Avec votre abonnement ${status?.source === "legacy_pro" ? "Pro" : "Certifié"} en cours.` : ""}
+              </p>
+              {!boostable ? (
+                <p className="mt-2 text-sm font-semibold text-orange-700">Seul un article en vente peut recevoir un boost.</p>
+              ) : !confirm ? (
+                <button type="button" onClick={() => setConfirm(true)} disabled={using}
+                  className="mt-4 inline-flex h-12 items-center gap-2 rounded-full bg-[#00796B] px-6 text-sm font-black text-white hover:bg-[#00695C] disabled:opacity-60">
+                  <Zap className="h-[18px] w-[18px]" aria-hidden /> Booster {days} jours
+                </button>
+              ) : (
+                <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                  <p className="text-sm text-slate-700">
+                    Votre article sera mis en avant pendant {days} jours. Il vous restera <strong>{remaining - 1}</strong> boost{remaining - 1 > 1 ? "s" : ""} ce mois-ci.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={boost} disabled={using}
+                      className="inline-flex h-11 items-center gap-2 rounded-full bg-[#00796B] px-5 text-sm font-black text-white hover:bg-[#00695C] disabled:opacity-60">
+                      {using ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Zap className="h-4 w-4" aria-hidden />} Confirmer
+                    </button>
+                    <button type="button" onClick={() => setConfirm(false)} disabled={using}
+                      className="h-11 rounded-full border border-slate-300 px-5 text-sm font-bold text-slate-600 hover:bg-white">
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-slate-500">{legacy ? "Inclus dans votre abonnement" : "Inclus dans Rivendy+"} : rien à payer.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-black text-slate-950">Vos {allowance} boosts du mois sont utilisés</p>
+              <p className="mt-1 text-sm text-slate-600">
+                {status?.cycle_end ? `${allowance} nouveaux boosts le ${dayMonth(status.cycle_end)}.` : "De nouveaux boosts arrivent au prochain cycle."}
+              </p>
+            </>
+          )}
+        </div>
       ) : (
-      <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
-        {TIERS.map((tier) => (
-          <div
-            key={tier.id}
-            className="relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md"
-            style={{
-              border: tier.isPopular ? `2px solid ${tier.color}` : `1.5px solid ${tier.color}33`,
-            }}
-          >
-            {tier.isPopular && (
-              <div
-                className="absolute right-0 top-0 rounded-bl-xl px-3 py-1.5 text-[10px] font-black text-white"
-                style={{ backgroundColor: tier.color }}
-              >
-                POPULAIRE
-              </div>
-            )}
-
-            {/* Header centré (pricing card) */}
-            <div className="text-center">
-              <span className="text-4xl">{tier.emoji}</span>
-              <p className="mt-2 font-black" style={{ color: tier.color }}>
-                Boost {tier.name}
-              </p>
-              <p className="text-sm text-slate-500">{tier.durationDays} jours</p>
-              <p className="mt-3 text-2xl font-black" style={{ color: tier.color }}>
-                {formatMoney(priceForMarket(tier, country?.id), country)}
-              </p>
-              <p className="text-xs text-slate-400">
-                soit {formatMoney(priceForMarket(tier, country?.id) / tier.durationDays, country)}/jour
-              </p>
-            </div>
-
-            <hr className="my-4 border-slate-100" />
-
-            {/* Benefits */}
-            <ul className="mb-5 space-y-2">
-              {tier.benefits.map((b) => (
-                <li key={b} className="flex items-start gap-2 text-sm text-slate-600">
-                  <CheckCircle2
-                    className="mt-0.5 h-4 w-4 shrink-0"
-                    style={{ color: tier.color }}
-                  />
-                  {b}
-                </li>
-              ))}
-            </ul>
-
-            {/* Button — collé en bas pour aligner les cartes */}
-            <button
-              type="button"
-              onClick={() => openPayment(tier)}
-              className="mt-auto w-full rounded-xl py-3 text-sm font-black text-white transition hover:opacity-90"
-              style={{ backgroundColor: tier.color }}
-            >
-              Choisir {tier.name}
-            </button>
-          </div>
-        ))}
-      </div>
-      )}
-
-      <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
-        Paiement vérifié manuellement sous 24h
-        <br />
-        {/* Plus de WhatsApp (2026-10-09) : la demande est suivie dans le dashboard. */}
-        Une question ? <Link href="/help?sujet=selling" className="font-semibold text-[#009688] hover:underline">Aide & support</Link>
-      </p>
-
-      {/* Payment modal */}
-      {selectedTier && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
-          onClick={() => setSelectedTier(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle — mobile uniquement */}
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
-
-            {/* Title */}
-            <div className="mb-5 flex items-start gap-3">
-              <span className="text-2xl">{selectedTier.emoji}</span>
-              <div>
-                <p
-                  className="text-lg font-black"
-                  style={{ color: selectedTier.color }}
-                >
-                  Boost {selectedTier.name}
-                </p>
-                <p className="text-sm text-slate-500">
-                  {selectedTier.durationDays} jours ·{" "}
-                  {formatMoney(priceForMarket(selectedTier, country?.id), country)}
-                </p>
-              </div>
-            </div>
-
-            {/* Method selector */}
-            <p className="mb-2 font-bold text-[#1A1A1A]">
-              Méthode de paiement
-            </p>
-            <div className="mb-5 grid grid-cols-2 gap-2">
-              {paymentMethods.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  disabled={!m.enabled}
-                  onClick={() => setSelectedMethodId(m.id)}
-                  className="rounded-xl border px-2 py-3 text-center text-xs font-bold transition disabled:cursor-not-allowed"
-                  style={{
-                    borderColor:
-                      selectedMethod.id === m.id ? m.color : "#E2E8F0",
-                    backgroundColor:
-                      selectedMethod.id === m.id ? `${m.color}15` : "#F8FAFC",
-                    color: m.enabled
-                      ? selectedMethod.id === m.id
-                        ? m.color
-                        : "#475569"
-                      : "#CBD5E1",
-                  }}
-                >
-                  {m.name}
-                  {!m.enabled && (
-                    <span className="mt-1 block text-[9px] font-semibold text-slate-400">
-                      Bientôt disponible
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Instructions */}
-            <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <p className="mb-3 text-sm font-bold text-slate-700">
-                Instructions de paiement
-              </p>
-
-              {/* Step 1 */}
-              <div className="mb-2 flex gap-2">
-                <div
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
-                  style={{ backgroundColor: selectedTier.color }}
-                >
-                  1
-                </div>
-                {!isCash && selectedMethod.number ? (
-                  <p className="text-sm text-slate-600">
-                    Envoyez{" "}
-                    <strong>{formatMoney(priceForMarket(selectedTier, country?.id), country)}</strong>{" "}
-                    au numéro {selectedMethod.name} :{" "}
-                    <strong
-                      style={{ color: selectedTier.color }}
-                    >
-                      {selectedMethod.number}
-                    </strong>
-                  </p>
-                ) : (
-                  <p className="text-sm text-slate-600">
-                    Enregistrez votre demande : l&apos;équipe Rivendy vous
-                    contacte pour convenir du paiement en espèces.
-                  </p>
-                )}
-              </div>
-
-              {/* Step 2 */}
-              <div className="mb-2 flex gap-2">
-                <div
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
-                  style={{ backgroundColor: selectedTier.color }}
-                >
-                  2
-                </div>
-                <div className="flex-1">
-                  <p className="mb-2 text-sm text-slate-600">
-                    Mentionnez la référence dans le motif :
-                  </p>
-                  <button
-                    type="button"
-                    onClick={copyReference}
-                    className="flex w-full items-center justify-between rounded-xl border px-3 py-2 transition hover:opacity-80"
-                    style={{
-                      borderColor: `${selectedTier.color}66`,
-                      backgroundColor: "white",
-                    }}
-                  >
-                    <span
-                      className="text-sm font-bold tracking-wide"
-                      style={{ color: selectedTier.color }}
-                    >
-                      {reference}
-                    </span>
-                    {copied ? (
-                      <CheckCircle
-                        className="h-4 w-4"
-                        style={{ color: selectedTier.color }}
-                      />
-                    ) : (
-                      <Copy
-                        className="h-4 w-4"
-                        style={{ color: selectedTier.color }}
-                      />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Step 3 — capture du paiement (Mobile Money) */}
-              {!isCash && (
-                <div className="mb-2 flex gap-2">
-                  <div
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
-                    style={{ backgroundColor: selectedTier.color }}
-                  >
-                    3
-                  </div>
-                  <div className="flex-1">
-                    <p className="mb-2 text-sm text-slate-600">
-                      Après le paiement, ajoutez la capture d&apos;écran de la
-                      confirmation (SMS ou appli) — facultatif, mais la
-                      validation est plus rapide :
-                    </p>
-                    <PaymentProofField
-                      file={proofFile}
-                      onChange={setProofFile}
-                      color={selectedTier.color}
-                      disabled={submitting}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Dernière étape */}
-              <div className="flex gap-2">
-                <div
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
-                  style={{ backgroundColor: selectedTier.color }}
-                >
-                  {isCash ? 3 : 4}
-                </div>
-                <p className="text-sm text-slate-600">
-                  Cliquez sur &quot;J&apos;ai payé&quot; ci-dessous. Notre
-                  équipe activera votre boost sous 24h.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => handlePaid(selectedTier)}
-              className="w-full rounded-xl py-4 text-sm font-black text-white transition hover:opacity-90 disabled:opacity-60"
-              style={{ backgroundColor: selectedTier.color }}
-            >
-              {submitting
-                ? proofFile && !isCash ? "Envoi de la capture…" : "Envoi…"
-                : isCash ? "Envoyer ma demande de boost" : "J'ai payé — Activer mon boost"}
-            </button>
-            <p className="mt-2 text-center text-xs text-slate-400">
-              En cliquant, vous confirmez avoir effectué le paiement.
-            </p>
-          </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-lg font-black text-slate-950">Les boosts sont inclus dans Rivendy+</p>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            Des boosts chaque mois, le badge certifié, les stories de 72 h et les livraisons offertes, avec un seul abonnement.
+          </p>
+          <Link href="/plus" className="mt-4 inline-flex h-12 items-center rounded-full bg-[#00796B] px-6 text-sm font-black text-white hover:bg-[#00695C]">
+            Découvrir Rivendy+
+          </Link>
+          <p className="mt-3 text-xs text-slate-500">Il n’y a plus de boost à payer à l’unité.</p>
         </div>
       )}
     </div>

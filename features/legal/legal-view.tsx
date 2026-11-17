@@ -23,7 +23,7 @@ Rivendy est une plateforme de mise en relation (marketplace) permettant aux util
 Toutes les commandes passent par Rivendy : acheteur et vendeur ne communiquent pas directement, l'équipe Rivendy assure le suivi de chaque commande jusqu'à la confirmation de réception. Tout signalement d'escroquerie avérée entraîne le bannissement du membre.
 
 5. Frais et Commissions
-Une commission Rivendy s'ajoute au prix fixé par le vendeur (le vendeur encaisse exactement son prix) ; son montant est affiché avant la publication et inclus dans le prix payé par l'acheteur. Les abonnements vendeur (Certifié, Pro) et les annonces « Boostées » sont payants, au tarif affiché avant tout paiement.
+Une commission Rivendy s'ajoute au prix fixé par le vendeur (le vendeur encaisse exactement son prix) ; son montant est affiché avant la publication et inclus dans le prix payé par l'acheteur. L'abonnement Rivendy+ et le Rivendy Pass sont payants, au tarif affiché avant tout paiement.
 
 6. Propriété Intellectuelle
 Le nom Rivendy, son logo, et tout contenu produit par la plateforme sont protégés. Toute reproduction sans autorisation est interdite.

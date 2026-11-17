@@ -90,7 +90,7 @@ export function StoreHero({
         <div className="pointer-events-none absolute inset-0 hidden bg-gradient-to-r from-white from-[38%] via-white/75 via-[58%] to-white/0 lg:block" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent lg:hidden" />
         <StoreCoverEditButton sellerId={seller.id} />
-        {/* Vidéo de couverture : Certifié / Pro (vérifié par le serveur) */}
+        {/* Vidéo de couverture : Rivendy+ (vérifié par le serveur) */}
         {seller.is_certified && <StoreCoverVideoButton sellerId={seller.id} />}
 
         {/* Carte stats flottante — ancrée au coin bas-droit de la bannière (mobile et desktop) */}

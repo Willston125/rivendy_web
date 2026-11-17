@@ -2,166 +2,72 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Copy, CheckCircle2 } from "lucide-react";
+import { BadgeCheck, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useCountryOrDefault } from "@/features/country/country-provider";
+import { useCountry } from "@/features/country/country-provider";
+import {
+  fetchBoostStatus, fetchMyEntitlements, fetchPlusCatalog, type BoostStatus, type MyEntitlements,
+} from "@/features/plus/plus-api";
+import { benefitGroups, type PlusOffer } from "@/features/plus/plus-logic";
 import { formatMoney } from "@/lib/utils/format";
-import { supabase } from "@/lib/supabase/client";
-import { CASH_METHOD, getMobileMoneyForCountry } from "@/lib/utils/mobile-money";
-import { subscriptionPriceFor } from "@/lib/utils/seller-offer-prices";
 import {
   attachPaymentProof,
   fetchPendingPaymentRequest,
   uploadPaymentProof,
   type PendingPaymentRequest,
 } from "@/lib/supabase/payment-proof";
-import { PaymentProofField, PendingPaymentBanner } from "@/features/seller/payment-proof-field";
-import type { SellerSubscriptionInput } from "@/types/rivendy";
+import { PendingPaymentBanner } from "@/features/seller/payment-proof-field";
 
-/* ── Plans ─────────────────────────────────────────────────── */
+/*
+ * « Rivendy+ pour vendre » (formules simplifiées, lot 3, 2026-11-17, d'après
+ * le canevas validé) : remplace l'ancienne page d'abonnement vendeur. Les
+ * formules Certifié et Pro ne se vendent plus (grille du 15/11) : le badge
+ * certifié, les boosts et les autres avantages vendeur viennent avec
+ * Rivendy+. Un Certifié ou Pro en cours garde tous les avantages vendeur de
+ * Rivendy+ jusqu'à sa fin ; une demande envoyée avant reste affichée tant que
+ * l'équipe ne l'a pas traitée.
+ */
 
-type SubscriptionTier = "certified" | "pro";
-
-interface Plan {
-  id: string;
-  tier: SubscriptionTier;
-  /** Valeur envoyée dans la colonne plan ('monthly' | 'yearly'). */
-  dbPlan: "monthly" | "yearly";
-  label: string;
-  emoji: string;
-  durationDays: number;
-  durationLabel: string;
-  buttonLabel: string;
-  savingsLabel?: string;
-  badge?: string;
-  badgeColor?: string;
-  isPopular?: boolean;
-  features: string[];
-}
-
-// Parité app subscription_screen.dart — priceForMarket(marketId).
-// Grille par devise (D-1, 2026-10-08) : lib/utils/seller-offer-prices.ts.
-function priceForMarket(plan: Plan, countryId: string | null | undefined): number {
-  return subscriptionPriceFor(plan.tier, plan.dbPlan, countryId);
-}
-
-function tierLabel(tier: SubscriptionTier): string {
-  return tier === "pro" ? "Pro" : "Certifié";
-}
-
-// Grille validée par le propriétaire le 2026-08-09 — miroir EXACT de
-// rivendy_app/lib/features/auth/screens/subscription_screen.dart
-// (subscriptionPlans, gardé par subscription_plans_test.dart).
-// Annuel = 10 mois payés. La formule hebdomadaire n'est plus vendue.
-const CERTIFIED_FEATURES = [
-  "Badge ✅ Vendeur Certifié",
-  "Stories affichées 72 h au lieu de 24 h",
-  "⚡ 2 boosts 3 jours inclus / mois",
-  "🎬 Stories vidéo",
-  "🎬 15 vidéos produit / mois",
-  "🎬 Vidéo de couverture boutique",
-];
-
-const PRO_FEATURES = [
-  "Badge ✅ Vendeur Certifié",
-  "Stories affichées 72 h au lieu de 24 h",
-  "⚡ 4 boosts 3 jours inclus / mois",
-  "🎬 Stories vidéo",
-  "🎬 Vidéos produit illimitées",
-  "🎬 Vidéo de couverture boutique",
-];
-
-const PLANS: Plan[] = [
-  {
-    id: "certified_monthly",
-    tier: "certified",
-    dbPlan: "monthly",
-    label: "Mensuel",
-    emoji: "📅",
-    durationDays: 30,
-    durationLabel: "30 jours",
-    buttonLabel: "S'abonner 30 jours",
-    badge: "LE PLUS POPULAIRE",
-    badgeColor: "#009688",
-    isPopular: true,
-    features: CERTIFIED_FEATURES,
-  },
-  {
-    id: "certified_yearly",
-    tier: "certified",
-    dbPlan: "yearly",
-    label: "Annuel",
-    emoji: "🏆",
-    durationDays: 365,
-    durationLabel: "1 an",
-    buttonLabel: "S'abonner 1 an",
-    savingsLabel: "2 mois offerts",
-    badge: "MEILLEUR PRIX",
-    badgeColor: "#FFB800",
-    features: CERTIFIED_FEATURES,
-  },
-  {
-    id: "pro_monthly",
-    tier: "pro",
-    dbPlan: "monthly",
-    label: "Mensuel",
-    emoji: "🚀",
-    durationDays: 30,
-    durationLabel: "30 jours",
-    buttonLabel: "S'abonner 30 jours",
-    features: PRO_FEATURES,
-  },
-  {
-    id: "pro_yearly",
-    tier: "pro",
-    dbPlan: "yearly",
-    label: "Annuel",
-    emoji: "🏆",
-    durationDays: 365,
-    durationLabel: "1 an",
-    buttonLabel: "S'abonner 1 an",
-    savingsLabel: "2 mois offerts",
-    badge: "MEILLEUR PRIX",
-    badgeColor: "#FFB800",
-    features: PRO_FEATURES,
-  },
-];
-
-/* ── Component ─────────────────────────────────────────────── */
+const TIER_NAMES: Record<string, string> = { certified: "Certifié", pro: "Pro" };
+const dateFr = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
 export function SubscriptionView() {
-  const { user, profile } = useAuth();
-  const country = useCountryOrDefault();
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("certified");
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [resultat, setResultat] =
-    useState<{ ok: boolean; text: string } | null>(null);
-  const [proofFile, setProofFile] = useState<File | null>(null);
+  const { user } = useAuth();
+  const { countries } = useCountry();
+  const [ent, setEnt] = useState<MyEntitlements | null>(null);
+  const [boosts, setBoosts] = useState<BoostStatus | null>(null);
+  const [offer, setOffer] = useState<PlusOffer | null>(null);
+  const [market, setMarket] = useState<{ id?: string; currency?: string }>({});
+  const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<PendingPaymentRequest | null>(null);
   const [attaching, setAttaching] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Demande d'abonnement déjà envoyée, en attente de vérification.
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
-    void fetchPendingPaymentRequest("seller_subscriptions", user.id).then((p) => {
-      if (!cancelled) setPending(p);
+    let alive = true;
+    void Promise.all([fetchMyEntitlements(), fetchBoostStatus(), fetchPlusCatalog(null),
+      fetchPendingPaymentRequest("seller_subscriptions", user.id)]).then(([e, b, c, p]) => {
+      if (!alive) return;
+      setEnt(e);
+      setBoosts(b);
+      setOffer((c.offers ?? []).find((o) => o.kind === "subscription") ?? null);
+      setMarket({ id: c.market, currency: c.currency });
+      setPending(p);
+      setLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => { alive = false; };
   }, [user]);
 
   async function addProofToPending(file: File) {
     if (!user || !pending) return;
     setAttaching(true);
-    setResultat(null);
+    setMessage(null);
     const path = await uploadPaymentProof(user.id, file);
     const err = path ? await attachPaymentProof("subscription", pending.id, path) : "upload";
     setAttaching(false);
     if (err || !path) {
-      setResultat({
+      setMessage({
         ok: false,
         text: err === "request_not_pending"
           ? "Cette demande a déjà été traitée par l'équipe Rivendy."
@@ -170,477 +76,84 @@ export function SubscriptionView() {
       return;
     }
     setPending({ ...pending, payment_proof_path: path });
-    setResultat({ ok: true, text: "Capture envoyée ✓ — l'équipe Rivendy vérifie votre paiement." });
+    setMessage({ ok: true, text: "Capture envoyée ✓ — l'équipe Rivendy vérifie votre paiement." });
   }
 
-  // Jamais de numéro en dur — miroir de mobile_money_data.dart (parité app).
-  const paymentMethods = getMobileMoneyForCountry(country?.id ?? "");
-  const selectedMethod =
-    paymentMethods.find((m) => m.id === selectedMethodId && m.enabled) ??
-    paymentMethods.find((m) => m.enabled) ??
-    CASH_METHOD;
-  const isCash = selectedMethod.id === "cash";
-
-  const userName = profile?.full_name ?? "USER";
-  const userId = userName.replace(/\s/g, "").toUpperCase().slice(0, 6) || "USER";
-  // Préfixe selon la formule — parité subscription_screen.dart (PRO-/CERT-).
-  const reference = `${(selectedPlan?.tier ?? selectedTier) === "pro" ? "PRO" : "CERT"}-${userId}`;
-
-  const visiblePlans = PLANS.filter((plan) => plan.tier === selectedTier);
-
-  function copyReference() {
-    navigator.clipboard.writeText(reference);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  // La demande part dans le DASHBOARD, plus sur WhatsApp (parité
-  // subscription_screen.dart, 2026-09-10) : l'INSERT en `pending` déclenche
-  // `notify_admins_new_subscription`, qui prévient les admins habilités du
-  // marché. Aucun numéro d'agence n'intervient plus dans ce parcours.
-  async function handlePaid(plan: Plan) {
-    if (!user || !country) return;
-    setSubmitting(true);
-    setResultat(null);
-
-    // Capture du paiement (facultative), envoyée avant la demande ; si l'envoi
-    // échoue, la demande part quand même et la capture se rajoute ensuite.
-    let proofPath: string | null = null;
-    let proofFailed = false;
-    if (!isCash && proofFile) {
-      proofPath = await uploadPaymentProof(user.id, proofFile);
-      proofFailed = proofPath === null;
-    }
-
-    const payload: SellerSubscriptionInput = {
-      seller_id: user.id,
-      plan: plan.dbPlan,
-      tier: plan.tier,
-      price_paid: priceForMarket(plan, country.id),
-      duration_days: plan.durationDays,
-      status: "pending",
-      // Parité subscription_screen.dart — l'id de la méthode choisie.
-      payment_method: selectedMethod.id,
-      country_id: country.id,
-      payment_reference: reference,
-      // Clé omise sans capture : la demande ne dépend pas de la colonne.
-      ...(proofPath ? { payment_proof_path: proofPath } : {}),
-    };
-    const { error } = await supabase.from("seller_subscriptions").insert(payload);
-
-    setSubmitting(false);
-
-    if (error) {
-      // L'enregistrement est désormais le SEUL canal : s'il échoue, personne
-      // n'est prévenu. L'ancien code enveloppait l'insert dans un try/catch
-      // qui n'attrapait RIEN — `insert()` ne lève pas d'exception, il renvoie
-      // `{ error }` — puis ouvrait WhatsApp quoi qu'il arrive : le vendeur
-      // repartait convaincu que sa demande était transmise.
-      setResultat({
-        ok: false,
-        text: `Votre demande n'a pas pu être enregistrée. Réessayez, ou signalez la référence ${reference} depuis Aide & Support.`,
-      });
-      return;
-    }
-
-    setSelectedPlan(null);
-    setProofFile(null);
-    void fetchPendingPaymentRequest("seller_subscriptions", user.id).then(setPending);
-    // La référence doit rester LISIBLE : c'est WhatsApp qui en tenait lieu
-    // d'archive. Le serveur en pose aussi une trace dans les notifications.
-    const proofNote = isCash
-      ? ""
-      : proofPath
-        ? " Capture du paiement jointe ✓"
-        : proofFailed
-          ? " La capture n'a pas pu être envoyée : ajoutez-la ci-dessus."
-          : " Ajoutez la capture de votre paiement ci-dessus pour accélérer la validation.";
-    setResultat({
-      ok: true,
-      text: isCash
-        ? `Demande enregistrée sous la référence ${reference}. L'équipe Rivendy vous contactera pour convenir du règlement en espèces.`
-        : `Paiement ${selectedMethod.name} déclaré sous la référence ${reference}. Votre badge ${tierLabel(plan.tier)} sera activé après vérification.${proofNote}`,
-    });
-  }
-
-  if (!country) return null;
+  const marketCountry = countries.find((c) => c.id === market.id) ?? null;
+  const money = (amount: number) =>
+    formatMoney(amount, marketCountry ?? { currency_code: market.currency ?? "", currency_symbol: "" });
+  const sell = offer ? benefitGroups(offer.entitlements ?? {}, money).sell : [];
+  const plusActive = !!ent?.active_until;
+  const legacy = !plusActive && ent?.legacy_seller ? ent.legacy_seller : null;
+  const allowance = Number(boosts?.allowance ?? 0);
+  const remaining = Number(boosts?.remaining ?? 0);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
-      {/* Header gradient */}
-      <div className="mb-6 rounded-3xl bg-gradient-to-br from-[#00897B] to-[#004D40] p-8 text-center text-white shadow-xl shadow-[#007168]/20">
-        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg shadow-black/20">
-          <BadgeCheck className="h-14 w-14 text-[#009688]" />
-        </div>
-        <h1 className="text-2xl font-black leading-tight">
-          Devenir Vendeur Certifié ✅
-        </h1>
-        <p className="mt-2 text-sm text-white/70">
-          Gagnez la confiance de vos acheteurs
-        </p>
-        <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-relaxed">
-          Votre badge apparaît sur votre profil
-          <br />
-          et sur CHAQUE produit que vous publiez
-        </div>
+    <div className="mx-auto max-w-3xl space-y-5 px-4 py-8 md:px-6">
+      <div>
+        <p className="text-xs font-black uppercase tracking-wider text-[#00796B]">Rivendy+</p>
+        <h1 className="mt-1 text-3xl font-black text-[#1A1A1A]">Rivendy+ pour vendre</h1>
       </div>
 
-      {/* Résultat de la demande — remplace l'ouverture WhatsApp, qui servait
-          jusqu'ici de seule confirmation ET d'archive de la référence. */}
       {pending && (
-        <PendingPaymentBanner
-          title="Demande d'abonnement en attente"
-          request={pending}
-          busy={attaching}
-          onAddProof={addProofToPending}
-        />
+        <PendingPaymentBanner title="Demande d’abonnement en attente" request={pending} busy={attaching} onAddProof={addProofToPending} />
       )}
-      {resultat && (
-        <div
-          role="status"
-          className={`mb-6 rounded-2xl border p-4 text-sm leading-relaxed ${
-            resultat.ok
-              ? "border-[#009688]/30 bg-[#E0F2F1] text-[#00544D]"
-              : "border-red-200 bg-red-50 text-red-800"
-          }`}
-        >
-          {resultat.text}
-          {resultat.ok && (
-            <span className="mt-2 block text-xs text-[#00695C]">
-              Vous retrouverez cette demande dans vos notifications.
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Badge preview */}
-      <div className="mb-6">
-        <p className="mb-3 text-sm font-bold text-[#1A1A1A]">
-          Aperçu de ce que verront les acheteurs
+      {message && (
+        <p role="status" className={`rounded-xl px-3 py-2 text-sm font-semibold ${message.ok ? "bg-[#E0F2F1] text-[#00695C]" : "bg-red-50 text-red-600"}`}>
+          {message.text}
         </p>
-        <div className="grid grid-cols-2 gap-3">
-          {/* Preview product */}
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-            <div className="relative flex aspect-square items-center justify-center bg-[#E8F5E9]">
-              <span className="text-4xl">🛍</span>
-              <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-lg bg-white px-2 py-1 shadow-sm">
-                <BadgeCheck className="h-3 w-3 text-[#009688]" />
-                <span className="text-[9px] font-bold text-[#009688]">Certifié</span>
-              </div>
-            </div>
-            <div className="p-2">
-              <p className="text-sm font-black text-[#009688]">{formatMoney(priceForMarket(PLANS[0], country?.id), country)}</p>
-              <p className="truncate text-xs text-slate-500">Produit exemple</p>
-            </div>
-          </div>
-          {/* Preview profile */}
-          <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-4 shadow-sm">
-            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#00C4B4] to-[#6A5ACD]">
-              <span className="text-2xl">👤</span>
-            </div>
-            <p className="text-sm font-black text-[#1A1A1A]">Votre Nom</p>
-            <div className="mt-2 flex items-center gap-1 rounded-full bg-[#009688]/10 px-2 py-1">
-              <BadgeCheck className="h-3.5 w-3.5 text-[#009688]" />
-              <span className="text-[10px] font-bold text-[#009688]">Certifié Rivendy</span>
-            </div>
-            <p className="mt-2 text-center text-[10px] italic text-slate-400">
-              ← Votre badge
-              <br />
-              visible ici
-            </p>
-          </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-2xl bg-white p-8 text-center shadow-sm"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></div>
+      ) : plusActive ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="flex items-center gap-2 text-lg font-black text-slate-950">
+            <BadgeCheck className="h-5 w-5 text-[#00796B]" aria-hidden /> Compte certifié jusqu’au {dateFr(ent!.active_until!)}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {allowance > 0 ? `${remaining} boost${remaining > 1 ? "s" : ""} restant${remaining > 1 ? "s" : ""} sur ${allowance} ce mois-ci · ` : ""}
+            <Link href="/plus/abonnement" className="font-extrabold text-[#00796B]">Mon Rivendy+</Link>
+          </p>
         </div>
-      </div>
-
-      {/* Plans */}
-      <h2 className="mb-1 text-lg font-black text-[#1A1A1A]">
-        Choisissez votre abonnement
-      </h2>
-      <p className="mb-4 text-sm text-slate-400">Résiliable à tout moment</p>
-
-      {/* Sélecteur de formule — parité subscription_screen.dart (_buildTierTab) */}
-      <div className="mb-5 flex rounded-xl bg-slate-100 p-1">
-        {(["certified", "pro"] as const).map((tier) => (
-          <button
-            key={tier}
-            type="button"
-            onClick={() => setSelectedTier(tier)}
-            className={`flex-1 rounded-lg py-2.5 text-sm font-black transition ${
-              selectedTier === tier
-                ? "bg-white text-[#009688] shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            {tier === "pro" ? "🚀 Pro" : "✅ Certifié"}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
-        {visiblePlans.map((plan) => {
-          const displaySavings = plan.savingsLabel
-            ? plan.dbPlan === "yearly"
-              ? `${plan.savingsLabel} — soit ~${formatMoney(priceForMarket(plan, country?.id) / 12, country)}/mois`
-              : plan.savingsLabel
-            : null;
-
-          return (
-            <div
-              key={plan.id}
-              className={`relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md ${
-                plan.isPopular
-                  ? "border-2 border-[#009688] shadow-lg shadow-[#009688]/10"
-                  : "border border-slate-200"
-              } ${plan.badge ? "pt-9" : ""}`}
-            >
-              {plan.badge && (
-                <div
-                  className="absolute right-0 top-0 rounded-bl-xl px-3 py-1.5 text-[10px] font-black text-white"
-                  style={{ backgroundColor: plan.badgeColor }}
-                >
-                  {plan.badge}
-                </div>
-              )}
-
-              {/* Header centré (pricing card) */}
-              <div className="text-center">
-                <span className="text-3xl">{plan.emoji}</span>
-                <p className="mt-2 font-black text-[#1A1A1A]">{plan.label}</p>
-                <p
-                  className={`mt-2 text-2xl font-black ${
-                    plan.isPopular ? "text-[#009688]" : "text-[#1A1A1A]"
-                  }`}
-                >
-                  {formatMoney(priceForMarket(plan, country?.id), country)}
-                </p>
-                <p className="text-xs text-slate-400">/ {plan.durationLabel}</p>
-              </div>
-
-              {/* Savings */}
-              {displaySavings && (
-                <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-center">
-                  <p className="text-xs font-semibold text-green-700">
-                    💰 {displaySavings}
-                  </p>
-                </div>
-              )}
-
-              <hr className="my-4 border-slate-100" />
-
-              {/* Features */}
-              <ul className="mb-5 space-y-2">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#009688]" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Button — collé en bas pour aligner les cartes */}
-              <button
-                type="button"
-                onClick={() => { setProofFile(null); setSelectedPlan(plan); }}
-                className={`mt-auto w-full rounded-xl py-3 text-sm font-black text-white transition ${
-                  plan.isPopular
-                    ? "bg-[#009688] hover:bg-[#00796B]"
-                    : "bg-[#1A1A1A] hover:bg-[#333]"
-                }`}
-              >
-                {plan.buttonLabel}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer */}
-      <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
-        Paiement vérifié manuellement sous 2h
-        <br />
-        {/* Plus de WhatsApp (2026-10-09) : la demande est suivie dans le dashboard. */}
-        Une question ? <Link href="/help?sujet=selling" className="font-semibold text-[#009688] hover:underline">Aide & support</Link>
-      </p>
-
-      {/* Payment modal overlay */}
-      {selectedPlan && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
-          onClick={() => setSelectedPlan(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle — mobile uniquement */}
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
-
-            {/* Title */}
-            <div className="mb-5 flex items-start gap-3">
-              <BadgeCheck className="h-7 w-7 shrink-0 text-[#009688]" />
-              <div>
-                <p className="font-black text-[#009688]">
-                  Abonnement {tierLabel(selectedPlan.tier)} {selectedPlan.label} sélectionné
-                </p>
-                <p className="text-sm text-slate-500">
-                  {selectedPlan.durationLabel} ·{" "}
-                  {formatMoney(priceForMarket(selectedPlan, country?.id), country)}
-                </p>
-              </div>
-            </div>
-
-            <p className="mb-4 font-bold text-[#1A1A1A]">
-              Pour activer votre badge Vendeur Certifié :
-            </p>
-
-            {/* Step 1 — choix de la méthode (parité subscription_screen.dart) */}
-            <div className="mb-3 flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                1
-              </div>
-              <div className="flex-1 text-sm text-slate-600">
-                <p>Choisissez votre mode de paiement :</p>
-                <div className="mt-2 space-y-1.5">
-                  {paymentMethods.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      disabled={!m.enabled}
-                      onClick={() => setSelectedMethodId(m.id)}
-                      className="flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed"
-                      style={{
-                        borderColor:
-                          selectedMethod.id === m.id ? m.color : "#E2E8F0",
-                        backgroundColor:
-                          selectedMethod.id === m.id ? `${m.color}10` : "white",
-                        color: m.enabled ? "#1A1A1A" : "#94A3B8",
-                      }}
-                    >
-                      <span>{m.name}</span>
-                      {m.enabled ? (
-                        selectedMethod.id === m.id && (
-                          <CheckCircle2
-                            className="h-4 w-4"
-                            style={{ color: m.color }}
-                          />
-                        )
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-400">
-                          Bientôt disponible
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2 — numéro (Mobile Money activé) ou note cash */}
-            <div className="mb-3 flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                2
-              </div>
-              <div className="flex-1 text-sm text-slate-600">
-                {!isCash && selectedMethod.number ? (
-                  <>
-                    <p>
-                      Envoie{" "}
-                      <strong>{formatMoney(priceForMarket(selectedPlan, country?.id), country)}</strong>{" "}
-                      sur ce numéro :
-                    </p>
-                    <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <span
-                        className="text-xs font-bold"
-                        style={{ color: selectedMethod.color }}
-                      >
-                        {selectedMethod.name} :{" "}
-                      </span>
-                      <span
-                        className="text-base font-black"
-                        style={{ color: selectedMethod.color }}
-                      >
-                        {selectedMethod.number}
-                      </span>
-                    </p>
-                  </>
-                ) : (
-                  <p>
-                    Enregistrez votre demande : l&apos;équipe Rivendy vous
-                    contacte pour convenir du paiement en espèces.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="mb-3 flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                3
-              </div>
-              <div className="flex-1 text-sm text-slate-600">
-                <p>Référence obligatoire dans le motif :</p>
-                <button
-                  type="button"
-                  onClick={copyReference}
-                  className="mt-2 flex w-full items-center justify-between rounded-xl border border-[#009688]/35 bg-[#009688]/5 px-4 py-3 transition hover:bg-[#009688]/10"
-                >
-                  <span className="font-black tracking-wide text-[#009688]">
-                    {reference}
-                  </span>
-                  {copied ? (
-                    <CheckCircle2 className="h-4 w-4 text-[#009688]" />
-                  ) : (
-                    <Copy className="h-4 w-4 text-[#009688]" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Step 4 — capture du paiement (Mobile Money) */}
-            {!isCash && (
-              <div className="mb-3 flex gap-3">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                  4
-                </div>
-                <div className="flex-1 text-sm text-slate-600">
-                  <p className="mb-2">
-                    Après le paiement, ajoutez la capture d&apos;écran de la
-                    confirmation (SMS ou appli) — facultatif, mais la
-                    validation est plus rapide :
-                  </p>
-                  <PaymentProofField file={proofFile} onChange={setProofFile} disabled={submitting} />
-                </div>
-              </div>
-            )}
-
-            {/* Dernière étape */}
-            <div className="mb-5 flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#009688]/10 text-xs font-black text-[#009688]">
-                {isCash ? 4 : 5}
-              </div>
-              <p className="text-sm text-slate-600">
-                Touchez &quot;J&apos;ai payé&quot; : votre demande est enregistrée et
-                vérifiée par l&apos;équipe Rivendy, puis votre badge est activé.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => handlePaid(selectedPlan)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#009688] py-4 text-sm font-black text-white transition hover:bg-[#00796B] disabled:opacity-60"
-            >
-              <BadgeCheck className="h-5 w-5" />
-              {submitting
-                ? proofFile && !isCash ? "Envoi de la capture…" : "Envoi…"
-                : isCash ? "Envoyer ma demande d'abonnement" : "J'ai payé — Enregistrer ma demande"}
-            </button>
-            <p className="mt-2 text-center text-xs text-slate-400">
-              En confirmant, vous attestez avoir effectué le paiement.
-            </p>
-          </div>
+      ) : legacy ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-lg font-black text-slate-950">
+            Votre abonnement {TIER_NAMES[legacy.tier ?? ""] ?? "vendeur"} court{legacy.until ? ` jusqu’au ${dateFr(legacy.until)}` : ""}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            Il a déjà tous les avantages vendeur de Rivendy+. Ensuite, passez à Rivendy+ : Play et la Musique sans publicité en plus.
+          </p>
+          <Link href="/plus" className="mt-4 inline-flex h-11 items-center rounded-full bg-[#00796B] px-5 text-sm font-black text-white hover:bg-[#00695C]">
+            Découvrir Rivendy+
+          </Link>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-lg font-black text-slate-950">Vendez plus avec Rivendy+</p>
+          {sell.length ? (
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              {sell.map((b) => (
+                <li key={b} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#00796B]" aria-hidden />{b}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-sm text-slate-600">Rivendy+ arrive bientôt dans votre pays.</p>
+          )}
+          {offer ? (
+            <>
+              <p className="mt-4 text-2xl font-black text-slate-950">{money(offer.price)} <span className="text-sm font-bold text-slate-500">/ mois</span></p>
+              <Link href="/plus#payer" className="mt-3 inline-flex h-12 items-center rounded-full bg-[#00796B] px-6 text-sm font-black text-white hover:bg-[#00695C]">
+                Choisir Rivendy+
+              </Link>
+            </>
+          ) : null}
         </div>
       )}
+
+      <p className="text-xs text-slate-500">
+        Les formules Certifié et Pro ne se vendent plus : Rivendy+ les remplace.
+      </p>
     </div>
   );
 }

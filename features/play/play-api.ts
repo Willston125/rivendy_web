@@ -138,6 +138,8 @@ export async function clearTitleHistory(): Promise<boolean> {
 export type PlaybackGrant = {
   hls_url: string; expires_at: string; premium: boolean; preview: boolean; preview_seconds: number | null;
   playback_session_id: string | null; heartbeat_seconds: number | null;
+  /** Ouvert par le Rivendy Pass (ce contenu seulement), pas par Rivendy+ (play-playback-token v9). */
+  unlocked?: boolean;
 };
 export type PlaybackResult = { ok: true; grant: PlaybackGrant } | { ok: false; error: string };
 

@@ -9,7 +9,7 @@
 
 /** Colonnes LUES (jamais `select('*')` : video_uid est fermé aux clients). */
 export const TITLE_COLUMNS =
-  "id, kind, title, synopsis, genre, release_year, duration_seconds, age_rating, poster_url, backdrop_url, thumbnail_url, video_status, trailer_uid, trailer_status, is_premium, public_video_uid, featured_rank, published_at, artist, artist_id, intro_start_s, intro_end_s, credits_start_s";
+  "id, kind, title, synopsis, genre, release_year, duration_seconds, age_rating, poster_url, backdrop_url, thumbnail_url, video_status, trailer_uid, trailer_status, is_premium, pass_unlockable, public_video_uid, featured_rank, published_at, artist, artist_id, intro_start_s, intro_end_s, credits_start_s";
 export const EPISODE_COLUMNS =
   "id, title_id, season, episode_number, title, synopsis, duration_seconds, thumbnail_url, video_status, is_free_preview, status, intro_start_s, intro_end_s, credits_start_s";
 
@@ -33,6 +33,8 @@ export interface PlayTitle {
   trailer_uid?: string | null;
   trailer_status?: string | null;
   is_premium?: boolean | null;
+  /** Bloqué mais débloquable au Rivendy Pass (formules, lot 1 ; GRANT SELECT anon). */
+  pass_unlockable?: boolean | null;
   public_video_uid?: string | null;
   featured_rank?: number | null;
   published_at?: string | null;

@@ -44,16 +44,24 @@ async function uid(): Promise<string | null> {
 
 export type VideoTicket = { uploadUrl: string; cfUid: string; protocol: "tus" | "basic" };
 
-async function edgeError(error: unknown): Promise<{ code: string | null; limit: number | null }> {
+type EdgeRefusal = { code: string | null; limit: number | null; quota: string | null; perDay: number | null };
+
+async function edgeError(error: unknown): Promise<EdgeRefusal> {
+  const none: EdgeRefusal = { code: null, limit: null, quota: null, perDay: null };
   if (error instanceof FunctionsHttpError) {
     try {
-      const body = (await error.context.json()) as { error?: string; limit?: number };
-      return { code: body?.error ?? null, limit: typeof body?.limit === "number" ? body.limit : null };
+      const body = (await error.context.json()) as { error?: string; limit?: number; quota?: string; per_day?: number };
+      return {
+        code: body?.error ?? null,
+        limit: typeof body?.limit === "number" ? body.limit : null,
+        quota: typeof body?.quota === "string" ? body.quota : null,
+        perDay: typeof body?.per_day === "number" ? body.per_day : null,
+      };
     } catch {
-      return { code: null, limit: null };
+      return none;
     }
   }
-  return { code: null, limit: null };
+  return none;
 }
 
 /**
@@ -63,13 +71,14 @@ async function edgeError(error: unknown): Promise<{ code: string | null; limit: 
  * annoncée : l'adresse rendue est une adresse tus (envoi reprenable).
  */
 export async function requestVideoTicket(kind: "clip" | "short" | "product", file: File, opts: { fromPlay?: boolean } = {}): Promise<VideoTicket> {
-  const message = (code: string | null, limit: number | null) => (kind === "clip" ? clipErrorMessage(code) : videoTicketMessage(code, limit));
+  const message = (code: string | null, limit: number | null, extra: { quota?: string | null; perDay?: number | null } = {}) =>
+    (kind === "clip" ? clipErrorMessage(code) : videoTicketMessage(code, limit, extra));
   const body: Record<string, unknown> = { kind, resumable: true, upload_length: file.size };
   if (opts.fromPlay) body.context = "play";
   const { data, error } = await supabase.functions.invoke("create-video-upload", { body });
   if (error) {
-    const { code, limit } = await edgeError(error);
-    throw new UploadError(message(code, limit));
+    const { code, limit, quota, perDay } = await edgeError(error);
+    throw new UploadError(message(code, limit, { quota, perDay }));
   }
   const p = data as { upload_url?: string; cf_uid?: string; protocol?: string; error?: string; limit?: number } | null;
   if (p?.error) throw new UploadError(message(p.error, typeof p.limit === "number" ? p.limit : null));

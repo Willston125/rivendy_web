@@ -287,7 +287,7 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
   const next = loaded?.episode
     ? nextEpisode(loaded.episodes, loaded.episode.id, (e) =>
-        !loaded.title.is_premium || !!e.is_free_preview || (!!grant?.premium && !grant.preview))
+        !loaded.title.is_premium || !!e.is_free_preview || (!!grant?.premium && !grant.preview && !grant.unlocked))
     : null;
   const goNext = useCallback(() => { if (next) router.push(`/play/watch/episode/${next.id}`); }, [next, router]);
 
@@ -324,6 +324,10 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
 
   const { title, episode } = loaded;
   const heading = episode ? `${title.title} · S${episode.season} É${episode.episode_number} — ${episode.title}` : title.title;
+  // Rivendy Pass (lot 3) : un titre bloqué se débloque sur sa fiche.
+  const unlockHref = title.pass_unlockable
+    ? (episode ? `/play/episode/${episode.id}` : `/play/movie/${title.id}`)
+    : null;
   const back = (
     <Link href={episode ? `/play/series/${title.id}` : titlePath(title)} className="mb-3 inline-flex h-10 items-center gap-1 rounded-lg text-sm font-semibold text-rvp-soft transition-colors hover:text-rvp-accent">
       <ChevronLeft className="h-4 w-4" /> {title.title}
@@ -345,8 +349,15 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
     return (
       <PlayPage className="max-w-[1320px]">
         {back}
-        <Notice title={heading} text={playbackErrorMessage(error)}>
-          {error === "pass_required" ? (
+        <Notice title={heading} text={error === "pass_required" && unlockHref
+          ? "Ce titre est bloqué : débloquez-le, ou regardez tout avec Rivendy+."
+          : playbackErrorMessage(error)}>
+          {error === "pass_required" && unlockHref ? (
+            <>
+              <Link href={unlockHref} className={btnPrimary}>Débloquer</Link>
+              <Link href="/plus" className={btnSecondary}>Tout Play avec Rivendy+</Link>
+            </>
+          ) : error === "pass_required" ? (
             <Link href="/plus" className={btnPrimary}>Découvrir Rivendy+</Link>
           ) : null}
           {error === "too_many_streams" ? (
@@ -384,8 +395,10 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-rvp-premium/30 bg-rvp-premium/10 px-4 py-3 text-sm text-rvp-soft">
           <Lock className="h-4 w-4 shrink-0 text-rvp-premium" aria-hidden />
           <span className="flex-1">
-            Aperçu gratuit{grant.preview_seconds ? ` : les ${Math.max(1, Math.round(grant.preview_seconds / 60))} premières minutes` : ""}. La suite avec Rivendy+.
+            Aperçu gratuit{grant.preview_seconds ? ` : les ${Math.max(1, Math.round(grant.preview_seconds / 60))} premières minutes` : ""}.
+            {unlockHref ? " La suite : débloquez-le, ou Rivendy+." : " La suite avec Rivendy+."}
           </span>
+          {unlockHref ? <Link href={unlockHref} className="font-bold text-rvp-accent underline underline-offset-4">Débloquer</Link> : null}
           <Link href="/plus" className="font-bold text-rvp-premium underline underline-offset-4">Découvrir Rivendy+</Link>
         </div>
       ) : null}
@@ -413,8 +426,11 @@ export function WatchView({ kind, id, start }: { kind: WatchKind; id: string; st
         onFatal={onFatal}
       />
       {!mini && ended && grant.preview ? (
-        <Notice title="Fin de l’aperçu" text="Regardez la suite avec Rivendy+, sur le site et dans l’application, avec le même compte.">
-          <Link href="/plus" className={btnPrimary}>Découvrir Rivendy+</Link>
+        <Notice title="Fin de l’aperçu" text={unlockHref
+          ? "Débloquez-le pour le regarder en entier, ou regardez tout avec Rivendy+, sur le site et dans l’application."
+          : "Regardez la suite avec Rivendy+, sur le site et dans l’application, avec le même compte."}>
+          {unlockHref ? <Link href={unlockHref} className={btnPrimary}>Débloquer</Link> : null}
+          <Link href="/plus" className={unlockHref ? btnSecondary : btnPrimary}>Découvrir Rivendy+</Link>
         </Notice>
       ) : null}
       {!mini && isArtistClip(title) && title.artist ? (

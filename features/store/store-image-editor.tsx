@@ -119,7 +119,7 @@ export function StoreCoverEditButton({ sellerId }: { sellerId: string }) {
   );
 }
 
-/* ── Vidéo de couverture (Certifié / Pro) ─────────────────────────
+/* ── Vidéo de couverture (Rivendy+, droit store_cover_video) ──────
    Miroir de seller_store_screen (app) : kind=store_cover → envoi direct à
    Cloudflare → attach-cover-video (qui détruit l'ancienne vidéo). Le forfait
    est vérifié par le SERVEUR (create-video-upload) ; la vidéo s'affiche dès

@@ -130,7 +130,23 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
   // arrive prête et vaut 30 s, comme une vidéo créée depuis Play dans l'app
   // (`context: 'play'`, la durée reste décidée par create-video-upload).
   const [videoFromPlay, setVideoFromPlay] = useState(false);
-  const videoMaxSeconds = videoFromPlay ? PLAY_VIDEO_SECONDS : MAX_VIDEO_SECONDS;
+  // Formules simplifiées (lot 1, 15/11) : la base décide — 15 s en gratuit,
+  // 30 s avec Rivendy+ (et depuis Play) ; 3 publications avec vidéo par jour en
+  // gratuit, sans limite avec Rivendy+ (my_video_quota). Inconnu : 15 s, comme avant.
+  const [videoQuota, setVideoQuota] = useState<{
+    videos_unlimited?: boolean; per_day?: number | null; remaining_today?: number | null; max_seconds?: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!user || isEdit) return;
+    let alive = true;
+    void supabase.rpc("my_video_quota").then(({ data, error }) => {
+      const q = data as { success?: boolean } | null;
+      if (alive && !error && q?.success) setVideoQuota(data as NonNullable<typeof videoQuota>);
+    });
+    return () => { alive = false; };
+  }, [user, isEdit]);
+  const accountMaxSeconds = Number(videoQuota?.max_seconds ?? 0) > 0 ? Number(videoQuota?.max_seconds) : MAX_VIDEO_SECONDS;
+  const videoMaxSeconds = videoFromPlay ? Math.max(PLAY_VIDEO_SECONDS, accountMaxSeconds) : accountMaxSeconds;
   useEffect(() => {
     if (isEdit) return;
     const handed = takeSellVideo();
@@ -987,9 +1003,13 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           )}
           <p className="text-xs text-slate-400">
             {videoFromPlay
-              ? `${PLAY_VIDEO_SECONDS} secondes maximum : vidéo préparée avec « Publier un Short ».`
-              : `${MAX_VIDEO_SECONDS} secondes maximum.`}{" "}
-            Selon votre formule (Gratuit 3, Certifié 15, Pro illimité par mois).
+              ? `${videoMaxSeconds} secondes maximum : vidéo préparée avec « Publier un Short ».`
+              : `${videoMaxSeconds} secondes maximum.`}{" "}
+            {videoQuota?.videos_unlimited
+              ? "Publications avec vidéo sans limite. "
+              : videoQuota && videoQuota.per_day != null
+                ? `Aujourd’hui : ${videoQuota.remaining_today ?? 0} publication${(videoQuota.remaining_today ?? 0) > 1 ? "s" : ""} avec vidéo sur ${videoQuota.per_day}${(videoQuota.remaining_today ?? 0) === 0 ? " (sans limite avec Rivendy+)" : ""}. `
+                : ""}
             Si l&apos;envoi échoue, l&apos;article est publié avec ses photos.
           </p>
         </div>

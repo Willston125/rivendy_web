@@ -2,6 +2,7 @@
 
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
+import { quotaExceededMessage } from "@/features/play/create/create-logic";
 
 /**
  * Vidéo (Cloudflare Stream) — miroir EXACT du contrat de l'app
@@ -21,14 +22,17 @@ export const MAX_VIDEO_SECONDS = 15;
 
 export class VideoError extends Error {}
 
-function messageForCode(code: string | null | undefined, limit?: number | null): string {
+function messageForCode(
+  code: string | null | undefined, limit?: number | null, extra: { quota?: string | null; perDay?: number | null } = {},
+): string {
   switch (code) {
     case "QUOTA_EXCEEDED":
-      return limit != null
-        ? `Quota vidéo atteint (${limit} ce mois-ci). Passez à une formule supérieure pour en publier plus.`
-        : "Quota vidéo atteint. Passez à une formule supérieure pour en publier plus.";
+      // Formules simplifiées (15/11) : publications du jour ou vidéos en ligne.
+      return quotaExceededMessage(extra.quota, extra.perDay ?? limit);
     case "SUBSCRIPTION_REQUIRED":
-      return "La vidéo de couverture est réservée aux vendeurs Certifié et Pro.";
+      return "La bannière vidéo de la boutique vient avec Rivendy+.";
+    case "RATE_LIMITED":
+      return "Trop d’envois d’affilée : réessayez dans une minute.";
     case "UNAUTHENTICATED":
       return "Connectez-vous pour publier une vidéo.";
     default:
@@ -37,16 +41,22 @@ function messageForCode(code: string | null | undefined, limit?: number | null):
 }
 
 /** Lit le code métier renvoyé par une Edge Function, y compris en 4xx. */
-async function errorCodeOf(error: unknown): Promise<{ code: string | null; limit: number | null }> {
+async function errorCodeOf(error: unknown): Promise<{ code: string | null; limit: number | null; quota: string | null; perDay: number | null }> {
+  const none = { code: null, limit: null, quota: null, perDay: null };
   if (error instanceof FunctionsHttpError) {
     try {
-      const body = (await error.context.json()) as { error?: string; limit?: number };
-      return { code: body?.error ?? null, limit: typeof body?.limit === "number" ? body.limit : null };
+      const body = (await error.context.json()) as { error?: string; limit?: number; quota?: string; per_day?: number };
+      return {
+        code: body?.error ?? null,
+        limit: typeof body?.limit === "number" ? body.limit : null,
+        quota: typeof body?.quota === "string" ? body.quota : null,
+        perDay: typeof body?.per_day === "number" ? body.per_day : null,
+      };
     } catch {
-      return { code: null, limit: null };
+      return none;
     }
   }
-  return { code: null, limit: null };
+  return none;
 }
 
 /** Durée d'un fichier vidéo, lue par le navigateur (secondes). */
@@ -79,8 +89,8 @@ export async function createUploadTicket(kind: "product" | "store_cover" = "prod
   if (opts.fromPlay && kind === "product") body.context = "play";
   const { data, error } = await supabase.functions.invoke("create-video-upload", { body });
   if (error) {
-    const { code, limit } = await errorCodeOf(error);
-    throw new VideoError(messageForCode(code, limit));
+    const { code, limit, quota, perDay } = await errorCodeOf(error);
+    throw new VideoError(messageForCode(code, limit, { quota, perDay }));
   }
   const payload = data as { upload_url?: string; cf_uid?: string; error?: string; limit?: number } | null;
   if (payload?.error) throw new VideoError(messageForCode(payload.error, payload.limit));

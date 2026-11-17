@@ -27,6 +27,8 @@ import { rejectReasonLabel } from "@/lib/utils/reject-reason";
 import { deleteVideo } from "@/lib/video/video-service";
 import type { Product, AppOrder } from "@/types/rivendy";
 import { useDialogs } from "@/features/ui/dialogs";
+import { DialogShell } from "@/components/ui/dialog-shell";
+import { fetchMyEntitlements } from "@/features/plus/plus-api";
 import { preorderDelayText } from "@/lib/utils/preorder-mode";
 
 type Tab = "garde-robe" | "commandes" | "ventes" | "stats";
@@ -89,9 +91,11 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 // Codes d'erreur de la RPC toggle_story — mêmes cas que l'app
 // (ToggleStoryResult.fromRpc, product_service.dart).
 const STORY_ERRORS: Record<string, string> = {
-  VIDEO_STORY_REQUIRES_SUB:
-    "Les stories vidéo sont réservées aux vendeurs Certifié et Pro. Abonnez-vous pour les activer.",
-  FORBIDDEN: "Cet article ne t'appartient pas.",
+  // Story vidéo ouverte à tous depuis le 15/11 (formules, lot 1) : gardé pour
+  // un serveur pas encore à jour.
+  VIDEO_STORY_REQUIRES_SUB: "La story vidéo n’est pas encore disponible sur votre compte.",
+  STORY_HOURS_NOT_ALLOWED: "Cette durée vient avec Rivendy+ : votre story dure 24 h.",
+  FORBIDDEN: "Cet article ne vous appartient pas.",
   NOT_FOUND: "Article introuvable : il a peut-être été supprimé.",
 };
 
@@ -111,6 +115,19 @@ export function SellerSalesView() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [marking, setMarking] = useState<string | null>(null);
   const [togglingStory, setTogglingStory] = useState<string | null>(null);
+  // Story : article à publier et durée choisie (formules, lot 3).
+  const [storyFor, setStoryFor] = useState<Product | null>(null);
+  const [storyHours, setStoryHours] = useState(24);
+  const [storyMax, setStoryMax] = useState(24);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    void fetchMyEntitlements().then((e) => {
+      const h = Number(e?.story_max_hours ?? 24);
+      if (alive) setStoryMax(Number.isFinite(h) && h > 24 ? h : 24);
+    });
+    return () => { alive = false; };
+  }, [user]);
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -265,18 +282,29 @@ export function SellerSalesView() {
       );
       return;
     }
+    // Formules simplifiées (lot 3) : la durée se choisit avant de publier
+    // (24 h pour tous, jusqu'à story_max_hours avec Rivendy+).
+    if (willBeStory) {
+      setStoryHours(24);
+      setStoryFor(product);
+      return;
+    }
+    await applyStory(product, false, null);
+  }
 
+  async function applyStory(product: Product, willBeStory: boolean, hours: number | null) {
+    setStoryFor(null);
     setTogglingStory(product.id);
     // 2026-10-03 : passage par la RPC toggle_story, comme l'app. L'UPDATE
     // direct de is_story ne vérifiait aucune ligne : hors du marché actif, la
     // RLS n'en modifiait aucune, sans erreur, et le bouton passait quand même
-    // à « Story ✓ ». Il contournait aussi les règles du serveur (story vidéo
-    // réservée aux formules Certifié/Pro, durée 24 h / 72 h selon l'abonnement
-    // actif). La RPC ne vérifie que la propriété : elle marche sur tous les
-    // marchés.
+    // à « Story ✓ ». Il contournait aussi les règles du serveur. Depuis le
+    // 15/11 (formules, lot 1) : story vidéo pour tous, 24 h ou jusqu'à 72 h
+    // avec Rivendy+ (p_hours). La RPC marche sur tous les marchés.
     const { data, error } = await supabase.rpc("toggle_story", {
       p_product_id: product.id,
       p_activate: willBeStory,
+      ...(willBeStory && hours ? { p_hours: hours } : {}),
     });
     setTogglingStory(null);
     const res = (data ?? {}) as { ok?: boolean; hours?: number; error?: string };
@@ -369,23 +397,57 @@ export function SellerSalesView() {
         </Link>
       </div>
 
-      {/* Bannière certification */}
+      {/* Bannière certification (formules, lot 3 : le badge vient avec Rivendy+) */}
       {profile?.is_certified ? (
-        <div className="mb-5 flex items-center gap-2 rounded-2xl bg-[#E0F2F1] px-4 py-3 text-sm font-bold text-[#009688]">
+        <div className="mb-5 flex items-center gap-2 rounded-2xl bg-[#E0F2F1] px-4 py-3 text-sm font-bold text-[#00695C]">
           <CheckCircle className="h-4 w-4 shrink-0" />
-          Badge Certifié actif : vos produits inspirent confiance
+          Compte certifié : vos articles inspirent confiance
         </div>
       ) : (
-        <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm font-bold text-amber-800">
-            <span>⭐</span>
-            Boostez vos ventes avec le badge Certifié
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl bg-[#E0F2F1] px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-[#00695C]">
+            Badge certifié et boosts chaque mois : Rivendy+
           </div>
-          <Link href="/seller/subscription" className="shrink-0 text-xs font-black text-[#009688] hover:underline">
-            Voir les offres →
+          <Link href="/seller/subscription" className="shrink-0 text-xs font-black text-[#00796B] hover:underline">
+            Découvrir →
           </Link>
         </div>
       )}
+
+      {/* Durée de la story (formules, lot 3) : 24 h pour tous, plus avec Rivendy+. */}
+      {storyFor ? (
+        <DialogShell labelledBy="story-title" describedBy="story-help" onClose={() => setStoryFor(null)}>
+          <p id="story-title" className="text-lg font-black text-slate-950">Mettre « {storyFor.title} » en story</p>
+          <p id="story-help" className="mt-1 text-sm text-slate-500">Photo ou vidéo : la story vidéo est ouverte à tous.</p>
+          <div className="mt-4 flex flex-col gap-2" role="radiogroup" aria-label="Durée de la story">
+            {[24, ...(storyMax > 24 ? [storyMax] : [])].map((h) => (
+              <button key={h} type="button" role="radio" aria-checked={storyHours === h} onClick={() => setStoryHours(h)}
+                className={`flex items-center justify-between rounded-2xl border-2 p-3.5 text-left text-[15px] font-extrabold ${
+                  storyHours === h ? "border-[#00796B] bg-[#E0F2F1]" : "border-slate-200 bg-white hover:border-slate-300"
+                }`}>
+                {h} heures
+                <span className="text-xs font-bold text-[#00695C]">{h > 24 ? "Rivendy+" : "Tous les comptes"}</span>
+              </button>
+            ))}
+          </div>
+          {storyMax <= 24 ? (
+            <p className="mt-2 text-xs text-slate-500">
+              Des stories plus longues avec Rivendy+.{" "}
+              <Link href="/plus" className="font-black text-[#00796B] hover:underline">Découvrir</Link>
+            </p>
+          ) : null}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button type="button" onClick={() => void applyStory(storyFor, true, storyHours)}
+              className="h-12 flex-1 rounded-full bg-[#00796B] px-5 text-sm font-black text-white hover:bg-[#00695C]">
+              Publier la story
+            </button>
+            <button type="button" onClick={() => setStoryFor(null)}
+              className="h-12 rounded-full border border-slate-300 px-5 text-sm font-bold text-slate-600 hover:bg-slate-50">
+              Annuler
+            </button>
+          </div>
+        </DialogShell>
+      ) : null}
 
       {/* Onglets */}
       <div className="mb-5 flex gap-1 rounded-2xl bg-slate-100 p-1">

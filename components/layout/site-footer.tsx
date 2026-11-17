@@ -25,7 +25,7 @@ const VENDRE = [
   { href: "/vendre-en-ligne", label: "Vendre en ligne" },
   { href: "/sell", label: "Vendre un article" },
   { href: "/seller/create", label: "Ouvrir ma boutique" },
-  { href: "/seller/subscription", label: "Devenir Vendeur Certifié" },
+  { href: "/plus", label: "Rivendy+" },
   { href: "/seller", label: "Espace vendeur" },
 ];
 

@@ -58,9 +58,6 @@ export interface PlusCatalog {
   channels?: PlusChannel[];
 }
 
-/** Les crédits livraison n'existent qu'au lot F : jamais promis avant. */
-export const DELIVERY_CREDITS_LIVE = false;
-
 /**
  * Contenus exclusifs et avant-premières : droits semés à vrai (formule
  * `month`) mais qu'aucun contenu ni aucune règle n'applique encore (audit des
@@ -69,22 +66,148 @@ export const DELIVERY_CREDITS_LIVE = false;
 export const EXCLUSIVE_CONTENT_LIVE = false;
 export const EARLY_ACCESS_LIVE = false;
 
-/** Avantages affichés pour une formule, d'après SES droits (jamais supposés). */
-export function offerBenefits(offer: Pick<PlusOffer, "entitlements">): string[] {
-  const e = offer.entitlements ?? {};
-  const out: string[] = [];
-  if (e.play_premium === true) out.push("Films et séries Premium sur Rivendy Play");
-  if (e.music_premium === true) out.push("Musique Premium en écoute complète");
-  if (EXCLUSIVE_CONTENT_LIVE && e.exclusive_content === true) out.push("Contenus exclusifs");
-  if (EARLY_ACCESS_LIVE && e.early_access === true) out.push("Avant-premières");
-  const streams = Number(e.simultaneous_streams ?? 0);
-  if (streams >= 2) out.push(`${streams} écrans en même temps`);
-  if (DELIVERY_CREDITS_LIVE) {
-    const credits = Number(e.delivery_credits_per_cycle ?? 0);
-    if (credits > 0) out.push(`${credits} livraisons offertes par cycle`);
+/** Droits résolus d'une formule dans un marché (rivendy_offer_entitlements_resolved). */
+export type Entitlements = Record<string, unknown>;
+
+const num = (e: Entitlements, key: string): number => {
+  const v = Number(e[key] ?? 0);
+  return Number.isFinite(v) ? v : 0;
+};
+const yes = (e: Entitlements, key: string): boolean => e[key] === true;
+const plural = (n: number, one: string, many: string) => (n > 1 ? many : one);
+
+/** « 3 jours », « 1 jour ». */
+export function daysLabel(days: number): string {
+  return `${days} ${plural(days, "jour", "jours")}`;
+}
+
+export interface BenefitGroups {
+  sell: string[];
+  buy: string[];
+  watch: string[];
+}
+
+/**
+ * Avantages d'une formule, rangés par usage (formules simplifiées, lot 3,
+ * 2026-11-17), d'après SES droits dans le marché — jamais supposés : un droit
+ * à zéro ou faux n'est pas promis (à Djibouti, aucun avantage de livraison).
+ */
+export function benefitGroups(e: Entitlements, money: (amount: number) => string): BenefitGroups {
+  const sell: string[] = [];
+  if (yes(e, "certified_badge")) sell.push("Compte certifié : le badge sur votre boutique et vos articles");
+  const boosts = num(e, "boosts_per_cycle");
+  if (boosts > 0) sell.push(`${boosts} ${plural(boosts, "boost", "boosts")} de ${daysLabel(num(e, "boost_days") || 3)} par mois`);
+  const story = num(e, "story_max_hours");
+  if (story > 24) sell.push(`Stories de 24 h ou de ${story} h, au choix`);
+  if (yes(e, "videos_unlimited")) {
+    const seconds = num(e, "video_max_seconds");
+    sell.push(seconds > 0 ? `Publications avec vidéo sans limite, vidéos de ${seconds} s` : "Publications avec vidéo sans limite");
   }
-  out.push("Sur le site et dans l’application, avec le même compte");
-  return out;
+  if (yes(e, "store_cover_video")) sell.push("Bannière vidéo en haut de votre boutique");
+
+  const buy: string[] = [];
+  const credits = num(e, "delivery_credits_per_cycle");
+  if (credits > 0) {
+    buy.push(`${credits} ${plural(credits, "livraison offerte", "livraisons offertes")} par mois, quel que soit le montant`);
+  }
+  const full = num(e, "delivery_full_threshold");
+  if (full > 0) buy.push(`Livraison offerte dès ${money(full)} d’articles`);
+  if (buy.length) buy.push("Rivendy choisit tout seul la réduction la plus forte, sans case à cocher");
+
+  const watch: string[] = [];
+  if (yes(e, "play_premium")) watch.push("Tout Rivendy Play, sans publicité");
+  if (yes(e, "music_premium")) watch.push("Toute la Musique Premium, sans publicité");
+  if (yes(e, "play_premium")) watch.push("Les titres bloqués s’ouvrent sans les débloquer un par un");
+  if (EXCLUSIVE_CONTENT_LIVE && yes(e, "exclusive_content")) watch.push("Contenus exclusifs");
+  if (EARLY_ACCESS_LIVE && yes(e, "early_access")) watch.push("Avant-premières");
+  const streams = num(e, "simultaneous_streams");
+  if (streams >= 2) watch.push(`${streams} écrans en même temps`);
+  watch.push("Sur le site et dans l’application, avec le même compte");
+  return { sell, buy, watch };
+}
+
+/** Avantages à plat (ancienne présentation, gardée pour les listes courtes). */
+export function offerBenefits(offer: Pick<PlusOffer, "entitlements">, money: (amount: number) => string = String): string[] {
+  const g = benefitGroups(offer.entitlements ?? {}, money);
+  return [...g.sell, ...g.buy, ...g.watch];
+}
+
+export interface CompareRow {
+  label: string;
+  free: string;
+  plus: string;
+}
+
+function thresholdsLabel(e: Entitlements, money: (amount: number) => string): string {
+  const parts: string[] = [];
+  const half = num(e, "delivery_half_threshold");
+  const pct = num(e, "delivery_half_percent");
+  const full = num(e, "delivery_full_threshold");
+  if (half > 0 && pct > 0) {
+    parts.push(`${pct >= 100 ? "offerte" : pct === 50 ? "à moitié prix" : `payée à ${pct} % par Rivendy`} dès ${money(half)}`);
+  }
+  if (full > 0) parts.push(`offerte dès ${money(full)}`);
+  return parts.length ? `Livraison ${parts.join(", ")}` : "—";
+}
+
+/**
+ * Tableau « Gratuit ou Rivendy+ » : les deux formules du marché, lues sur le
+ * serveur (la formule Gratuit se règle au dashboard comme Rivendy+). Les
+ * lignes de livraison n'apparaissent que si le marché en a.
+ */
+export function compareRows(free: Entitlements, plus: Entitlements, money: (amount: number) => string): CompareRow[] {
+  const yn = (e: Entitlements, key: string) => (yes(e, key) ? "Oui" : "—");
+  const boosts = (e: Entitlements) => {
+    const n = num(e, "boosts_per_cycle");
+    return n > 0 ? `${n} par mois` : "Aucun";
+  };
+  const story = (e: Entitlements) => {
+    const h = num(e, "story_max_hours") || 24;
+    return h > 24 ? `24 h ou ${h} h` : `${h} h`;
+  };
+  const videos = (e: Entitlements) => {
+    if (yes(e, "videos_unlimited")) return "Sans limite";
+    const n = num(e, "videos_per_day");
+    return n > 0 ? `${n} par jour` : "—";
+  };
+  const seconds = (e: Entitlements) => {
+    const s = num(e, "video_max_seconds");
+    return s > 0 ? `${s} s` : "—";
+  };
+  const boostDays = num(plus, "boost_days") || num(free, "boost_days") || 3;
+  const rows: CompareRow[] = [
+    { label: "Badge compte certifié", free: yn(free, "certified_badge"), plus: yn(plus, "certified_badge") },
+    { label: `Boosts d’articles (${daysLabel(boostDays)})`, free: boosts(free), plus: boosts(plus) },
+    { label: "Story d’un article", free: story(free), plus: story(plus) },
+    { label: "Publications avec vidéo", free: videos(free), plus: videos(plus) },
+    { label: "Durée d’une vidéo d’article", free: seconds(free), plus: seconds(plus) },
+    { label: "Bannière vidéo de la boutique", free: yn(free, "store_cover_video"), plus: yn(plus, "store_cover_video") },
+  ];
+  const hasDelivery = [free, plus].some((e) =>
+    num(e, "delivery_credits_per_cycle") > 0 || num(e, "delivery_half_threshold") > 0 || num(e, "delivery_full_threshold") > 0);
+  if (hasDelivery) {
+    const credits = (e: Entitlements) => {
+      const n = num(e, "delivery_credits_per_cycle");
+      return n > 0 ? `${n} par mois` : "—";
+    };
+    rows.push(
+      { label: "Livraisons offertes", free: credits(free), plus: credits(plus) },
+      { label: "Selon le montant de la commande", free: thresholdsLabel(free, money), plus: thresholdsLabel(plus, money) },
+    );
+  }
+  rows.push(
+    {
+      label: "Rivendy Play",
+      free: yes(free, "play_premium") ? "Tout le catalogue" : "Titres libres ; titres bloqués avec le Rivendy Pass",
+      plus: yes(plus, "play_premium") ? "Tout le catalogue, sans publicité" : "Titres libres",
+    },
+    {
+      label: "Rivendy Musique",
+      free: yes(free, "music_premium") ? "Tout le Premium" : "Avec publicités",
+      plus: yes(plus, "music_premium") ? "Tout le Premium, sans publicité" : "Avec publicités",
+    },
+  );
+  return rows;
 }
 
 /** « 30 jours », « 24 heures », « 7 jours ». */
@@ -216,8 +339,10 @@ export function rejectReasons(notifications: Array<{ metadata?: unknown }>): Rec
   for (const n of notifications) {
     const m = n.metadata;
     if (!m || typeof m !== "object") continue;
-    const { step, play_pass_id: id, reason } = m as Record<string, unknown>;
-    if (step !== "rejected" || typeof id !== "string" || typeof reason !== "string") continue;
+    // Rivendy+ (play_pass_id) ou Rivendy Pass (play_unlock_id, lot 3).
+    const { step, play_pass_id: passId, play_unlock_id: unlockId, reason } = m as Record<string, unknown>;
+    const id = typeof passId === "string" ? passId : typeof unlockId === "string" ? unlockId : null;
+    if (step !== "rejected" || !id || typeof reason !== "string") continue;
     const text = reason.trim();
     if (text && !(id in out)) out[id] = text;
   }

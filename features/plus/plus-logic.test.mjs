@@ -3,10 +3,80 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  offerBenefits, durationLabel, isValidPayerPhone, isValidOperatorReference,
+  offerBenefits, benefitGroups, compareRows, daysLabel, durationLabel, isValidPayerPhone, isValidOperatorReference,
   requestErrorMessage, declareErrorMessage, periodStatus, requestValidUntil, rejectReasons,
-  DELIVERY_CREDITS_LIVE, EXCLUSIVE_CONTENT_LIVE, EARLY_ACCESS_LIVE,
+  EXCLUSIVE_CONTENT_LIVE, EARLY_ACCESS_LIVE,
 } from "./plus-logic.ts";
+
+// Formules du 15/11 (lot 1), telles que les rend rivendy_offer_entitlements_resolved.
+const KMF = (n) => `${new Intl.NumberFormat("fr-FR").format(n).replace(/ | /g, " ")} KMF`;
+const MONTH_KM = {
+  certified_badge: true, boosts_per_cycle: 5, boost_days: 3, story_max_hours: 72, store_cover_video: true,
+  videos_unlimited: true, videos_per_day: 0, videos_online_max: 120, video_max_seconds: 30,
+  delivery_credits_per_cycle: 2, delivery_credit_full_until: 500, delivery_credit_partial_percent: 50,
+  delivery_half_threshold: 25000, delivery_half_percent: 50, delivery_full_threshold: 35000,
+  play_premium: true, music_premium: true, simultaneous_streams: 2, exclusive_content: true, early_access: true,
+};
+const FREE_KM = {
+  certified_badge: false, boosts_per_cycle: 0, boost_days: 3, story_max_hours: 24, store_cover_video: false,
+  videos_unlimited: false, videos_per_day: 3, videos_online_max: 60, video_max_seconds: 15,
+  delivery_credits_per_cycle: 0, delivery_half_threshold: 25000, delivery_half_percent: 50, delivery_full_threshold: 0,
+  play_premium: false, music_premium: false,
+};
+const strip = (e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith("delivery_")));
+const MONTH_DJ = strip(MONTH_KM);
+const FREE_DJ = strip(FREE_KM);
+
+test("avantages rangés par usage : vendre, acheter, regarder (Comores)", () => {
+  const g = benefitGroups(MONTH_KM, KMF);
+  assert.deepEqual(g.sell, [
+    "Compte certifié : le badge sur votre boutique et vos articles",
+    "5 boosts de 3 jours par mois",
+    "Stories de 24 h ou de 72 h, au choix",
+    "Publications avec vidéo sans limite, vidéos de 30 s",
+    "Bannière vidéo en haut de votre boutique",
+  ]);
+  assert.deepEqual(g.buy, [
+    "2 livraisons offertes par mois, quel que soit le montant",
+    "Livraison offerte dès 35 000 KMF d’articles",
+    "Rivendy choisit tout seul la réduction la plus forte, sans case à cocher",
+  ]);
+  assert.ok(g.watch.includes("Tout Rivendy Play, sans publicité"));
+  assert.ok(g.watch.includes("Toute la Musique Premium, sans publicité"));
+  assert.ok(g.watch.includes("2 écrans en même temps"));
+  assert.equal(g.watch.at(-1), "Sur le site et dans l’application, avec le même compte");
+});
+
+test("Djibouti : aucun avantage de livraison promis", () => {
+  const g = benefitGroups(MONTH_DJ, KMF);
+  assert.deepEqual(g.buy, []);
+  assert.equal(g.sell.length, 5);
+  const rows = compareRows(FREE_DJ, MONTH_DJ, KMF);
+  assert.ok(!rows.some((r) => r.label.includes("ivraison")));
+});
+
+test("droit à zéro ou faux : jamais promis", () => {
+  const g = benefitGroups({ boosts_per_cycle: 0, story_max_hours: 24, videos_unlimited: false, play_premium: true }, KMF);
+  assert.deepEqual(g.sell, []);
+  assert.deepEqual(g.buy, []);
+  assert.ok(!g.watch.some((b) => b.includes("Musique")));
+  assert.equal(daysLabel(1), "1 jour");
+});
+
+test("tableau Gratuit / Rivendy+ : valeurs du serveur, livraison aux Comores", () => {
+  const rows = compareRows(FREE_KM, MONTH_KM, KMF);
+  const row = (label) => rows.find((r) => r.label === label);
+  assert.deepEqual(row("Badge compte certifié"), { label: "Badge compte certifié", free: "—", plus: "Oui" });
+  assert.deepEqual(row("Boosts d’articles (3 jours)"), { label: "Boosts d’articles (3 jours)", free: "Aucun", plus: "5 par mois" });
+  assert.equal(row("Story d’un article").plus, "24 h ou 72 h");
+  assert.equal(row("Publications avec vidéo").free, "3 par jour");
+  assert.equal(row("Publications avec vidéo").plus, "Sans limite");
+  assert.equal(row("Durée d’une vidéo d’article").free, "15 s");
+  assert.equal(row("Livraisons offertes").plus, "2 par mois");
+  assert.equal(row("Selon le montant de la commande").free, "Livraison à moitié prix dès 25 000 KMF");
+  assert.equal(row("Selon le montant de la commande").plus, "Livraison à moitié prix dès 25 000 KMF, offerte dès 35 000 KMF");
+  assert.equal(row("Rivendy Musique").free, "Avec publicités");
+});
 
 const NOW = new Date("2026-10-28T15:00:00Z");
 const base = {
@@ -15,10 +85,10 @@ const base = {
   starts_at: null, expires_at: null, created_at: "2026-10-28T10:00:00Z",
 };
 
-test("avantages : lus dans les droits de la formule, jamais supposés", () => {
+test("avantages à plat : lus dans les droits de la formule, jamais supposés", () => {
   const plus = offerBenefits({ entitlements: { play_premium: true, music_premium: true, exclusive_content: true,
-    early_access: true, simultaneous_streams: 2, delivery_credits_per_cycle: 2 } });
-  assert.ok(plus.includes("Films et séries Premium sur Rivendy Play"));
+    early_access: true, simultaneous_streams: 2 } });
+  assert.ok(plus.includes("Tout Rivendy Play, sans publicité"));
   assert.ok(plus.includes("2 écrans en même temps"));
   const day = offerBenefits({ entitlements: { play_premium: true, simultaneous_streams: 1 } });
   assert.ok(!day.some((b) => b.includes("écrans")));
@@ -31,13 +101,12 @@ test("contenus exclusifs et avant-premières : jamais promis avant d'exister", (
   const b = offerBenefits({ entitlements: { play_premium: true, exclusive_content: true, early_access: true } });
   assert.ok(!b.includes("Contenus exclusifs"));
   assert.ok(!b.includes("Avant-premières"));
-  assert.ok(b.includes("Films et séries Premium sur Rivendy Play"));
+  assert.ok(b.includes("Tout Rivendy Play, sans publicité"));
 });
 
-test("crédits livraison : jamais promis avant le lot F", () => {
-  assert.equal(DELIVERY_CREDITS_LIVE, false);
-  const b = offerBenefits({ entitlements: { delivery_credits_per_cycle: 2 } });
-  assert.ok(!b.some((x) => x.includes("livraison")));
+test("livraisons offertes : promises dès qu'elles existent dans les droits (lot 1 en production)", () => {
+  const b = offerBenefits({ entitlements: { delivery_credits_per_cycle: 2 } }, KMF);
+  assert.ok(b.includes("2 livraisons offertes par mois, quel que soit le montant"));
 });
 
 test("durées", () => {

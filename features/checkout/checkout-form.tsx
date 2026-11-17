@@ -42,6 +42,10 @@ import {
 import { BUY_NOW_KEY, cartMarkets, hasVariants } from "@/features/cart/cart-logic";
 import { VariantSelects } from "@/features/cart/variant-selects";
 import { DeliveryAddressPicker } from "./delivery-address-picker";
+import {
+  benefitSentence, deliveryDisplay, orderTotals, type CreatedOrder, type DeliveryQuote, type OrderTotals,
+} from "./delivery-benefit";
+import { fetchPlusCatalog } from "@/features/plus/plus-api";
 import type { CartItem, PaymentMethod, SellerCartGroup } from "@/types/rivendy";
 
 /**
@@ -282,8 +286,54 @@ export function CheckoutForm() {
     return deliveryAddress?.deliveryFeeKmf ?? 0;
   }, [deliveryMode, usesStructuredAddress, deliveryAddress, selectedZone]);
 
-  /** Total réellement dû par l'acheteur : produits + livraison. */
-  const amountDue = totalAmount + deliveryFee;
+  // 🛵 Réduction de livraison (formules simplifiées, lot 3, 2026-11-17) : le
+  // SERVEUR la calcule (rivendy_delivery_quote, même règle que
+  // secure_create_order : seuils de 25 000 / 35 000 sur tout le panier,
+  // livraisons offertes Rivendy+). Le site l'affiche et ne la calcule jamais ;
+  // sans aperçu, le tarif plein (rien promis). Les frais restent hors du prix
+  // des articles et le vendeur reçoit toujours son prix.
+  const [quote, setQuote] = useState<{ key: string; q: DeliveryQuote } | null>(null);
+  const quoteKey = user && deliveryFee > 0 ? `${totalAmount}:${deliveryFee}` : null;
+  useEffect(() => {
+    if (!quoteKey) return;
+    let alive = true;
+    const timer = setTimeout(() => {
+      void supabase.rpc("rivendy_delivery_quote", { p_products_total: totalAmount, p_delivery_fee: deliveryFee })
+        .then(({ data, error }) => {
+          if (!alive) return;
+          setQuote({ key: quoteKey, q: error || !data ? { success: false, error: "network" } : (data as DeliveryQuote) });
+        });
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [quoteKey, totalAmount, deliveryFee]);
+  const currentQuote = quote && quote.key === quoteKey ? quote.q : null;
+  const moneyDelivery = (amount: number) => (usesStructuredAddress ? formatKmf(amount) : formatMoney(amount, country));
+  const delivery = deliveryDisplay(currentQuote, deliveryFee, totalAmount, moneyDelivery);
+
+  // Rivendy+ et ses livraisons offertes, rappelés à un compte qui ne les a pas
+  // (Grande Comore seulement ; nombre lu dans la formule du marché).
+  const [plusDeliveryCredits, setPlusDeliveryCredits] = useState(0);
+  useEffect(() => {
+    if (!user || !usesStructuredAddress) return;
+    let alive = true;
+    void fetchPlusCatalog(null).then((c) => {
+      const offer = (c.offers ?? []).find((o) => o.kind === "subscription");
+      const credits = Number(offer?.entitlements?.delivery_credits_per_cycle ?? 0);
+      if (alive) setPlusDeliveryCredits(Number.isFinite(credits) ? credits : 0);
+    });
+    return () => { alive = false; };
+  }, [user, usesStructuredAddress]);
+  const plusTeaser = plusDeliveryCredits > 0 && currentQuote?.success && Number(currentQuote.credits_per_cycle ?? 0) === 0
+    ? `Avec Rivendy+ : ${plusDeliveryCredits} livraison${plusDeliveryCredits > 1 ? "s offertes" : " offerte"} par mois.`
+    : null;
+
+  /** Total réellement dû par l'acheteur : produits + sa part de la livraison. */
+  const amountDue = totalAmount + delivery.buyerFee;
+  // Totaux enregistrés par le serveur, montrés après la commande.
+  const [createdTotals, setCreatedTotals] = useState<OrderTotals | null>(null);
 
   // Label zone effectif selon mode de livraison
   const effectiveZoneLabel = useMemo(() => {
@@ -445,7 +495,7 @@ export function CheckoutForm() {
       const paymentName = selectedMethod!.name;
       const paymentStatus = selectedMethod!.type === "cash" ? "pending_cash" : "paid";
 
-      type SecureOrderResult = {
+      type SecureOrderResult = CreatedOrder & {
         success: boolean;
         order_id: string;
         total_price: number;
@@ -455,6 +505,8 @@ export function CheckoutForm() {
         /** Article en cause sur `product_not_available`. */
         product_id?: string;
       };
+      // Ce que le serveur a enregistré (part de livraison payée par Rivendy comprise).
+      const createdResults: SecureOrderResult[] = [];
 
       // 🛵 Livraison multi-vendeurs — même règle que l'app Flutter :
       // l'acheteur paie UNE seule livraison pour tout le panier, même si celui-ci
@@ -578,6 +630,7 @@ export function CheckoutForm() {
         if (structuredAddress || zoneFee > 0) deliveryFeeAssigned = true;
         orderIds.push(id);
         orderedGroups.push(group);
+        createdResults.push(resultObj);
 
         // Ordonnance rattachée APRÈS création (la commande doit exister), à la
         // seule commande qui contient de la pharmacie. Best-effort comme l'app :
@@ -617,6 +670,7 @@ export function CheckoutForm() {
           ? `${failedCount > 1 ? `${failedCount} commandes n'ont pas pu être créées` : "1 commande n'a pas pu être créée"} : ${firstFailure ?? "erreur inconnue."} Les articles concernés sont restés dans votre panier.`
           : "",
       );
+      setCreatedTotals(orderTotals(createdResults));
       setCreatedIds(orderIds);
 
       // Dashboard-first (2026-08-30, parité app) : la commande existe dès que
@@ -677,6 +731,27 @@ export function CheckoutForm() {
             ? `Vos ${createdIds.length} commandes ont bien été transmises à Rivendy. Notre équipe va les prendre en charge.`
             : "Votre commande a bien été transmise à Rivendy. Notre équipe va la prendre en charge."}
         </p>
+        {createdTotals && createdTotals.products > 0 ? (
+          <div className="mx-auto mt-5 max-w-sm space-y-1.5 rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Articles</span>
+              <strong className="text-slate-900">{formatMoney(createdTotals.products, country)}</strong>
+            </div>
+            {createdTotals.feeFull > 0 ? (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Livraison</span>
+                <strong className="text-slate-900">{moneyDelivery(createdTotals.buyerFee)}</strong>
+              </div>
+            ) : null}
+            {benefitSentence(createdTotals.benefit, createdTotals.share, moneyDelivery) ? (
+              <p className="text-xs font-bold text-[#00695C]">{benefitSentence(createdTotals.benefit, createdTotals.share, moneyDelivery)}</p>
+            ) : null}
+            <div className="flex justify-between border-t border-slate-100 pt-2">
+              <strong className="text-slate-700">{selectedMethod?.type === "cash" ? "À payer à la livraison" : "Total"}</strong>
+              <strong className="text-lg text-[#00796B]">{formatMoney(createdTotals.amountDue, country)}</strong>
+            </div>
+          </div>
+        ) : null}
         {partialFailure && (
           <div
             role="status"
@@ -1133,10 +1208,28 @@ export function CheckoutForm() {
             <>
               <div className="mt-1 flex justify-between">
                 <span className="text-slate-500">Frais de livraison</span>
-                <span className="font-bold text-[#009688]">
-                  + {usesStructuredAddress ? formatKmf(deliveryFee) : formatMoney(deliveryFee, country)}
+                <span className={delivery.share > 0 && delivery.share >= delivery.feeFull
+                  ? "font-bold text-slate-400 line-through"
+                  : "font-bold text-[#009688]"}>
+                  + {moneyDelivery(deliveryFee)}
                 </span>
               </div>
+              {delivery.label ? (
+                <div className="mt-1 flex justify-between gap-2 font-bold text-[#00695C]">
+                  <span>{delivery.label}</span>
+                  <span className="shrink-0">− {moneyDelivery(delivery.share)}</span>
+                </div>
+              ) : null}
+              {delivery.detail ? <p className="mt-0.5 text-xs text-slate-500">{delivery.detail}</p> : null}
+              {delivery.nudge ? (
+                <p className="mt-2 rounded-xl bg-[#E0F2F1] px-3 py-2 text-xs font-bold text-[#00695C]">{delivery.nudge}</p>
+              ) : null}
+              {plusTeaser ? (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {plusTeaser}{" "}
+                  <Link href="/plus" className="font-black text-[#00796B] hover:underline">Découvrir</Link>
+                </p>
+              ) : null}
               <div className="mt-2 flex justify-between border-t border-slate-100 pt-2">
                 <span className="font-bold text-slate-700">Total à payer</span>
                 <span className="text-lg font-black text-[#009688]">

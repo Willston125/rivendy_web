@@ -13,7 +13,7 @@ import { usePlayList } from "./play-list";
 import {
   CARD_SIZES, CARD_WIDTHS, POSTER_SIZES, WIDE_SIZES, cardFrame, cardLift, cardPlay, display, motion,
 } from "./play-theme";
-import { PremiumBadge } from "./play-ui";
+import { AccessBadge } from "./pass-ui";
 
 /**
  * Cartes cinéma de Rivendy Play (« Emerald Cinema », 2026-10-24) : l'image
@@ -150,7 +150,7 @@ export function MediaCard({ title, href, kicker, meta, progress, onRemove, remov
           className={cn("absolute inset-0 h-full w-full object-cover", poster ? "object-[50%_18%]" : "object-[50%_35%]")}
           fallback={<ArtFallback />} />
         <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-rvp-ground via-rvp-ground/45 via-35% to-transparent to-70%" />
-        {title.is_premium && kindOf(title.kind) !== "clip" ? <span className="absolute left-2.5 top-2.5 @min-[13rem]:left-3 @min-[13rem]:top-3"><PremiumBadge solid /></span> : null}
+        {title.is_premium && kindOf(title.kind) !== "clip" ? <span className="absolute left-2.5 top-2.5 @min-[13rem]:left-3 @min-[13rem]:top-3"><AccessBadge title={title} solid /></span> : null}
         <span className="absolute inset-x-0 bottom-0 pb-3 pl-3 pr-12 pt-6 @min-[13rem]:pb-4 @min-[13rem]:pl-4 @min-[13rem]:pr-16">
           {top ? <span className="hidden truncate text-[11.5px] font-medium text-rvp-soft @min-[13rem]:block">{top}</span> : null}
           <span className={cn(display, "mt-0.5 line-clamp-2 text-[15px] leading-[1.1] text-rvp-text @min-[13rem]:text-[17px] @min-[16rem]:text-[19px]")}>{title.title}</span>
@@ -262,7 +262,7 @@ export function PosterCard({ title, rank, progress, sizes = POSTER_SIZES, eager 
               {rank}
             </span>
           ) : null}
-          {title.is_premium && kindOf(title.kind) !== "clip" ? <span className="absolute left-2 top-2"><PremiumBadge solid /></span> : null}
+          {title.is_premium && kindOf(title.kind) !== "clip" ? <span className="absolute left-2 top-2"><AccessBadge title={title} solid /></span> : null}
           {progress != null && progress > 0 ? <ProgressTrack ratio={progress} className="absolute inset-x-0 bottom-0 rounded-none" /> : null}
         </span>
         <span className={cn("mt-2.5 block truncate text-sm font-semibold text-rvp-text group-hover:text-rvp-accent", motion)}>

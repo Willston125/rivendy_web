@@ -37,8 +37,8 @@ const FAQS = [
     a: "En tant que vendeur, vous êtes crédité de votre prix dans le portefeuille Rivendy dès que l'acheteur confirme la réception (ou automatiquement après 24 h). Depuis le portefeuille, faites une demande de retrait à partir de {retrait_min} : l'équipe Rivendy la valide puis vous verse sur votre Mobile Money.",
   },
   {
-    q: "Comment obtenir le badge Vendeur Certifié ?",
-    a: "Après avoir publié vos premiers articles et réalisé quelques ventes, rendez-vous dans Paramètres → \"Devenir Vendeur Certifié\". Le badge améliore la visibilité de vos annonces et inspire confiance aux acheteurs.",
+    q: "Comment obtenir le badge certifié ?",
+    a: "Le badge certifié vient avec Rivendy+ et s'affiche tant que l'abonnement est actif. Choisissez Rivendy+ dans Paramètres ou sur la page Rivendy+. Le badge améliore la visibilité de vos annonces et inspire confiance aux acheteurs.",
   },
   {
     q: "Quels sont les frais et commissions Rivendy ?",

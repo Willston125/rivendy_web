@@ -376,7 +376,7 @@ export function SellerDashboard() {
             </p>
             {[
               { href: "/seller/sales",        icon: Truck,      label: "Mes ventes" },
-              { href: "/seller/subscription", icon: BadgeCheck, label: "Abonnement & certification" },
+              { href: "/seller/subscription", icon: BadgeCheck, label: "Rivendy+" },
               // « Booster un produit » menait à /seller/promo, la page publique
               // « Bons plans » : il ouvre désormais le vrai parcours de boost.
               {
@@ -400,26 +400,26 @@ export function SellerDashboard() {
             ))}
           </div>
 
-          {/* Certification — vers le parcours de paiement complet */}
+          {/* Certification : le badge vient avec Rivendy+ (formules, lot 3) */}
           {!profile?.is_certified && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="rounded-2xl border border-[#B2DFDB] bg-[#E0F2F1] p-4">
               <div className="flex items-center gap-2">
-                <BadgeCheck className="h-5 w-5 text-amber-500" />
-                <p className="text-sm font-black text-amber-800">Devenir certifié</p>
+                <BadgeCheck className="h-5 w-5 text-[#00796B]" />
+                <p className="text-sm font-black text-[#004D40]">Devenir certifié</p>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-amber-700">
-                Le badge certifié augmente la confiance des acheteurs et inclut des boosts chaque mois.
+              <p className="mt-1 text-xs leading-relaxed text-[#00695C]">
+                Avec Rivendy+ : le badge certifié et des boosts chaque mois.
               </p>
               <Link
                 href="/seller/subscription"
-                className="mt-3 flex h-9 w-full items-center justify-center rounded-xl bg-amber-500 text-xs font-black text-white transition hover:bg-amber-600"
+                className="mt-3 flex h-9 w-full items-center justify-center rounded-xl bg-[#00796B] text-xs font-black text-white transition hover:bg-[#00695C]"
               >
-                Voir les formules
+                Découvrir Rivendy+
               </Link>
             </div>
           )}
 
-          {/* Boost — vers le parcours complet (plans, paiement, crédits inclus) */}
+          {/* Boost — vers le parcours des boosts inclus (Rivendy+) */}
           {firstBoostable && (
             <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
@@ -432,7 +432,7 @@ export function SellerDashboard() {
                 className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#009688] text-xs font-black text-white transition hover:bg-[#00796B]"
               >
                 <Zap className="h-3.5 w-3.5 fill-white" />
-                Choisir un boost
+                Booster
               </Link>
             </div>
           )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bookmark, Clock, Film, History, Lock, Music, Play, RotateCcw, Search, SearchX, Smartphone, Trash2, Tv, X } from "lucide-react";
+import { Bookmark, Check, Clock, Film, History, Lock, LockOpen, Music, Play, RotateCcw, Search, SearchX, Smartphone, Trash2, Tv, X } from "lucide-react";
 import { ShareButton } from "@/components/ui/share-button";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
@@ -21,6 +21,11 @@ import {
   searchTitles, titlePath,
   type PlayEpisode, type PlayTitle, type WatchProgress,
 } from "./play-logic";
+import { UnlockSheet, useMarketMoney, usePassInfo, usePassPrices, usePreviewSeconds, type UnlockTarget } from "./pass-ui";
+import {
+  accessLevel, episodeState, filmState, passPriceFor, pendingFor, seasonOffer, showSeasonCard,
+  type AccessLevel, type MyUnlock, type PassState,
+} from "./pass-logic";
 import { usePlaySearch } from "./play-search";
 import { usePageBackdrop } from "./play-shell";
 import {
@@ -42,6 +47,8 @@ import {
 // ── Catalogues ─────────────────────────────────────────────────────────────
 
 const CATALOG_ICON = { film: Film, serie: Tv, clip: Music } as const;
+const ACCESS_ORDER: AccessLevel[] = ["free", "pass", "plus"];
+const ACCESS_LABEL: Record<AccessLevel, string> = { free: "Libres", pass: "À débloquer", plus: "Rivendy+" };
 
 export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" | "clip"; heading: string; intro: string }) {
   const market = useHomeMarket();
@@ -50,6 +57,7 @@ export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" |
   const [round, setRound] = useState(0);
   const [data, setData] = useState<{ key: string; titles: PlayTitle[] | null } | null>(null);
   const [genre, setGenre] = useState<string | null>(null);
+  const [access, setAccess] = useState<AccessLevel | null>(null);
   const key = market ? `${market}:${kind}:${round}` : null;
 
   useEffect(() => {
@@ -64,8 +72,12 @@ export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" |
   const current = data && data.key === key ? data : null;
   const titles = useMemo(() => current?.titles ?? [], [current]);
   const genres = useMemo(() => genresOf(titles), [titles]);
-  const shown = genre ? titles.filter((t) => foldText(t.genre?.trim() ?? "") === foldText(genre)) : titles;
   const clips = kind === "clip";
+  // Trois niveaux (formules, lot 3) : le filtre n'apparaît que s'il en existe au moins deux.
+  const levels = useMemo(() => (clips ? [] : ACCESS_ORDER.filter((l) => titles.some((t) => accessLevel(t) === l))), [clips, titles]);
+  const shown = titles
+    .filter((t) => !genre || foldText(t.genre?.trim() ?? "") === foldText(genre))
+    .filter((t) => !access || accessLevel(t) === access);
   const layout = clips ? "wide" : "card";
   const noun = clips ? "clip" : kind === "serie" ? "série" : "film";
   // Ambiance : la première carte, floutée en haut de la page (même image que la carte).
@@ -103,6 +115,13 @@ export function CatalogView({ kind, heading, intro }: { kind: "film" | "serie" |
             <FilterChips label="Filtrer par genre" allLabel="Tous" value={genre} onChange={setGenre}
               options={genres.map((g) => ({ value: g, label: g }))} />
           ) : null}
+          {levels.length > 1 ? (
+            <FilterChips label="Filtrer par accès" allLabel="Tous les accès" value={access} onChange={setAccess}
+              options={levels.map((l) => ({ value: l, label: ACCESS_LABEL[l] }))} />
+          ) : null}
+          {shown.length === 0 ? (
+            <p className="mt-6 text-sm text-rvp-soft">Aucun titre avec ces filtres.</p>
+          ) : null}
           {clips ? (
             <WideGrid>{shown.map((t, i) => <li key={t.id}><ClipCard title={t} eager={i < 3} /></li>)}</WideGrid>
           ) : (
@@ -136,14 +155,128 @@ function Notice({ children }: { children: ReactNode }) {
   );
 }
 
-function PremiumNote({ title }: { title: PlayTitle }) {
+// ── Rivendy Pass et Rivendy+ sur les fiches (formules, lot 3, 2026-11-17) ──
+
+const noteRow = "mt-5 flex flex-wrap items-center justify-center gap-2 text-sm text-rvp-soft @min-[36rem]:justify-start";
+const plusLink = "font-semibold text-rvp-premium underline-offset-4 hover:underline";
+/** Bouton or : Rivendy+ seulement (l'or est réservé à Rivendy+). */
+const btnPremium = cn(btnPrimary,
+  "bg-rvp-premium text-[#1A1203] shadow-none hover:bg-rvp-premium/90 hover:shadow-none active:bg-rvp-premium");
+const statusPill = "inline-flex h-12 items-center gap-2 rounded-rvp border border-rvp-premium/40 bg-rvp-premium/10 px-5 text-[15px] font-semibold text-rvp-premium";
+
+/** « 2 h 05 » d'aperçu → « les 10 premières minutes ». */
+function previewLabel(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `Voir les ${minutes} premières minutes`;
+}
+
+/**
+ * Ligne sous les boutons d'une fiche bloquée : ce qu'apporte le Pass ou
+ * Rivendy+, selon l'état rendu par le serveur (visiteur : le prix du pays).
+ */
+function AccessNote({ title, state, pending, price, visitorPrice, money }: {
+  title: PlayTitle; state: PassState | null; pending?: MyUnlock | null; price?: number | null;
+  visitorPrice: number | null; money: (amount: number) => string;
+}) {
   if (!title.is_premium || kindOf(title.kind) === "clip") return null;
-  return (
-    <p className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm text-rvp-soft @min-[36rem]:justify-start">
-      <Lock className="h-4 w-4 text-rvp-premium" aria-hidden /> Inclus dans Rivendy+, sur le site et dans l’application.
-      <Link href="/plus" className="font-semibold text-rvp-premium underline-offset-4 hover:underline">Découvrir Rivendy+</Link>
-    </p>
-  );
+  const noun = kindOf(title.kind) === "serie" ? "l’épisode" : "le film";
+  switch (state) {
+    case "free":
+    case "not_in_territory":
+      return null;
+    case "plus":
+      return <p className={noteRow}><Lock className="h-4 w-4 text-rvp-premium" aria-hidden /> Inclus dans votre Rivendy+.</p>;
+    case "unlocked":
+      return <p className={noteRow}><Check className="h-4 w-4 text-rvp-accent" aria-hidden /> Débloqué pour toujours, sur le site et dans l’application.</p>;
+    case "locked":
+      return (
+        <p className={noteRow}>
+          Acquis pour toujours, sur le site et dans l’application.
+          <Link href="/plus" className={plusLink}>Tout Play avec Rivendy+</Link>
+        </p>
+      );
+    case "to_pay":
+      return pending ? (
+        <p className={noteRow}>
+          À payer : {money(Number(pending.price))} · référence <span className="font-mono font-semibold text-rvp-text">{pending.reference}</span>, valable 7 jours.
+        </p>
+      ) : null;
+    case "declared":
+      return <p className={noteRow}>Le contenu s’ouvrira tout seul, ici et dans l’application. Vous recevrez une notification.</p>;
+    case "plus_only":
+      return (
+        <p className={noteRow}>
+          <Lock className="h-4 w-4 text-rvp-premium" aria-hidden /> Réservé à Rivendy+ : ce titre ne se débloque pas à l’unité.
+        </p>
+      );
+    default: {
+      const p = price ?? visitorPrice;
+      if (title.pass_unlockable && p != null) {
+        return (
+          <p className={noteRow}>
+            <Lock className="h-4 w-4 text-rvp-accent" aria-hidden /> {money(p)} {noun}, acquis pour toujours — ou tout Play avec Rivendy+.
+            <Link href="/plus" className={plusLink}>Découvrir Rivendy+</Link>
+          </p>
+        );
+      }
+      return (
+        <p className={noteRow}>
+          <Lock className="h-4 w-4 text-rvp-premium" aria-hidden /> Inclus dans Rivendy+, sur le site et dans l’application.
+          <Link href="/plus" className={plusLink}>Découvrir Rivendy+</Link>
+        </p>
+      );
+    }
+  }
+}
+
+/**
+ * Boutons d'un contenu bloqué qu'on ne peut pas encore regarder en entier :
+ * débloquer, reprendre le paiement, vérification, ou Rivendy+.
+ */
+function PassButtons({ state, price, money, pending, onUnlock, watchHref, previewSeconds, signedIn, unlockable, loginHref }: {
+  state: PassState | null; price: number | null; money: (amount: number) => string; pending?: MyUnlock | null;
+  onUnlock: () => void; watchHref: string; previewSeconds: number | null; signedIn: boolean; unlockable: boolean; loginHref: string;
+}) {
+  const preview = previewSeconds ? (
+    <Link href={watchHref} className={btnSecondary}><Play className="h-[18px] w-[18px] fill-current" aria-hidden /> {previewLabel(previewSeconds)}</Link>
+  ) : null;
+  if (!signedIn) {
+    return unlockable ? (
+      <><Link href={loginHref} className={btnPrimary}><LockOpen className="h-[18px] w-[18px]" aria-hidden /> Se connecter pour débloquer</Link>{preview}</>
+    ) : (
+      <Link href={watchHref} className={btnPrimary}><Play className="h-[18px] w-[18px] fill-current" aria-hidden /> Regarder</Link>
+    );
+  }
+  switch (state) {
+    case "locked":
+      return (
+        <>
+          <button type="button" onClick={onUnlock} className={btnPrimary}>
+            <LockOpen className="h-[18px] w-[18px]" aria-hidden /> Débloquer{price != null ? ` · ${money(price)}` : ""}
+          </button>
+          {preview}
+        </>
+      );
+    case "to_pay":
+      return pending ? (
+        <Link href={`/plus/abonnement?deblocage=${encodeURIComponent(pending.id)}`} className={btnPrimary}>Reprendre le paiement</Link>
+      ) : null;
+    case "declared":
+      return <span className={statusPill}><Clock className="h-[18px] w-[18px]" aria-hidden /> Rivendy vérifie votre paiement</span>;
+    case "plus_only":
+    case "not_for_sale":
+      return <><Link href="/plus" className={btnPremium}>Découvrir Rivendy+</Link>{preview}</>;
+    default:
+      return null;
+  }
+}
+
+/** Le contenu se regarde-t-il en entier ? (le serveur revérifie à la lecture) */
+function watchable(blocked: boolean, state: PassState | null, signedIn: boolean, ready: boolean, hasOffer: boolean): boolean {
+  if (!blocked) return true;
+  if (state === "free" || state === "plus" || state === "unlocked") return true;
+  // Compte connecté mais état inconnu (serveur injoignable) : la lecture décide, comme avant.
+  return signedIn && ready && !hasOffer;
 }
 
 function SecondaryActions({ title }: { title: PlayTitle }) {
@@ -213,6 +346,20 @@ export function TitleView({ title }: { title: PlayTitle }) {
   const ready = isVideoReady(title);
   const clip = kindOf(title.kind) === "clip";
   const watch = clip ? `/play/watch/clip/${title.id}` : `/play/watch/movie/${title.id}`;
+  // Rivendy Pass (lot 3) : l'état vient du serveur (play_unlock_offer).
+  const blocked = !!title.is_premium && !clip;
+  const pass = usePassInfo(title);
+  const market = useHomeMarket();
+  const prices = usePassPrices();
+  const previewSeconds = usePreviewSeconds(title);
+  const loginHref = useLoginHref();
+  const money = useMarketMoney(pass.offer?.market ?? market, pass.offer?.currency);
+  const [unlocking, setUnlocking] = useState(false);
+  const state = blocked && pass.offer ? filmState(pass.offer, pass.unlocks, title.id) : null;
+  const pending = pendingFor(pass.unlocks, title.id, "title") ?? null;
+  const price = pass.offer?.title?.price ?? null;
+  const visitorPrice = blocked && !pass.signedIn && prices ? passPriceFor(prices, market, "title") : null;
+  const canWatch = watchable(blocked, state, pass.signedIn, pass.ready, !!pass.offer);
 
   return (
     <PlayPage className="max-sm:pt-0">
@@ -227,22 +374,34 @@ export function TitleView({ title }: { title: PlayTitle }) {
           : !ready ? <Notice>Bientôt disponible. Ajoutez-le à Ma liste pour le retrouver.</Notice> : null}
         <div className={actionsRow}>
           {allowed && ready ? (
-            <>
-              <Link href={watch} className={btnPrimary}>
-                <Play className="h-[18px] w-[18px] fill-current" aria-hidden />
-                {at > 0 ? `Reprendre (${durationLabel(at) || "moins d’une minute"})` : clip ? "Regarder le clip" : "Regarder"}
-              </Link>
-              {at > 0 ? (
-                <Link href={`${watch}?start=0`} className={btnSecondary}><RotateCcw className="h-[18px] w-[18px]" aria-hidden /> Recommencer</Link>
-              ) : null}
-            </>
+            canWatch ? (
+              <>
+                <Link href={watch} className={btnPrimary}>
+                  <Play className="h-[18px] w-[18px] fill-current" aria-hidden />
+                  {at > 0 ? `Reprendre (${durationLabel(at) || "moins d’une minute"})` : clip ? "Regarder le clip" : "Regarder"}
+                </Link>
+                {at > 0 ? (
+                  <Link href={`${watch}?start=0`} className={btnSecondary}><RotateCcw className="h-[18px] w-[18px]" aria-hidden /> Recommencer</Link>
+                ) : null}
+              </>
+            ) : pass.ready ? (
+              <PassButtons state={state} price={price} money={money} pending={pending} onUnlock={() => setUnlocking(true)}
+                watchHref={watch} previewSeconds={previewSeconds} signedIn={pass.signedIn} unlockable={!!title.pass_unlockable}
+                loginHref={loginHref} />
+            ) : null
           ) : null}
           <SecondaryActions title={title} />
         </div>
-        <PremiumNote title={title} />
+        {allowed && pass.ready ? (
+          <AccessNote title={title} state={state} pending={pending} price={price} visitorPrice={visitorPrice} money={money} />
+        ) : null}
         <Synopsis text={title.synopsis} />
       </DetailHero>
       <Trailer title={title} />
+      {unlocking && price != null ? (
+        <UnlockSheet title={title} target={{ unit: "title", price }} market={pass.offer?.market} currency={pass.offer?.currency}
+          onClose={() => setUnlocking(false)} onChanged={pass.reload} />
+      ) : null}
     </PlayPage>
   );
 }
@@ -256,6 +415,64 @@ export function SeriesView({ title, episodes }: { title: PlayTitle; episodes: Pl
   const seasons = [...new Set(episodes.map((e) => e.season))].sort((a, b) => a - b);
   const [season, setSeason] = useState<number | null>(null);
   const shownSeason = season ?? current?.season ?? seasons[0] ?? 1;
+  // Rivendy Pass (lot 3) : épisode par épisode, un épisode offert par saison, ou la saison entière.
+  const pass = usePassInfo(title);
+  const market = useHomeMarket();
+  const prices = usePassPrices();
+  const money = useMarketMoney(pass.offer?.market ?? market, pass.offer?.currency);
+  const [unlock, setUnlock] = useState<UnlockTarget | null>(null);
+  const offer = pass.offer;
+  const visitorPrice = title.is_premium && !pass.signedIn && prices ? passPriceFor(prices, market, "episode") : null;
+  const seasonCard = offer ? seasonOffer(shownSeason, offer, pass.unlocks, title.id) : null;
+  const seasonPending = pendingFor(pass.unlocks, title.id, "season", { season: shownSeason }) ?? null;
+  const someUnlocked = (offer?.episodes ?? []).some((x) => x.season === shownSeason && !x.free && x.unlocked);
+  const heroState: PassState | null = offer
+    ? (offer.access === "free" ? "free" : offer.plus_active ? "plus" : offer.access === "plus" ? "plus_only"
+      : offer.in_territory === false ? "not_in_territory" : offer.unlockable ? "locked" : "not_for_sale")
+    : null;
+
+  function episodePass(e: PlayEpisode): { status: ReactNode; action: ReactNode } {
+    const free = <span className="font-semibold text-rvp-accent">Offert</span>;
+    const gold = <span className="inline-flex items-center gap-1 text-rvp-premium"><Lock className="h-3 w-3" aria-hidden /> Rivendy+</span>;
+    if (!title.is_premium) return { status: null, action: null };
+    const o = offer?.episodes?.find((x) => x.episode_id === e.id) ?? null;
+    if (!offer || !o) {
+      if (e.is_free_preview) return { status: free, action: null };
+      return {
+        status: title.pass_unlockable && visitorPrice != null
+          ? <span className="inline-flex items-center gap-1 font-semibold text-rvp-accent"><Lock className="h-3 w-3" aria-hidden /> {money(visitorPrice)}</span>
+          : gold,
+        action: null,
+      };
+    }
+    const st = episodeState(o, offer, pass.unlocks, title.id);
+    const price = o.price ?? offer.episode_price ?? null;
+    const pending = pendingFor(pass.unlocks, title.id, "episode", { episodeId: e.id })
+      ?? pendingFor(pass.unlocks, title.id, "season", { season: e.season }) ?? null;
+    switch (st) {
+      case "free": return { status: e.is_free_preview ? free : null, action: null };
+      case "plus": return { status: gold, action: null };
+      case "unlocked": return { status: <span className="inline-flex items-center gap-1 font-semibold text-rvp-accent"><Check className="h-3 w-3" aria-hidden /> Débloqué</span>, action: null };
+      case "to_pay":
+        return {
+          status: <span className="font-semibold text-rvp-premium">À payer</span>,
+          action: pending ? <Link href={`/plus/abonnement?deblocage=${encodeURIComponent(pending.id)}`} className="text-[13px] font-bold text-rvp-accent underline-offset-4 hover:underline">Reprendre le paiement</Link> : null,
+        };
+      case "declared": return { status: <span className="font-semibold text-rvp-premium">Paiement en vérification</span>, action: null };
+      case "locked":
+        return {
+          status: <span className="inline-flex items-center gap-1 font-semibold text-rvp-accent"><Lock className="h-3 w-3" aria-hidden /> {price != null ? money(price) : "Rivendy Pass"}</span>,
+          action: price != null ? (
+            <button type="button" onClick={() => setUnlock({ unit: "episode", episodeId: e.id, episodeNumber: e.episode_number, price })}
+              className={cn("inline-flex h-10 items-center gap-1.5 rounded-full border border-rvp-accent px-4 text-[13px] font-extrabold text-rvp-accent hover:bg-rvp-accent/10", motion)}>
+              <LockOpen className="h-4 w-4" aria-hidden /> Débloquer · {money(price)}
+            </button>
+          ) : null,
+        };
+      case "not_in_territory": return { status: null, action: null };
+      default: return { status: gold, action: null };
+    }
+  }
 
   return (
     <PlayPage className="max-sm:pt-0">
@@ -267,7 +484,10 @@ export function SeriesView({ title, episodes }: { title: PlayTitle; episodes: Pl
           {allowed && current ? <PlayButton title={title} progress={progress} episodes={episodes} /> : null}
           <SecondaryActions title={title} />
         </div>
-        <PremiumNote title={title} />
+        {allowed && pass.ready ? (
+          <AccessNote title={title} state={heroState === "locked" ? null : heroState}
+            price={offer?.episode_price ?? null} visitorPrice={visitorPrice} money={money} />
+        ) : null}
         <Synopsis text={title.synopsis} />
       </DetailHero>
       {episodes.length > 0 ? (
@@ -276,14 +496,39 @@ export function SeriesView({ title, episodes }: { title: PlayTitle; episodes: Pl
             <FilterChips label="Choisir la saison" value={shownSeason} onChange={(s) => setSeason(s ?? seasons[0])}
               options={seasons.map((s) => ({ value: s, label: `Saison ${s}` }))} />
           ) : null}
+          {seasonCard && showSeasonCard(seasonCard) && seasonCard.price != null ? (
+            <div className="mb-4 flex flex-wrap items-center gap-4 rounded-rvp-panel border border-rvp-edge-strong bg-rvp-surface/70 p-4 sm:p-5">
+              <div className="min-w-0 flex-[1_1_240px]">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-rvp-accent">Saison {shownSeason} entière</p>
+                <p className={cn(display, "mt-1 text-2xl text-rvp-text")}>{money(seasonCard.price)}</p>
+                {seasonCard.regularTotal != null && seasonCard.regularTotal > seasonCard.price ? (
+                  <p className="mt-0.5 text-[13px] text-rvp-soft">
+                    au lieu de {money(seasonCard.regularTotal)} épisode par épisode ({seasonCard.paidEpisodes} épisodes à débloquer)
+                  </p>
+                ) : null}
+                {someUnlocked && seasonCard.state === "locked" ? (
+                  <p className="mt-0.5 text-xs text-rvp-muted">Les épisodes déjà débloqués ne sont pas déduits.</p>
+                ) : null}
+              </div>
+              {seasonCard.state === "locked" ? (
+                <button type="button" onClick={() => setUnlock({ unit: "season", season: shownSeason, price: seasonCard.price! })} className={btnPrimary}>
+                  <LockOpen className="h-[18px] w-[18px]" aria-hidden /> Débloquer la saison {shownSeason}
+                </button>
+              ) : seasonCard.state === "to_pay" && seasonPending ? (
+                <Link href={`/plus/abonnement?deblocage=${encodeURIComponent(seasonPending.id)}`} className={btnPrimary}>Reprendre le paiement</Link>
+              ) : (
+                <span className={statusPill}><Clock className="h-[18px] w-[18px]" aria-hidden /> Rivendy vérifie votre paiement</span>
+              )}
+            </div>
+          ) : null}
           <ol className="grid gap-3 @min-[56rem]:grid-cols-2 @min-[56rem]:gap-4">
             {episodes.filter((e) => e.season === shownSeason).map((e) => {
               const pos = mine.find((x) => x.episode_id === e.id);
               const ratio = pos && pos.duration_seconds > 0 ? Math.min(1, pos.position_seconds / pos.duration_seconds) : 0;
-              const locked = !!title.is_premium && !e.is_free_preview;
+              const { status, action } = episodePass(e);
               return (
                 <li key={e.id}>
-                  <EpisodeRow series={title} episode={e} ratio={ratio} locked={locked} current={current?.id === e.id} />
+                  <EpisodeRow series={title} episode={e} ratio={ratio} status={status} action={action} current={current?.id === e.id} />
                 </li>
               );
             })}
@@ -291,6 +536,10 @@ export function SeriesView({ title, episodes }: { title: PlayTitle; episodes: Pl
         </Section>
       ) : null}
       <Trailer title={title} />
+      {unlock ? (
+        <UnlockSheet title={title} target={unlock} market={offer?.market} currency={offer?.currency}
+          onClose={() => setUnlock(null)} onChanged={pass.reload} />
+      ) : null}
     </PlayPage>
   );
 }
@@ -310,8 +559,8 @@ function EpisodeArt({ number, poster }: { number: number; poster: string | null 
   );
 }
 
-function EpisodeRow({ series, episode: e, ratio, locked, current }: {
-  series: PlayTitle; episode: PlayEpisode; ratio: number; locked: boolean; current: boolean;
+function EpisodeRow({ series, episode: e, ratio, status, action, current }: {
+  series: PlayTitle; episode: PlayEpisode; ratio: number; status: ReactNode; action: ReactNode; current: boolean;
 }) {
   const fallbackArt = landscapeArt(series);
   const thumb = e.thumbnail_url?.startsWith("https://") ? e.thumbnail_url : null;
@@ -337,11 +586,11 @@ function EpisodeRow({ series, episode: e, ratio, locked, current }: {
         </Link>
         <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-rvp-muted">
           {durationLabel(e.duration_seconds)}
-          {locked ? <span className="inline-flex items-center gap-1 text-rvp-premium"><Lock className="h-3 w-3" aria-hidden /> Rivendy+</span> : null}
-          {series.is_premium && e.is_free_preview ? <span className="font-semibold text-rvp-accent">Offert</span> : null}
+          {status}
           {current ? <span className="font-semibold text-rvp-accent">À suivre</span> : null}
         </p>
         {e.synopsis ? <p className="mt-1.5 line-clamp-2 text-sm text-rvp-soft">{e.synopsis}</p> : null}
+        {action ? <div className="mt-2.5">{action}</div> : null}
       </div>
     </div>
   );
@@ -354,6 +603,21 @@ export function EpisodeView({ episode, series }: { episode: PlayEpisode; series:
   const p = progress.find((x) => x.episode_id === episode.id);
   const at = p ? resumeAt(p.position_seconds, p.duration_seconds) : 0;
   const locked = !!series.is_premium && !episode.is_free_preview;
+  // Rivendy Pass (lot 3) : cet épisode se débloque seul, ou avec sa saison.
+  const pass = usePassInfo(series);
+  const market = useHomeMarket();
+  const prices = usePassPrices();
+  const loginHref = useLoginHref();
+  const money = useMarketMoney(pass.offer?.market ?? market, pass.offer?.currency);
+  const [unlocking, setUnlocking] = useState(false);
+  const epOffer = pass.offer?.episodes?.find((x) => x.episode_id === episode.id) ?? null;
+  const state = locked && pass.offer && epOffer ? episodeState(epOffer, pass.offer, pass.unlocks, series.id) : null;
+  const pending = pendingFor(pass.unlocks, series.id, "episode", { episodeId: episode.id })
+    ?? pendingFor(pass.unlocks, series.id, "season", { season: episode.season }) ?? null;
+  const price = epOffer?.price ?? pass.offer?.episode_price ?? null;
+  const visitorPrice = locked && !pass.signedIn && prices ? passPriceFor(prices, market, "episode") : null;
+  const canWatch = watchable(locked, state, pass.signedIn, pass.ready, !!pass.offer && !!epOffer);
+  const watch = `/play/watch/episode/${episode.id}`;
   const heading = (
     <>
       <p className="rvp-fade-in mt-4 text-base font-semibold text-rvp-soft">
@@ -367,21 +631,44 @@ export function EpisodeView({ episode, series }: { episode: PlayEpisode; series:
       <DetailHero title={series} kicker={`Saison ${episode.season} · Épisode ${episode.episode_number}`} heading={heading}>
         <p className="rvp-fade-in mt-5 flex flex-wrap items-center justify-center gap-2.5 text-sm text-rvp-soft @min-[36rem]:justify-start">
           {durationLabel(episode.duration_seconds)}
-          {locked ? <PremiumBadge /> : null}
+          {locked ? (state === "unlocked" ? <span className="font-semibold text-rvp-accent">Débloqué</span>
+            : series.pass_unlockable ? <AccessLevelBadge level="pass" /> : <PremiumBadge />) : null}
           {series.is_premium && episode.is_free_preview ? <span className="font-semibold text-rvp-accent">Épisode offert</span> : null}
         </p>
         {!allowed ? <Notice>Cette série n’est pas disponible dans votre pays.</Notice> : (
           <div className={actionsRow}>
-            <Link href={`/play/watch/episode/${episode.id}`} className={btnPrimary}>
-              <Play className="h-[18px] w-[18px] fill-current" aria-hidden /> {at > 0 ? `Reprendre (${durationLabel(at) || "moins d’une minute"})` : "Regarder"}
-            </Link>
+            {canWatch ? (
+              <Link href={watch} className={btnPrimary}>
+                <Play className="h-[18px] w-[18px] fill-current" aria-hidden /> {at > 0 ? `Reprendre (${durationLabel(at) || "moins d’une minute"})` : "Regarder"}
+              </Link>
+            ) : pass.ready ? (
+              <PassButtons state={state} price={price} money={money} pending={pending} onUnlock={() => setUnlocking(true)}
+                watchHref={watch} previewSeconds={null} signedIn={pass.signedIn} unlockable={!!series.pass_unlockable}
+                loginHref={loginHref} />
+            ) : null}
             <Link href={`/play/series/${series.id}`} className={btnSecondary}>Tous les épisodes</Link>
           </div>
         )}
-        {locked ? <PremiumNote title={series} /> : null}
+        {locked && allowed && pass.ready ? (
+          <AccessNote title={series} state={state} pending={pending} price={price} visitorPrice={visitorPrice} money={money} />
+        ) : null}
         <Synopsis text={episode.synopsis} />
       </DetailHero>
+      {unlocking && price != null ? (
+        <UnlockSheet title={series} target={{ unit: "episode", episodeId: episode.id, episodeNumber: episode.episode_number, price }}
+          market={pass.offer?.market} currency={pass.offer?.currency} onClose={() => setUnlocking(false)} onChanged={pass.reload} />
+      ) : null}
     </PlayPage>
+  );
+}
+
+/** Petite pastille « Rivendy Pass » des fiches (le prix est dans la ligne d'accès). */
+function AccessLevelBadge({ level }: { level: AccessLevel }) {
+  if (level !== "pass") return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-rvp-accent/10 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-rvp-accent ring-1 ring-rvp-accent/30">
+      <Lock className="h-3 w-3" aria-hidden /> Rivendy Pass
+    </span>
   );
 }
 

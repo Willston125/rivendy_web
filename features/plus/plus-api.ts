@@ -59,15 +59,60 @@ export interface MyEntitlements {
   offer?: string | null;
   label?: string | null;
   active_until?: string | null;
+  account_market?: string | null;
   play_premium?: boolean;
   music_premium?: boolean;
   simultaneous_streams?: number;
+  certified_badge?: boolean;
+  boosts_per_cycle?: number;
+  story_max_hours?: number;
+  store_cover_video?: boolean;
+  videos_unlimited?: boolean;
+  video_max_seconds?: number;
+  /** Ancien abonnement Certifié ou Pro honoré jusqu'à sa fin (décision du 15/11). */
+  legacy_seller?: { tier?: string | null; until?: string | null; market?: string | null } | null;
+  /** Livraisons offertes du cycle (lot 1, fichier 4). */
+  delivery?: {
+    credits_per_cycle?: number;
+    credits_used?: number;
+    credits_remaining?: number;
+    cycle_end?: string | null;
+  } | null;
 }
 
 export async function fetchMyEntitlements(): Promise<MyEntitlements | null> {
   const { data, error } = await supabase.rpc("rivendy_entitlements");
   if (error) return null;
   return (data as MyEntitlements | null) ?? null;
+}
+
+/**
+ * Droits d'une formule dans un marché, tels que le dashboard les règle
+ * (« free » = la formule Gratuit, « month » = Rivendy+). Lisible sans compte.
+ */
+export async function fetchOfferEntitlements(offer: string, market: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase.rpc("rivendy_offer_entitlements_resolved", { p_offer: offer, p_country: market });
+  if (error || !data || typeof data !== "object") return null;
+  return data as Record<string, unknown>;
+}
+
+export interface BoostStatus {
+  has_subscription?: boolean;
+  plus?: boolean;
+  /** rivendy_plus · legacy_certified · legacy_pro · free */
+  source?: string;
+  allowance?: number;
+  used?: number;
+  remaining?: number;
+  boost_days?: number;
+  cycle_end?: string | null;
+}
+
+/** Boosts inclus du cycle (5 avec Rivendy+ ou un ancien Certifié / Pro, 0 en gratuit). */
+export async function fetchBoostStatus(): Promise<BoostStatus | null> {
+  const { data, error } = await supabase.rpc("get_boost_credit_status");
+  if (error || !data) return null;
+  return data as BoostStatus;
 }
 
 /** Les 20 dernières périodes et demandes du compte (la RLS ne montre que les siennes). */

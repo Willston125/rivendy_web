@@ -285,8 +285,12 @@ export interface AppOrder {
   total_price: number;
   total_commission: number;
   total_seller_amount: number;
-  /** Frais de livraison, HORS total_price (invariant §1.8). */
+  /** Frais de livraison, HORS total_price (invariant §1.8). Depuis le 15/11 : la part de l'ACHETEUR. */
   delivery_fee_kmf?: number | null;
+  /** Part de la livraison payée par Rivendy (formules, lot 1, fichier 4). */
+  delivery_rivendy_share_kmf?: number | null;
+  /** credit · half_threshold · full_threshold, ou null. */
+  delivery_benefit?: string | null;
   /** Snapshot d'adresse figé à la commande (parcours KM). */
   delivery_region_name?: string | null;
   delivery_locality_name?: string | null;

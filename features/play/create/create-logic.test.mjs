@@ -130,8 +130,13 @@ test("articles d'un Short : ligne, mention, recherche sans accents, « Sans vid�
 });
 
 test("messages : quota, cadence, clip, Short", () => {
-  assert.equal(videoTicketMessage("QUOTA_EXCEEDED", 3), "Quota vidéo atteint (3 ce mois-ci). Passez à une formule supérieure pour en publier plus.");
-  assert.equal(videoTicketMessage("QUOTA_EXCEEDED"), "Quota vidéo atteint. Passez à une formule supérieure pour en publier plus.");
+  // Formules simplifiées (15/11) : publications du jour, ou vidéos en ligne (nombre jamais affiché).
+  assert.equal(videoTicketMessage("QUOTA_EXCEEDED", null, { quota: "daily", perDay: 3 }),
+    "Vous avez déjà publié 3 articles avec vidéo aujourd’hui. Prochaine publication avec vidéo demain, ou sans limite avec Rivendy+.");
+  assert.equal(videoTicketMessage("QUOTA_EXCEEDED", null, { quota: "online" }),
+    "Vous avez trop de vidéos en ligne : retirez-en une pour publier celle-ci. Les comptes Rivendy+ peuvent en garder davantage.");
+  assert.ok(!/\d/.test(videoTicketMessage("QUOTA_EXCEEDED", 60, { quota: "online" })));
+  assert.equal(videoTicketMessage("QUOTA_EXCEEDED"), "Quota vidéo atteint. Rivendy+ permet d’en publier davantage.");
   assert.equal(videoTicketMessage("RATE_LIMITED"), "Trop d’envois d’affilée : réessayez dans une minute.");
   assert.equal(videoTicketMessage("INTERNAL"), "L’envoi de la vidéo a échoué, réessayez.");
   assert.equal(clipErrorMessage("QUOTA_EXCEEDED"), "Vous avez déjà envoyé 10 clips ce mois-ci.");

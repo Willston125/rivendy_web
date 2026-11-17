@@ -784,3 +784,40 @@ Suite de la publication depuis le site (lots 3 et 4, canevas validé). Aucun SQL
 - **Règles pures** : `create/create-logic.ts` (miroir d'artist_models, play_create_service, shorts_service, video_service) ;
   `npm run check:create`.
 - Pages personnelles noindex et exclues de robots.ts (/play/shorts, /play/mes-shorts, /play/clips/artiste/…).
+
+## Formules simplifiées, lot 3 : Rivendy+, Rivendy Pass, livraison au panier (2026-11-17, branche `feat/formules-lot3`)
+
+Canevas validé le 17/11 (11 planches), phrase du propriétaire : « Je t'autorise à toucher le panier, les pages Rivendy+ et
+Pass, les abonnements et les boosts du site (formules, lot 3) ». Grille : `rivendy-docs/docs/rivendy-plus/GRILLE_FORMULES_2026-11-14.md`.
+**Aucun SQL** : le site appelle les fonctions du lot 1 (en production depuis le 15/11), il ne calcule ni prix, ni droit, ni
+réduction. L'app suit au lot 4 (parité).
+
+- **Rivendy+** (`features/plus/`) : `/plus` refondue (avantages rangés « vendre / acheter / regarder » et tableau Gratuit ou
+  Rivendy+ lus dans `rivendy_offer_entitlements_resolved('free' | 'month', marché)` ; un droit à zéro n'est jamais promis : à
+  Djibouti, pas de livraison) ; `/plus/abonnement` = « Mon Rivendy+ » : statut (Rivendy+, ancien Certifié / Pro via
+  `rivendy_entitlements().legacy_seller`, gratuit), « Ce mois-ci » (boosts `get_boost_credit_status`, livraisons offertes
+  `rivendy_entitlements().delivery`), demandes RVP- ET RVD- à payer (même carte : référence, consignes, déclaration), titres
+  du Pass acquis, historique commun. `?demande=` (Rivendy+) et `?deblocage=` (Pass) mettent la demande en avant.
+- **Rivendy Pass dans Play** (`features/play/pass-*.ts(x)`) : `play_titles.pass_unlockable` lu (GRANT anon du lot 1) ;
+  pastilles d'affiche : prix du Pass du pays (vert, `play_unlock_prices`, une lecture par visite), Rivendy+ (or) ; filtre
+  « Libres / À débloquer / Rivendy+ » dans Films et Séries (si deux niveaux au moins) ; fiche film : 9 états
+  (`play_unlock_offer` + `my_play_unlocks`, `filmState`), aperçu « les N premières minutes » si `play_title_previews` prêt ;
+  série : épisode par épisode, épisode offert, carte « saison entière » (repère « au lieu de ») ; fenêtre `UnlockSheet` (feuille
+  de Play) : choisir → référence RVD- → déclarer → vérification. **Mobile money seulement** (le guichet ne lit pas encore
+  RVD-, décision du 16/11) ; vente fermée dans le pays (`sale_open`) = message, pas de demande. Lecteur : « bloqué » et fin
+  d'aperçu proposent « Débloquer » (fiche du titre) ; l'épisode suivant n'est enchaîné que si Rivendy+ ouvre tout
+  (`grant.unlocked` = Pass, ce contenu seulement).
+- **Panier** (`features/checkout/delivery-benefit.ts`) : `rivendy_delivery_quote(produits, tarif)` dès que l'adresse est
+  choisie (compte connecté) ; ligne de réduction, précision (« 1 sur 2 ce mois-ci »), coup de pouce près d'un seuil (60 % du
+  seuil au moins), rappel Rivendy+ à un compte sans livraison offerte ; total et consigne mobile money = part de l'acheteur.
+  Avant ce lot, le site affichait le tarif plein alors que le serveur réduisait déjà (15/11). Confirmation : totaux RENDUS par
+  `secure_create_order` (panier multi-vendeurs : le dernier `delivery_group` fait foi). Mes commandes : part de Rivendy
+  (`delivery_rivendy_share_kmf`, `delivery_benefit`).
+- **Vendeur** : `/seller/subscription` = « Rivendy+ pour vendre » (plus aucune vente Certifié / Pro ; ancienne demande en
+  attente toujours affichée) ; `/seller/boost/[id]` = boosts inclus seulement (Bronze / Argent / Or et leurs prix retirés) ;
+  story : choix 24 h / `story_max_hours` (`toggle_story(p_hours)`), story vidéo pour tous ; quotas vidéo lus dans
+  `my_video_quota` (15 s / 30 s, publications du jour) ; messages QUOTA_EXCEEDED `daily` / `online` (nombre jamais affiché).
+  `lib/utils/seller-offer-prices.ts` gardé (seuil de retrait, grille encore vendue par l'app jusqu'au lot 4).
+- **Textes** : réglages, pied de page, aide, conditions (« L'abonnement Rivendy+ et le Rivendy Pass sont payants… »),
+  Mes ventes, espace vendeur. Le badge « Certifié » des boutiques reste.
+- Essais : `npm run check:plus` (13), `check:pass` (8), `check:delivery` (11), `check:create` (13). tsc 0, lint 0.

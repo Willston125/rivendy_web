@@ -135,8 +135,8 @@ export function SettingsView() {
               icon: BadgeCheck,
               iconColor: "#007168",
               iconBg: "#E0F2F1",
-              label: "Abonnement Vendeur Certifié",
-              sub: "Badge actif sur vos annonces",
+              label: "Rivendy+ pour vendre",
+              sub: "Compte certifié actif",
               href: "/seller/subscription",
               badge: (
                 <span className="rounded-full bg-[#E0F2F1] px-2.5 py-0.5 text-xs font-black text-[#009688]">
@@ -148,8 +148,8 @@ export function SettingsView() {
               icon: BadgeCheck,
               iconColor: "#007168",
               iconBg: "#E0F2F1",
-              label: "Devenir Vendeur Certifié ✅",
-              sub: "Badge de confiance sur vos annonces",
+              label: "Rivendy+ pour vendre",
+              sub: "Badge certifié et boosts chaque mois",
               href: "/seller/subscription",
             },
         {
