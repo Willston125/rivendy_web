@@ -1,0 +1,36 @@
+# Audit 22, lot 6 (EXPLOIT-5) : avant, aucune vérification automatique ne tournait
+# avant une mise en production (un push sur main part chez Vercel, dépôt public).
+# Le même contrôle que celui fait à la main avant chaque livraison : npm run check
+# (typage, lint et toutes les vérifications maison).
+name: Vérifications
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verifications-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: npm run check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typage, lint et vérifications maison
+        run: npm run check
