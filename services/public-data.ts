@@ -291,9 +291,10 @@ async function fetchProducts({
   if (category && category !== "all") query = query.eq("category", category);
   if (subcategory?.trim()) query = query.eq("subcategory", subcategory.trim());
   if (search?.trim()) {
-    // Audit 22 (MKWEB-3) : même filtre que /search, valeur entre guillemets
-    // (audit 20, WEB-17). Collé tel quel, « robe. », « (mkoumi) » ou
-    // « iPhone 13 (128 Go) » cassaient la requête : 0 résultat.
+    // Audit 22 (MKWEB-3) : même filtre que /search (search-logic.ts), valeur
+    // entre guillemets (audit 20, WEB-17), ponctuation ignorée entre les mots.
+    // « robe. », « (mkoumi) » ou « iPhone 13 (128 Go) » cassaient la requête
+    // (0 résultat), puis ne trouvaient que le texte exact, ponctuation comprise.
     const filter = ilikeOrFilter(["title", "description"], search);
     if (filter) query = query.or(filter);
   }

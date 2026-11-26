@@ -843,3 +843,15 @@ Aucun SQL, aucune fonction Edge. Proposition : `rivendy-docs/docs/audit-22-2026-
   en cache (sentinelle `not_cached_miss`).
 - **Recherche de l'en-tête (MKWEB-3)** : `fetchProducts` utilise `ilikeOrFilter` (même filtre que /search).
 - Essais : `npm run check` en entier (typecheck, lint 0, 194 vérifications) ; `check:phone` 12, `check:plus` 14.
+
+## Audit 22 : recherche sans ponctuation (2026-11-26, branche `fix/audit22-recherche-ponctuation`)
+
+Mesuré en ligne après le lot 3 (`3354ae3`) : la requête ne cassait plus, mais `ilikeOrFilter` cherchait le texte EXACT,
+ponctuation comprise : « (mkoumi) » → 0 alors que « mkoumi » → 2 (« Robe Mkoumi », « Robe Mkoumi droite ») ; « robe. » → 0.
+- `searchPattern` (`features/search/search-logic.ts`) : les mots dans l'ordre, séparés par `%`, ponctuation et espaces
+  ignorés (« iPhone 13 (128 Go) » → `%iPhone%13%128%Go%`) ; un mot = lettres (accents, signes diacritiques) et chiffres,
+  forme NFC ; `%` et `_` ne sont jamais des jokers ; 10 mots au plus ; ponctuation seule (« ... ») cherchée telle quelle.
+- Même fonction pour /search et la recherche de l'en-tête (`fetchProducts`). L'app a le même défaut (MKAPP-16,
+  `product_service.dart`, texte sans guillemets) : à porter au lot 4.
+- Essais : `check:search` 10 (dont une simulation d'ILIKE sur des titres relevés en ligne le 26/11) ; `npm run check`
+  en entier (typecheck, lint 0, 199 vérifications).
