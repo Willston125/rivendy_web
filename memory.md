@@ -855,3 +855,16 @@ ponctuation comprise : « (mkoumi) » → 0 alors que « mkoumi » → 2 (« Rob
   `product_service.dart`, texte sans guillemets) : à porter au lot 4.
 - Essais : `check:search` 10 (dont une simulation d'ILIKE sur des titres relevés en ligne le 26/11) ; `npm run check`
   en entier (typecheck, lint 0, 199 vérifications).
+
+## Audit 22, lot 4 : numéros comoriens à 7 chiffres, partie site (2026-11-26)
+
+Phrase du propriétaire : « Je t'autorise à toucher l'authentification de l'app et du site (règle des numéros
+comoriens), change-phone et recover-account, et la caisse de l'app pour l'audit 22 ».
+- `phoneDigitsOf` : 7 à 15 chiffres (avant 8), comme l'app, l'inscription et `_shared/phone-login.ts` ; un compte à
+  7 chiffres qui change de numéro local passe désormais par change-phone (mot de passe). `phoneChangeMessage` :
+  « 7 à 15 chiffres ».
+- `loginDigitCandidates(phone, countryId)` : un numéro saisi en local essaie aussi « indicatif du marché + numéro »
+  (compte déplacé vers +269… joignable par « 321 45 67 ») ; `signInWithPhone(…, country?.id)` (login-form.tsx).
+- « Récupérer mon compte » : `invalid_phone` dit d'ajouter l'indicatif (+269).
+- À déployer EN MÊME TEMPS que la règle serveur (change-phone, recover-account). Essais : `check:phone` 14 ;
+  `npm run check` en entier.

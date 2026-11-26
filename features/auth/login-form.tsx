@@ -34,7 +34,8 @@ export function LoginForm() {
     setLoading(true);
     setError("");
     try {
-      await signInWithPhone(phone, password);
+      // Audit 22 (COMPTES-3) : le marché choisi, pour la forme avec indicatif.
+      await signInWithPhone(phone, password, country?.id);
       router.push(next);
       router.refresh();
     } catch (err) {

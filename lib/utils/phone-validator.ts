@@ -87,8 +87,13 @@ export function detectPhoneCountryId(phone: string): string | null {
  * sous une forme ne soit pas injoignable sous l'autre (audit 21, APPSOCLE-1).
  * Règle PURE, à garder identique à l'app (phone_validator.dart :
  * loginDigitCandidates).
+ *
+ * `countryId` (audit 22, COMPTES-3) : marché choisi à la connexion. Un numéro
+ * LOCAL de ce marché essaie aussi sa forme avec l'indicatif (« 321 45 67 » →
+ * 2693214567) : un compte dont l'identifiant a été déplacé vers la forme
+ * internationale reste joignable par la saisie habituelle.
  */
-export function loginDigitCandidates(phone: string): string[] {
+export function loginDigitCandidates(phone: string, countryId?: string | null): string[] {
   const raw = (phone ?? "").replace(/\D/g, "");
   const out: string[] = [];
   const add = (d: string) => {
@@ -101,6 +106,12 @@ export function loginDigitCandidates(phone: string): string[] {
       const local = raw.slice(rule.dialDigits.length);
       if (rule.localLengths.includes(local.length)) add(local);
     }
+  }
+  // Saisi en local alors que l'identifiant porte l'indicatif du marché.
+  const market = countryId ? RULES[countryId] : undefined;
+  if (market && !(phone ?? "").trim().startsWith("+") && !raw.startsWith("00")
+      && market.localLengths.includes(raw.length)) {
+    add(`${market.dialDigits}${raw}`);
   }
   return out.slice(0, 4);
 }
@@ -115,7 +126,9 @@ export function phoneDigitsOf(raw: string): string | null {
   if (!s || s.length > 32) return null;
   if (!/^\+?[0-9 ().-]+$/.test(s)) return null;
   const digits = s.replace(/\D/g, "");
-  return digits.length >= 8 && digits.length <= 15 ? digits : null;
+  // Audit 22 (COMPTES-3) : 7 à 15 chiffres, comme l'inscription (numéro
+  // comorien local), l'app et change-phone.
+  return digits.length >= 7 && digits.length <= 15 ? digits : null;
 }
 
 /**
@@ -135,7 +148,7 @@ export function phoneChangeMovesLogin(loginDigits: string | null | undefined, ne
 /** Motifs de refus de change-phone → phrase (miroir de l'app : phoneChangeMessage). */
 export function phoneChangeMessage(reason: string | null | undefined): string {
   switch (reason) {
-    case "invalid_phone": return "Ce numéro n’est pas valide (8 à 15 chiffres).";
+    case "invalid_phone": return "Ce numéro n’est pas valide (7 à 15 chiffres).";
     case "missing_password":
     case "wrong_password": return "Mot de passe incorrect : votre numéro n’a pas été changé.";
     case "phone_taken": return "Ce numéro est déjà celui d’un autre compte Rivendy.";

@@ -21,7 +21,8 @@ type AuthContextValue = {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  signInWithPhone: (phone: string, password: string) => Promise<void>;
+  /** `countryId` (audit 22, COMPTES-3) : marché choisi, pour la forme avec indicatif. */
+  signInWithPhone: (phone: string, password: string, countryId?: string | null) => Promise<void>;
   signUpWithPhone: (input: {
     fullName: string;
     phone: string;
@@ -116,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [loadProfileFor]);
 
-  const signInWithPhone = useCallback(async (phone: string, password: string) => {
+  const signInWithPhone = useCallback(async (phone: string, password: string, countryId?: string | null) => {
     // Purge D'ABORD toute session locale, sans toucher au serveur.
     // Sans cela, un jeton déjà révoqué côté serveur (réinitialisation du mot
     // de passe, déconnexion depuis un autre appareil) bloque la connexion :
@@ -138,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // identique à avant — puis, seulement sur un refus d'identifiants, les
     // formes dérivées du même numéro (local ↔ international), pour qu'un compte
     // créé sous une forme reste joignable sous l'autre.
-    const candidates = loginDigitCandidates(phone).map((d) => `${d}@nikey.app`);
+    const candidates = loginDigitCandidates(phone, countryId).map((d) => `${d}@nikey.app`);
     if (candidates.length === 0) candidates.push(syntheticEmailFromPhone(phone));
 
     let lastMessage = "";

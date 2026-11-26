@@ -134,7 +134,8 @@ export async function requestAccountRecovery(
 
 /** Messages FR des échecs de récupération (recover-account). */
 export const RECOVERY_MESSAGES: Record<string, string> = {
-  invalid_phone: "Numéro invalide.",
+  // Audit 22 (COMPTES-15) : dire quoi faire, pas seulement « invalide ».
+  invalid_phone: "Numéro invalide. Vérifiez-le, ou ajoutez l’indicatif de votre pays (+269 pour les Comores).",
   name_required: "Indiquez votre nom.",
   message_too_short: "Décrivez votre problème (10 caractères minimum).",
   network: "Connexion impossible. Réessayez dans quelques instants.",
