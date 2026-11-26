@@ -102,6 +102,9 @@ export function CreateStoreForm() {
   );
   const [currentProductIndex, setCurrentProductIndex] = useState(0);
   const [publishedCount, setPublishedCount] = useState(0);
+  // Publication automatique (2026-11-26) : articles retenus « en attente »
+  // (contact dans un texte, compte sous surveillance).
+  const [heldCount, setHeldCount] = useState(0);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishDone, setPublishDone] = useState(false);
   const [notice, setNotice] = useState("");
@@ -206,6 +209,7 @@ export function CreateStoreForm() {
     setNotice("");
     setPublishError(null);
     setPublishedCount(0);
+    setHeldCount(0);
     setStep(3);
 
     try {
@@ -250,10 +254,11 @@ export function CreateStoreForm() {
 
       // Un INSERT multi-lignes est atomique côté Postgres : si une ligne est
       // refusée, aucun produit du lot n'est créé.
-      const { error: insertError } = await supabase.from("products").insert(rows);
+      const { data: insertedRows, error: insertError } = await supabase.from("products").insert(rows).select("status");
       if (insertError) throw insertError;
 
       setPublishedCount(rows.length);
+      setHeldCount(((insertedRows ?? []) as { status?: string }[]).filter((r) => r.status === "pending").length);
       setPublishDone(true);
     } catch (err) {
       const message =
@@ -538,7 +543,7 @@ export function CreateStoreForm() {
         {/* Info */}
         <div className="flex items-center gap-2 rounded-2xl bg-[#00C4B4]/10 px-4 py-3 text-sm font-bold text-[#00C4B4]">
           <CheckCircle className="h-4 w-4 shrink-0" />
-          {wp.length} article{wp.length > 1 ? "s" : ""} prêt{wp.length > 1 ? "s" : ""} à être envoyé{wp.length > 1 ? "s" : ""} en modération
+          {wp.length} article{wp.length > 1 ? "s" : ""} prêt{wp.length > 1 ? "s" : ""} à être publié{wp.length > 1 ? "s" : ""}
         </div>
 
         {/* Liste récap */}
@@ -595,7 +600,10 @@ export function CreateStoreForm() {
           <div>
             <h2 className="text-2xl font-black text-[#1A1A1A]">Votre magasin est ouvert ! 🎉</h2>
             <p className="mt-2 text-sm text-slate-500">
-              {publishedCount} article{publishedCount > 1 ? "s" : ""} envoyé{publishedCount > 1 ? "s" : ""} en modération avec succès.
+              {publishedCount - heldCount} article{publishedCount - heldCount > 1 ? "s" : ""} en ligne
+              {heldCount > 0
+                ? ` · ${heldCount} en attente de vérification (un numéro, un lien ou WhatsApp dans le texte : tout contact passe par Rivendy)`
+                : ""}.
             </p>
           </div>
           <button
@@ -632,7 +640,7 @@ export function CreateStoreForm() {
         <CloudUpload className="h-14 w-14 text-[#6A5ACD]" />
         <div>
           <h2 className="text-xl font-black text-[#1A1A1A]">Publication en cours…</h2>
-          <p className="mt-1 text-sm text-slate-500">{publishedCount} / {total} articles envoyés en modération</p>
+          <p className="mt-1 text-sm text-slate-500">{publishedCount} / {total} articles publiés</p>
         </div>
         {/* Barre de progression */}
         <div className="w-full max-w-xs overflow-hidden rounded-full bg-slate-200">

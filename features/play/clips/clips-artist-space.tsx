@@ -46,7 +46,7 @@ export function ClipsArtistSpaceView() {
           <MicVocal className="h-7 w-7 text-rvp-accent" aria-hidden /> Espace artiste
         </h1>
         <p className="mt-1.5 max-w-2xl text-[15px] text-rvp-soft">
-          Publiez vos clips gratuitement sur Rivendy Play. Chaque clip est vérifié par Rivendy avant d’être en ligne.
+          Publiez vos clips gratuitement sur Rivendy Play. Chaque clip est en ligne dès la fin de l’encodage ; un clip signalé est retiré et revu par Rivendy.
         </p>
       </header>
 
@@ -90,7 +90,7 @@ function StatusCard({ status, name, reason, artistId }: { status: string; name: 
             ) : null}
           </div>
           <p className="text-[12.5px] leading-5 text-rvp-muted">
-            {CLIP.perMonth} clips par mois, {CLIP.maxSeconds / 60} min chacun au plus · chaque clip est vérifié par Rivendy avant publication.
+            {CLIP.perMonth} clips par mois, {CLIP.maxSeconds / 60} min chacun au plus · en ligne dès la fin de l’encodage.
           </p>
         </div>
       </section>

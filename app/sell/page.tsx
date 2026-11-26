@@ -17,8 +17,8 @@ const STEPS = [
   },
   {
     icon: Clock,
-    label: "Modération Rivendy",
-    desc: "Notre équipe vérifie et valide l'annonce sous 24 h.",
+    label: "En ligne tout de suite",
+    desc: "Votre annonce est visible dès sa publication. Un numéro, un lien ou WhatsApp dans le texte la fait d'abord vérifier par notre équipe : tout contact passe par Rivendy.",
   },
   {
     icon: Eye,

@@ -502,10 +502,13 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             : "Produit mis à jour avec succès ✓");
         }
       } else {
-        // La base force status 'pending', is_story false, show_in_catalog
-        // false, n'admet que 'standard' ou 'preorder' (catégories article)
-        // et recalcule la commission (guard_product_insert) : les montants
-        // client ne servent qu'à la compatibilité.
+        // La base décide du statut (publication automatique du 2026-11-26) :
+        // en ligne tout de suite, ou 'pending' si un texte contient un contact
+        // ou si le compte est sous surveillance. Elle force is_story false,
+        // show_in_catalog false, n'admet que 'standard' ou 'preorder'
+        // (catégories article) et recalcule la commission
+        // (guard_product_insert) : les montants client ne servent qu'à la
+        // compatibilité.
         const { data: inserted, error: insertError } = await supabase
           .from("products")
           .insert({
@@ -525,9 +528,10 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
             commission_amount: commissionAmount,
             price: displayPrice,
           })
-          .select("id")
+          .select("id, status")
           .single();
         if (insertError) throw insertError;
+        const online = (inserted as { status?: string } | null)?.status !== "pending";
 
         // 🎬 Vidéo : jamais bloquante (§1.9) — l'article photo est déjà créé.
         let videoWarning: string | null = null;
@@ -537,9 +541,11 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
           videoWarning = await uploadProductVideo(video, newId, (r) => setVideoProgress(r), { fromPlay: videoFromPlay });
           setVideoProgress(null);
         }
-        setSuccess(publishesPreorder
-          ? "Produit envoyé en modération. Une fois validé, il apparaîtra dans l'onglet « Sur commande », avec son délai."
-          : "Produit envoyé en modération. Il sera visible après validation par notre équipe.");
+        setSuccess(!online
+          ? "Annonce reçue : elle sera visible après vérification par notre équipe (un numéro, un lien ou WhatsApp dans le texte demande une vérification — tout contact passe par Rivendy)."
+          : publishesPreorder
+            ? "Annonce publiée ✓ Elle est en ligne dans l'onglet « Sur commande », avec son délai."
+            : "Annonce publiée ✓ Elle est en ligne sur Rivendy.");
         if (videoWarning) setNotice(videoWarning);
 
         setTitle(""); setDescription(""); setSellerPrice("");
@@ -1039,7 +1045,7 @@ export function ProductForm({ product }: { product?: EditableProduct }) {
 
       <Button type="submit" className="w-full" size="lg" disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isEdit ? "Mettre à jour le produit" : "Envoyer en modération"}
+        {isEdit ? "Mettre à jour le produit" : "Publier l'annonce"}
       </Button>
 
       {marketReminder && country && (

@@ -280,13 +280,28 @@ export function shortSubmitMessage(code: string | null | undefined): string {
   }
 }
 
-/** Fin d'un envoi réussi, selon le cas (mêmes phrases que l'app). */
+/** Fin d'un envoi réussi, selon le cas (mêmes phrases que l'app). Publication
+ *  automatique (2026-11-26) : un Short ou un clip est en ligne tout de suite,
+ *  sauf compte sous vérification préalable (« …Pending »). */
 export const DONE_MESSAGE = {
-  clip: "Clip envoyé : Rivendy le vérifie avant de le publier.",
-  freeShort: "Short envoyé : Rivendy le vérifie avant de le publier. Suivez-le dans « Mes Shorts ».",
+  clip: "Clip envoyé : il est en ligne sur Rivendy Play dès que la vidéo est prête.",
+  clipPending: "Clip envoyé : Rivendy le vérifie avant de le publier.",
+  freeShort: "Short envoyé : il est en ligne dans les Shorts dès que la vidéo est prête. Suivez-le dans « Mes Shorts ».",
+  freeShortPending: "Short envoyé : Rivendy le vérifie avant de le publier. Suivez-le dans « Mes Shorts ».",
   articlePending: "Short envoyé : il apparaît dans les Shorts dès que l’article est validé.",
-  articleOnline: "Short envoyé : Rivendy vérifie la nouvelle vidéo avant de la montrer dans les Shorts.",
+  articleOnline: "Short envoyé : il apparaît dans les Shorts dès que la vidéo est prête.",
 } as const;
+
+/** Message de fin d'un Short libre selon le statut rendu par play_submit_short. */
+export function freeShortDoneMessage(status: unknown): string {
+  return status === "pending" ? DONE_MESSAGE.freeShortPending : DONE_MESSAGE.freeShort;
+}
+
+/** Message de fin d'un clip selon le statut rendu par play_submit_clip
+ *  (« published », « publishing » : dès que la vidéo est prête ; « pending »). */
+export function clipDoneMessage(status: unknown): string {
+  return status === "pending" ? DONE_MESSAGE.clipPending : DONE_MESSAGE.clip;
+}
 
 // ── Qui peut commenter ───────────────────────────────────────────────────────
 

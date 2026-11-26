@@ -29,8 +29,10 @@ export type VideoUpload = {
   doneLabel: string | null;
 };
 
-/** La tâche reçoit le numéro de l'essai (0 au premier envoi, puis à chaque « Renvoyer »). */
-export type VideoUploadTask = (ctx: UploadContext, attempt: number) => Promise<void>;
+/** La tâche reçoit le numéro de l'essai (0 au premier envoi, puis à chaque « Renvoyer »).
+ *  Elle peut rendre le message de fin (publication automatique du 2026-11-26 :
+ *  en ligne ou à vérifier, selon la réponse du serveur) ; sinon `success`. */
+export type VideoUploadTask = (ctx: UploadContext, attempt: number) => Promise<string | void>;
 
 type Job = { upload: VideoUpload; task: VideoUploadTask; success: string; controller: AbortController | null; attempt: number };
 
@@ -87,8 +89,8 @@ async function run(j: Job) {
     onRetry: (attempt, delayMs) => patch(j, { phase: "retrying", retry: { attempt, delayMs } }),
   };
   try {
-    await j.task(ctx, j.attempt);
-    patch(j, { phase: "done", progress: 1, message: j.success, retry: null });
+    const done = await j.task(ctx, j.attempt);
+    patch(j, { phase: "done", progress: 1, message: typeof done === "string" && done ? done : j.success, retry: null });
   } catch (e) {
     patch(j, { phase: "failed", retry: null, message: e instanceof UploadError ? e.message : "L’envoi de la vidéo a échoué, réessayez." });
   } finally {

@@ -110,7 +110,7 @@ export function PublishMenu() {
 
             <nav aria-label="Publier" className="flex flex-col gap-2 md:gap-1">
               <PublishEntry href="/sell" onClick={close} tone="market" icon={<Tag className="h-[22px] w-[22px]" aria-hidden />}
-                title="Un article à vendre" text="Photos, prix et vidéo de 15 s. Vérifié par Rivendy sous 24 h." />
+                title="Un article à vendre" text="Photos, prix et vidéo de 15 s. En ligne tout de suite." />
               <PublishEntry href={SHORT_NEW_PATH} onClick={close} tone="play" icon={<Smartphone className="h-[22px] w-[22px]" aria-hidden />}
                 title="Un Short" text="Une vidéo de 30 s au plus : pour un de vos articles, ou un Short libre." />
               <PublishEntry href={musicHref} onClick={close} tone="music" icon={<Disc3 className="h-[22px] w-[22px]" aria-hidden />}

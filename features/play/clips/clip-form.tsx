@@ -159,7 +159,7 @@ export function ClipFormView({ clipId }: { clipId: string }) {
       </Link>
       <h1 className={cn(display, "text-[28px] leading-tight text-rvp-text sm:text-[34px]")}>{editing ? "Modifier le clip" : "Envoyer un clip"}</h1>
       <p className="mt-1.5 max-w-2xl text-[15px] text-rvp-soft">
-        {editing ? "Le texte seulement : la vidéo ne se remplace pas." : "Gratuit pour tous, sur le site et dans l’application, une fois vérifié par Rivendy."}
+        {editing ? "Le texte seulement : la vidéo ne se remplace pas." : "Gratuit pour tous, sur le site et dans l’application, en ligne dès que la vidéo est prête."}
       </p>
     </header>
   );
@@ -237,8 +237,8 @@ export function ClipFormView({ clipId }: { clipId: string }) {
               <ol className="mt-3 space-y-2.5 text-[14px] leading-6 text-rvp-soft">
                 <li><strong className="text-rvp-text">1. Envoi</strong> directement chez Cloudflare, par morceaux : gardez l’onglet ouvert ; une coupure reprend où elle s’était arrêtée.</li>
                 <li><strong className="text-rvp-text">2. Encodage</strong> de la vidéo, quelques minutes.</li>
-                <li><strong className="text-rvp-text">3. Vérification</strong> par Rivendy (droits, contenu).</li>
-                <li><strong className="text-rvp-text">4. En ligne</strong> dans Rivendy Clips, gratuit pour tous.</li>
+                <li><strong className="text-rvp-text">3. En ligne</strong> dans Rivendy Clips, gratuit pour tous, dès la fin de l’encodage.</li>
+                <li><strong className="text-rvp-text">4. Signalé</strong>, un clip est retiré et revu par Rivendy (droits, contenu).</li>
               </ol>
             </section>
           </div>
@@ -278,7 +278,7 @@ export function ClipFormView({ clipId }: { clipId: string }) {
           ) : null}
           {!editing ? (
             <p className="text-[13px] leading-relaxed text-rvp-soft">
-              En envoyant ce clip, vous confirmez détenir les droits sur la musique et les images. Rivendy le vérifie avant de le publier, gratuitement, dans tous les pays.
+              En envoyant ce clip, vous confirmez détenir les droits sur la musique et les images. Il est publié gratuitement, dans tous les pays ; un clip signalé est retiré et revu par Rivendy.
             </p>
           ) : null}
           {problem ? <p role="alert" className="rounded-xl bg-red-500/12 px-3.5 py-2.5 text-[14px] leading-snug text-red-200">{problem}</p> : null}

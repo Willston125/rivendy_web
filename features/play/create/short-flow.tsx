@@ -34,7 +34,9 @@ import { startVideoUpload, useVideoUpload, videoUploadBusy } from "./video-uploa
  *    (30 s, comme une vidéo créée depuis Play dans l'app) ;
  *  - article déjà publié : la vidéo devient celle de l'article (l'ancienne
  *    est supprimée chez Cloudflare) et passe dans les Shorts ;
- *  - Short libre : légende, règles acceptées, puis dépôt « à vérifier ».
+ *  - Short libre : légende, règles acceptées, puis dépôt — en ligne tout de
+ *    suite (publication automatique du 2026-11-26), à vérifier pour un compte
+ *    sous vérification préalable.
  * L'app coupe les vidéos trop longues ; le site n'a pas d'outil de coupe
  * (choix validé avec le canevas) : il explique comment couper sur le téléphone.
  */
@@ -267,7 +269,7 @@ export function ShortFlowView() {
               <h2 className={cn(display, "text-[24px] text-rvp-text")}>Pour quoi ?</h2>
               <Choice icon={SquarePlus} title="Pour un nouvel article" text="Filmez, puis complétez l’annonce : photo, prix, catégorie." onClick={() => choose("nouvel")} />
               <Choice icon={Package} title="Pour un de mes articles" text="La vidéo s’ajoute à un article déjà publié." onClick={() => choose("article")} />
-              <Choice icon={Sparkles} title="Short libre" text="Sans article à vendre. Rivendy le vérifie avant de le publier." onClick={() => choose("libre")} />
+              <Choice icon={Sparkles} title="Short libre" text="Sans article à vendre. En ligne dès que la vidéo est prête." onClick={() => choose("libre")} />
               <p className="px-1 text-[12.5px] leading-5 text-rvp-muted">Le nombre de vidéos par mois dépend de votre formule vendeur : vidéos d’articles et Shorts comptent ensemble.</p>
             </div>
           ) : step === "article" ? (
@@ -315,7 +317,7 @@ export function ShortFlowView() {
             <form onSubmit={(e) => { e.preventDefault(); sendFree(); }} className="flex flex-col gap-4">
               <div>
                 <h2 className={cn(display, "text-[24px] text-rvp-text")}>Votre Short</h2>
-                <p className="mt-0.5 text-[14px] text-rvp-soft">Rivendy le vérifie avant de le publier.</p>
+                <p className="mt-0.5 text-[14px] text-rvp-soft">En ligne dès que la vidéo est prête. Signalé, il est retiré et revu par Rivendy.</p>
               </div>
               <label className="flex flex-col gap-1.5">
                 <span className="sr-only">Légende du Short</span>
@@ -341,7 +343,7 @@ export function ShortFlowView() {
               </label>
               {problem ? <p role="alert" className="rounded-xl bg-red-500/12 px-3.5 py-2.5 text-[14px] leading-snug text-red-100">{problem}</p> : null}
               <button type="submit" disabled={!accepted || sending} className={cn(btnPrimary, "h-12")}>
-                {sending ? "Un instant…" : "Envoyer pour vérification"}
+                {sending ? "Un instant…" : "Publier le Short"}
               </button>
             </form>
           ) : (

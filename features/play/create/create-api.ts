@@ -4,7 +4,7 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { attachVideoToProduct, deleteVideo } from "@/lib/video/video-service";
 import {
-  clipErrorMessage, commentsModeOf, isRetryableStatus, parseOffset, retryDelayMs, SHORT_ARTICLE_STATUSES,
+  clipDoneMessage, clipErrorMessage, commentsModeOf, freeShortDoneMessage, isRetryableStatus, parseOffset, retryDelayMs, SHORT_ARTICLE_STATUSES,
   shortSubmitMessage, toShortArticle, TUS, videoTicketMessage, type CommentsMode, type ShortArticle,
 } from "./create-logic";
 
@@ -231,8 +231,10 @@ export async function uploadToTicket(ticket: VideoTicket, file: File, ctx: Uploa
 
 export type ClipFields = { title: string; description: string; genre: string; trackId: string | null };
 
-/** Envoi puis dépôt « en vérification » (play_submit_clip), puis le titre Musique relié (facultatif). */
-export async function sendClip(ticket: VideoTicket, file: File, fields: ClipFields, ctx: UploadContext): Promise<void> {
+/** Envoi puis dépôt (play_submit_clip : en ligne dès que la vidéo est prête, ou à
+ *  vérifier pour un compte sous vérification), puis le titre Musique relié
+ *  (facultatif). Rend le message de fin. */
+export async function sendClip(ticket: VideoTicket, file: File, fields: ClipFields, ctx: UploadContext): Promise<string> {
   await uploadToTicket(ticket, file, ctx);
   const { data, error } = await supabase.rpc("play_submit_clip", {
     p_cf_uid: ticket.cfUid,
@@ -241,7 +243,7 @@ export async function sendClip(ticket: VideoTicket, file: File, fields: ClipFiel
     p_genre: fields.genre.trim(),
   });
   if (error) throw new UploadError("L’envoi du clip a échoué, réessayez.");
-  const res = (data ?? {}) as { success?: boolean; error?: string; id?: string };
+  const res = (data ?? {}) as { success?: boolean; error?: string; id?: string; status?: string };
   if (res.success !== true) {
     // Vidéo envoyée mais refusée au dépôt : on ne la laisse pas facturée.
     await deleteVideo(ticket.cfUid).catch(() => false);
@@ -251,6 +253,7 @@ export async function sendClip(ticket: VideoTicket, file: File, fields: ClipFiel
     // Un échec du lien ne fait pas échouer l'envoi : il se refait en modifiant le clip.
     await linkClipTrack(res.id, fields.trackId).catch(() => undefined);
   }
+  return clipDoneMessage(res.status);
 }
 
 function ensureOk(data: unknown, error: unknown): void {
@@ -382,24 +385,25 @@ async function productHasVideo(productId: string, cfUid: string): Promise<boolea
 }
 
 /**
- * Short libre : envoi (30 s, quota de la formule), puis dépôt « à vérifier »
- * — visible après validation par Rivendy. `ready` : l'adresse déjà demandée
- * par la page (le quota s'affiche alors tout de suite) ; sinon, une nouvelle.
+ * Short libre : envoi (30 s, quota de la formule), puis dépôt — en ligne tout
+ * de suite (publication automatique du 2026-11-26), ou à vérifier pour un
+ * compte sous vérification. `ready` : l'adresse déjà demandée par la page (le
+ * quota s'affiche alors tout de suite) ; sinon, une nouvelle. Rend le message de fin.
  */
-export async function sendFreeShort(file: File, caption: string, ctx: UploadContext, ready?: VideoTicket | null): Promise<void> {
+export async function sendFreeShort(file: File, caption: string, ctx: UploadContext, ready?: VideoTicket | null): Promise<string | void> {
   const ticket = ready ?? await requestVideoTicket("short", file);
   await uploadToTicket(ticket, file, ctx);
-  let res: { success?: boolean; error?: string } | null = null;
+  let res: { success?: boolean; error?: string; status?: string } | null = null;
   try {
     const { data, error } = await supabase.rpc("play_submit_short", { p_cf_uid: ticket.cfUid, p_caption: caption.trim(), p_accept_rules: true });
     if (error) throw error;
-    res = (data ?? {}) as { success?: boolean; error?: string };
+    res = (data ?? {}) as { success?: boolean; error?: string; status?: string };
   } catch {
     // Réponse perdue alors que le serveur a peut-être accepté : on vérifie
     // avant de supprimer la vidéo (audit 19, PL19-8).
     if (await shortExistsFor(ticket.cfUid)) return;
   }
-  if (res?.success === true) return;
+  if (res?.success === true) return freeShortDoneMessage(res.status);
   await deleteVideo(ticket.cfUid).catch(() => false);
   throw new UploadError(shortSubmitMessage(res?.error));
 }
