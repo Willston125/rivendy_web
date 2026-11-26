@@ -66,6 +66,22 @@ export interface PlusCatalog {
 export const EXCLUSIVE_CONTENT_LIVE = false;
 export const EARLY_ACCESS_LIVE = false;
 
+/**
+ * Audit 22 (PLAY-2) : les films et séries PREMIUM se lisent-ils sur le site ?
+ * Pas tant que la clé de signature Cloudflare Stream (CF_STREAM_SIGNING_KEY_ID
+ * et CF_STREAM_SIGNING_JWK, action du propriétaire) n'est pas posée :
+ * play-playback-token refuse alors le Premium au site (personal_token_required).
+ * Tant que c'est faux, aucune vente ne promet « sur le site » pour la vidéo
+ * Premium. Passer à `true` le jour où la clé est posée et la lecture vérifiée.
+ * La musique, elle, s'écoute déjà sur le site.
+ */
+export const PREMIUM_VIDEO_ON_WEB = false;
+
+/** Où se regarde la vidéo Premium — phrase commune aux feuilles de vente. */
+export const PREMIUM_VIDEO_WHERE = PREMIUM_VIDEO_ON_WEB
+  ? "Sur le site et dans l’application"
+  : "Dans l’application Rivendy (Android) — sur le site bientôt";
+
 /** Droits résolus d'une formule dans un marché (rivendy_offer_entitlements_resolved). */
 export type Entitlements = Record<string, unknown>;
 
@@ -122,7 +138,10 @@ export function benefitGroups(e: Entitlements, money: (amount: number) => string
   if (EARLY_ACCESS_LIVE && yes(e, "early_access")) watch.push("Avant-premières");
   const streams = num(e, "simultaneous_streams");
   if (streams >= 2) watch.push(`${streams} écrans en même temps`);
-  watch.push("Sur le site et dans l’application, avec le même compte");
+  watch.push(PREMIUM_VIDEO_ON_WEB || !yes(e, "play_premium")
+    ? "Sur le site et dans l’application, avec le même compte"
+    // Audit 22 (PLAY-2) : la vidéo Premium ne se lit pas encore sur le site.
+    : "Films et séries Premium dans l’application Rivendy (Android), sur le site bientôt ; la musique partout, avec le même compte");
   return { sell, buy, watch };
 }
 

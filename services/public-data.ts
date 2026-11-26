@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { isAdLive } from "@/features/ads/ad-window";
 import { usableImageUrl } from "@/lib/utils/image-url";
+import { ilikeOrFilter } from "@/features/search/search-logic";
 import {
   DEFAULT_COUNTRY_ID,
   type Advertisement,
@@ -249,9 +250,21 @@ type GetProductsOpts = {
  * en tête 5 min au plus, déjà borné par expire-boosts (pg_cron, 15 min).
  */
 export async function getProducts(opts: GetProductsOpts) {
-  if (opts.search?.trim()) return fetchProducts(opts);
-  return getProductsBrowseCached(opts);
+  // Audit 22 (MKWEB-2) : une erreur de lecture LÈVE dans la fonction mise en
+  // cache — unstable_cache ne garde pas un échec — et n'est rattrapée qu'ici,
+  // pour CETTE requête. Avant, le catalogue vide d'une seconde de panne était
+  // servi 5 minutes à tout le monde (Google compris).
+  try {
+    if (opts.search?.trim()) return await fetchProducts(opts);
+    return await getProductsBrowseCached(opts);
+  } catch (e) {
+    console.error("getProducts :", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
+
+/** Résultat « absent » : jamais mis en cache (audit 22, MKWEB-2). */
+const NOT_CACHED_MISS = "not_cached_miss";
 
 const getProductsBrowseCached = unstable_cache(
   (opts: GetProductsOpts) => fetchProducts(opts),
@@ -278,8 +291,11 @@ async function fetchProducts({
   if (category && category !== "all") query = query.eq("category", category);
   if (subcategory?.trim()) query = query.eq("subcategory", subcategory.trim());
   if (search?.trim()) {
-    const term = search.trim().replace(/[%,]/g, "");
-    query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%`);
+    // Audit 22 (MKWEB-3) : même filtre que /search, valeur entre guillemets
+    // (audit 20, WEB-17). Collé tel quel, « robe. », « (mkoumi) » ou
+    // « iPhone 13 (128 Go) » cassaient la requête : 0 résultat.
+    const filter = ilikeOrFilter(["title", "description"], search);
+    if (filter) query = query.or(filter);
   }
   // Fourchette de prix — parity Flutter (filtre _priceMin / _priceMax)
   if (typeof priceMin === "number" && !Number.isNaN(priceMin)) query = query.gte("price", priceMin);
@@ -302,13 +318,24 @@ async function fetchProducts({
 
   const from = Math.max(0, offset);
   const { data, error } = await query.range(from, from + limit - 1);
-  if (error || !data) return [];
+  if (error) throw new Error(`Catalogue indisponible : ${error.message}`);
+  if (!data) return [];
 
   return data.map((row) => normalizeProduct(row as ProductRow));
 }
 
 export async function getProductById(id: string) {
-  return getProductByIdCached(id);
+  // Audit 22 (MKWEB-2) : ni une erreur ni une fiche absente ne sont mises en
+  // cache — une annonce validée juste après une visite s'ouvrait en 404
+  // pendant 5 minutes (clic sur la notification « annonce validée »).
+  try {
+    return await getProductByIdCached(id);
+  } catch (e) {
+    if (!(e instanceof Error && e.message === NOT_CACHED_MISS)) {
+      console.error("getProductById :", e instanceof Error ? e.message : e);
+    }
+    return null;
+  }
 }
 
 // Fiche produit mise en cache 5 min (audit 21, WEBCOMMERCE-26). Une modification
@@ -323,7 +350,8 @@ const getProductByIdCached = unstable_cache(
       .eq("id", id)
       .maybeSingle();
 
-    if (error || !data) return null;
+    if (error) throw new Error(`Article indisponible : ${error.message}`);
+    if (!data) throw new Error(NOT_CACHED_MISS);
     return normalizeProduct(data as ProductRow);
   },
   ["product-by-id-v1"],
@@ -348,7 +376,13 @@ export async function getSimilarProducts(product: Product, limit = 8) {
   // Même marché que l'ARTICLE (pas le pays du profil vendeur, figé à DJ pour
   // les comptes créés depuis le 2026-09-02).
   const country = product.country_id || product.seller_country_id || DEFAULT_COUNTRY_ID;
-  return getSimilarProductsCached(String(product.category ?? ""), product.id, country, limit);
+  // Audit 22 (MKWEB-2) : erreur jamais mise en cache.
+  try {
+    return await getSimilarProductsCached(String(product.category ?? ""), product.id, country, limit);
+  } catch (e) {
+    console.error("getSimilarProducts :", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 const getSimilarProductsCached = unstable_cache(
@@ -363,7 +397,8 @@ const getSimilarProductsCached = unstable_cache(
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (error || !data) return [];
+    if (error) throw new Error(`Articles similaires indisponibles : ${error.message}`);
+    if (!data) return [];
     return data.map((row) => normalizeProduct(row as ProductRow));
   },
   ["similar-products-v1"],
@@ -401,7 +436,13 @@ export async function getSellerProfile(sellerId: string) {
 /** Catalogue d'une boutique, sur le même contrat public que Flutter.
  *  La vue applique les statuts, suppressions et règles de précommande. */
 export async function getSellerPublicProducts(sellerId: string, countryId?: string) {
-  return getSellerPublicProductsCached(sellerId, countryId ?? null);
+  // Audit 22 (MKWEB-2) : erreur jamais mise en cache.
+  try {
+    return await getSellerPublicProductsCached(sellerId, countryId ?? null);
+  } catch (e) {
+    console.error("getSellerPublicProducts :", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 // Catalogue d'une boutique mis en cache 5 min (audit 21, WEBCOMMERCE-26).
@@ -417,7 +458,8 @@ const getSellerPublicProductsCached = unstable_cache(
     if (countryId) query = query.eq("country_id", countryId);
 
     const { data, error } = await query;
-    if (error || !data) return [];
+    if (error) throw new Error(`Catalogue de la boutique indisponible : ${error.message}`);
+    if (!data) return [];
     return data.map((row) => normalizeProduct(row as ProductRow));
   },
   ["seller-public-products-v1"],

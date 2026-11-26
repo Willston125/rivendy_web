@@ -7,13 +7,14 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/features/auth/auth-provider";
 import { compressImage } from "@/services/image-upload";
 import { useCountry } from "@/features/country/country-provider";
-import { phoneHint, validatePhone } from "@/lib/utils/phone-validator";
+import { phoneChangeMessage, phoneChangeMovesLogin, phoneHint, validatePhone } from "@/lib/utils/phone-validator";
 
 export function ProfileInfoForm() {
   const { user, profile, refreshProfile } = useAuth();
   const { country } = useCountry();
-  // L'identifiant de connexion est le numéro d'INSCRIPTION (email synthétique
-  // {chiffres}@nikey.app) : changer le numéro WhatsApp ne le change pas.
+  // Numéro de connexion = identifiant `{chiffres}@nikey.app`. Audit 22
+  // (COMPTES-2) : un nouveau numéro aux AUTRES chiffres le déplace aussi, par
+  // la fonction serveur change-phone, mot de passe exigé — comme dans l'app.
   const loginDigits = (user?.email ?? "").endsWith("@nikey.app") ? (user?.email ?? "").split("@")[0] : "";
 
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
@@ -53,6 +54,16 @@ export function ProfileInfoForm() {
   const [emailPwd, setEmailPwd] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailNote, setEmailNote] = useState("");
+
+  // Changement de numéro qui déplace le numéro de connexion : invite mot de
+  // passe, puis change-phone (audit 22, COMPTES-2). L'adresse de récupération,
+  // si elle a aussi changé, est proposée juste après.
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState("");
+  const [phonePwd, setPhonePwd] = useState("");
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneNote, setPhoneNote] = useState("");
+  const [emailAfterPhone, setEmailAfterPhone] = useState("");
 
   const hasChanges =
     fullName !== (profile?.full_name ?? "") ||
@@ -101,6 +112,14 @@ export function ProfileInfoForm() {
     setError("");
     setSaving(true);
 
+    // Audit 22 (COMPTES-2) : d'autres chiffres que ceux du numéro de connexion
+    // → change-phone (mot de passe), jamais une écriture directe du profil :
+    // sinon l'identifiant gardait l'ancien numéro et la connexion suivante
+    // échouait (« Numéro ou mot de passe incorrect »).
+    const newPhone = phone.trim();
+    const phoneMovesLogin =
+      newPhone !== (profile?.whatsapp_number ?? "") && phoneChangeMovesLogin(loginDigits, newPhone);
+
     /* N'envoyer QUE les colonnes réellement modifiées.
        Corrigé le 2026-09-07 : ce formulaire réécrivait les NEUF colonnes à
        chaque enregistrement, avec les valeurs chargées à l'ouverture de la
@@ -120,6 +139,7 @@ export function ProfileInfoForm() {
     ];
     const patch: Record<string, string | null> = {};
     for (const { col, next, prev } of candidates) {
+      if (col === "whatsapp_number" && phoneMovesLogin) continue; // → change-phone, plus bas
       if ((next ?? "") !== prev) patch[col] = next;
     }
 
@@ -130,7 +150,7 @@ export function ProfileInfoForm() {
     const newEmail = email.trim();
     const emailChanged = newEmail !== (profile?.real_email ?? "");
 
-    if (Object.keys(patch).length === 0 && !emailChanged) {
+    if (Object.keys(patch).length === 0 && !emailChanged && !phoneMovesLogin) {
       setSaving(false);
       setMessage("Aucune modification à enregistrer.");
       setTimeout(() => setMessage(""), 3000);
@@ -166,6 +186,16 @@ export function ProfileInfoForm() {
 
     setSaving(false);
 
+    if (phoneMovesLogin) {
+      // L'adresse, si elle a aussi changé, est proposée APRÈS le numéro.
+      setEmailAfterPhone(emailChanged && newEmail ? newEmail : "");
+      setPendingPhone(newPhone);
+      setPhonePwd("");
+      setPhoneNote("");
+      setShowPhoneModal(true);
+      return;
+    }
+
     if (emailChanged) {
       if (!newEmail) {
         // Le retrait d'une adresse de récupération passe par Rivendy.
@@ -182,6 +212,55 @@ export function ProfileInfoForm() {
 
     setMessage("✅ Informations mises à jour !");
     setTimeout(() => setMessage(""), 3000);
+  }
+
+  // Confirme le changement de numéro via change-phone (audit 22, COMPTES-2) :
+  // le numéro du profil ET le numéro de connexion changent ensemble, côté
+  // serveur, après vérification du mot de passe. Même parcours que l'app
+  // (AuthProvider.updatePhone).
+  async function submitPhoneChange() {
+    if (!pendingPhone) return;
+    if (!phonePwd) { setPhoneNote(phoneChangeMessage("missing_password")); return; }
+    setPhoneBusy(true);
+    setPhoneNote("");
+    let res: { ok?: boolean; reason?: string; profile_synced?: boolean } = {};
+    try {
+      // Aucun trim() du mot de passe : une espace en fait partie.
+      const { data, error: fnErr } = await supabase.functions.invoke("change-phone", {
+        body: { phone: pendingPhone, password: phonePwd },
+      });
+      res = (data ?? {}) as typeof res;
+      if (fnErr && !res.reason) res = { ok: false, reason: "failed" };
+    } catch {
+      res = { ok: false, reason: "network" };
+    }
+    if (!res.ok) {
+      setPhoneBusy(false);
+      setPhoneNote(phoneChangeMessage(res.reason));
+      return;
+    }
+    // Identifiant changé mais profil non écrit côté serveur : on l'écrit ici,
+    // comme l'app.
+    if (res.profile_synced === false && user) {
+      await supabase.from("profiles")
+        .update({ whatsapp_number: pendingPhone, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+    }
+    // La session porte l'ANCIEN identifiant : on la rafraîchit pour la suite.
+    await supabase.auth.refreshSession().catch(() => undefined);
+    await refreshProfile();
+    setPhoneBusy(false);
+    setShowPhoneModal(false);
+    setPhonePwd("");
+    setMessage(`✅ Numéro changé. Connectez-vous désormais avec ${pendingPhone}.`);
+    setTimeout(() => setMessage(""), 6000);
+    if (emailAfterPhone) {
+      setPendingEmail(emailAfterPhone);
+      setEmailAfterPhone("");
+      setEmailPwd("");
+      setEmailNote("");
+      setShowEmailModal(true);
+    }
   }
 
   // Confirme le changement d'adresse de récupération via change-email (le
@@ -284,8 +363,8 @@ export function ProfileInfoForm() {
         </FormField>
         {loginDigits && (
           <p className="-mt-2 text-xs text-slate-500">
-            Pour vous connecter, utilisez toujours le numéro de votre inscription (+{loginDigits}) :
-            changer votre numéro WhatsApp ici ne change pas votre identifiant de connexion.
+            Vous vous connectez avec le numéro +{loginDigits}. Si vous changez de numéro, votre
+            mot de passe vous sera demandé, et vous vous connecterez ensuite avec le nouveau.
           </p>
         )}
 
@@ -377,6 +456,50 @@ export function ProfileInfoForm() {
           )}
         </button>
       </div>
+
+      {showPhoneModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-black text-[#1A1A1A]">Confirmer le changement de numéro</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Entrez votre mot de passe actuel. Vous vous connecterez ensuite avec{" "}
+              <span className="font-semibold">{pendingPhone}</span>.
+            </p>
+            <input
+              type="password"
+              value={phonePwd}
+              onChange={(e) => setPhonePwd(e.target.value)}
+              placeholder="Mot de passe actuel"
+              autoComplete="current-password"
+              className="mt-4 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#009688] focus:ring-2 focus:ring-[#009688]/20"
+            />
+            {phoneNote && <p className="mt-2 text-xs font-semibold text-red-500">{phoneNote}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhoneModal(false);
+                  setPhonePwd("");
+                  setPhone(profile?.whatsapp_number ?? "");
+                  setEmailAfterPhone("");
+                }}
+                disabled={phoneBusy}
+                className="h-11 flex-1 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={submitPhoneChange}
+                disabled={phoneBusy || !phonePwd}
+                className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-[#009688] text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {phoneBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEmailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">

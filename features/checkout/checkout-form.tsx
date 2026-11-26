@@ -195,9 +195,11 @@ export function CheckoutForm() {
 
   // Méthode de paiement sélectionnée
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
-  const [transactionRef, setTransactionRef] = useState("");
   // Audit 19 (MK19-4) : numéro qui envoie le paiement Mobile Money — l'équipe
   // rapproche le virement de la commande (orders.payer_phone).
+  // Audit 22 (MKWEB-1) : le paiement se fait APRÈS la commande. On ne demande
+  // plus de référence de transaction avant (l'argent partait avant que la
+  // commande existe) : le numéro payeur, exigé, rattache le virement.
   const [payerPhone, setPayerPhone] = useState("");
   // Note libre transmise à l'équipe Rivendy (`p_order_note`). L'app l'envoie
   // depuis le 2026-08-30 — c'est par là que passe l'ordonnance d'une commande
@@ -379,6 +381,8 @@ export function CheckoutForm() {
     buyerPhone.trim().length > 0 &&
     !buyerPhoneError &&
     !payerPhoneError &&
+    // Audit 22 (MKWEB-1) : Mobile Money → numéro payeur obligatoire.
+    (selectedMethod?.type === "cash" || payerPhone.trim().length > 0) &&
     isDeliveryReady &&
     selectedMethod !== null &&
     !noPaymentMethod;
@@ -596,7 +600,10 @@ export function CheckoutForm() {
             p_payment_method: paymentName,
             p_payment_status: paymentStatus,
             p_country_id: orderMarket,
-            p_transaction_ref: transactionRef.trim() || null,
+            // Audit 22 (MKWEB-1) : aucune référence avant la commande — le
+            // paiement est demandé après, avec le montant enregistré par le
+            // serveur ; l'équipe saisit la référence en confirmant la réception.
+            p_transaction_ref: null,
             ...(selectedMethod?.type !== "cash" && payerPhone.trim()
               ? { p_payer_phone: payerPhone.trim() }
               : {}),
@@ -768,10 +775,29 @@ export function CheckoutForm() {
             <p key={id} className="text-sm font-bold text-[#009688]">✅ {id}</p>
           ))}
         </div>
+        {/* Audit 22 (MKWEB-1) : la consigne de paiement n'apparaît qu'ICI,
+            une fois la commande créée — montant enregistré par le serveur et
+            référence de la commande à mettre en motif. */}
         {selectedMethod && selectedMethod.type !== "cash" && (
-          <p className="mt-4 text-sm font-semibold text-slate-600">
-            Votre paiement sera vérifié par Rivendy avant la préparation de la commande.
-          </p>
+          <div className="mx-auto mt-5 max-w-sm space-y-2 rounded-2xl border border-[#00796B]/30 bg-[#E0F2F1] p-4 text-left text-sm">
+            <p className="font-black text-[#00695C]">Dernière étape : le paiement</p>
+            {mobileMoneyTarget ? (
+              <p className="text-slate-700">
+                Envoyez{" "}
+                <strong>{createdTotals ? formatMoney(createdTotals.amountDue, country) : "le montant de votre commande"}</strong>{" "}
+                au {mobileMoneyTarget.name} <strong>{mobileMoneyTarget.number}</strong>
+                {payerPhone.trim() ? <> depuis le <strong>{payerPhone.trim()}</strong></> : null}. En motif,
+                indiquez : <strong className="font-mono">{createdIds.join(", ")}</strong>.
+              </p>
+            ) : (
+              <p className="text-slate-700">
+                L&apos;équipe Rivendy vous indique comment régler, avec la référence de votre commande.
+              </p>
+            )}
+            <p className="text-xs text-slate-500">
+              Rivendy rapproche votre paiement de la commande, puis la prépare. Vous recevrez une notification.
+            </p>
+          </div>
         )}
         <button
           type="button"
@@ -1131,11 +1157,11 @@ export function CheckoutForm() {
             <div className="space-y-1.5">
               <p className="text-xs text-slate-600">
                 {mobileMoneyTarget
-                  ? `Envoyez ${formatMoney(amountDue, country)} au ${mobileMoneyTarget.name} ${mobileMoneyTarget.number}, puis indiquez la référence de la transaction.`
-                  : "L'équipe Rivendy vous indiquera comment régler par ce moyen."}
+                  ? `Vous paierez par ${mobileMoneyTarget.name} APRÈS la commande : Rivendy vous indique alors le montant exact et la référence à mettre en motif.`
+                  : "Après la commande, l'équipe Rivendy vous indiquera comment régler par ce moyen."}
               </p>
               <Label htmlFor="payerPhone" className="text-sm font-bold text-slate-700">
-                Numéro qui envoie le paiement
+                Numéro Mobile Money qui paiera *
               </Label>
               <Input
                 id="payerPhone"
@@ -1149,15 +1175,6 @@ export function CheckoutForm() {
               {payerPhoneError && (
                 <p id="payerPhoneError" className="text-xs font-semibold text-red-600">{payerPhoneError}</p>
               )}
-              <Label htmlFor="transactionRef" className="text-sm font-bold text-slate-700">
-                Référence de paiement (optionnel)
-              </Label>
-              <Input
-                id="transactionRef"
-                value={transactionRef}
-                onChange={(e) => setTransactionRef(e.target.value)}
-                placeholder="Numéro de transaction"
-              />
             </div>
           </div>
         </section>

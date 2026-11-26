@@ -53,7 +53,10 @@ async function readMarketStores(countryId: string): Promise<StoreEntry[]> {
     .select("seller_id, seller_name, seller_avatar_url, seller_is_certified, category")
     .eq("country_id", countryId)
     .limit(5000);
-  if (error || !data) return [];
+  // Audit 22 (MKWEB-2) : une erreur LÈVE (unstable_cache ne garde pas un échec)
+  // ; rattrapée par la page, pour cette visite seulement.
+  if (error) throw new Error(`Annuaire des boutiques indisponible : ${error.message}`);
+  if (!data) return [];
 
   const bySeller = new Map<string, StoreEntry & { perCategory: Map<string, number> }>();
   for (const row of data) {
@@ -111,7 +114,10 @@ export default async function StoresDirectoryPage({ searchParams }: { searchPara
   const { country: requested } = await searchParams;
   const country = await getCountry(requested || HOME_MARKET_ID);
   const where = inMarket(country);
-  const stores = await getMarketStores(country.id);
+  const stores = await getMarketStores(country.id).catch((e: unknown) => {
+    console.error("annuaire des boutiques :", e instanceof Error ? e.message : e);
+    return [] as StoreEntry[];
+  });
   const heading = country.id === "KM" ? "Boutiques en ligne à Moroni et aux Comores" : `Boutiques en ligne ${where}`;
 
   return (

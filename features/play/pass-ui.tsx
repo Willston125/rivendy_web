@@ -7,7 +7,10 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useCountry } from "@/features/country/country-provider";
 import { useHomeMarket } from "@/features/media/use-home-market";
 import { fetchPlusCatalog } from "@/features/plus/plus-api";
-import { declareErrorMessage, isValidOperatorReference, isValidPayerPhone, type PlusChannel } from "@/features/plus/plus-logic";
+import {
+  declareErrorMessage, isValidOperatorReference, isValidPayerPhone, PREMIUM_VIDEO_ON_WEB, PREMIUM_VIDEO_WHERE,
+  type PlusChannel,
+} from "@/features/plus/plus-logic";
 import { useDialogs } from "@/features/ui/dialogs";
 import { supabase } from "@/lib/supabase/client";
 import { uploadPaymentProof } from "@/lib/supabase/payment-proof";
@@ -256,9 +259,18 @@ export function UnlockSheet({ title, target, market, currency, onClose, onChange
           <p className="font-rvp-display text-[28px] font-extrabold leading-none">{amount}</p>
           <ul className="space-y-1.5 text-[13.5px] text-rvp-soft">
             <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-rvp-accent" aria-hidden />À vous pour toujours</li>
-            <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-rvp-accent" aria-hidden />Sur le site et dans l’application</li>
+            <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-rvp-accent" aria-hidden />{PREMIUM_VIDEO_WHERE}</li>
             <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-rvp-accent" aria-hidden />À revoir autant que vous voulez</li>
           </ul>
+          {/* Audit 22 (PLAY-2) : dit AVANT le paiement, tant que la vidéo
+              Premium ne se lit pas sur le site (iPhone, ordinateur). */}
+          {!PREMIUM_VIDEO_ON_WEB ? (
+            <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-[13px] text-amber-100">
+              Ce titre se regarde dans l’application Rivendy sur un téléphone Android. Sur iPhone et
+              sur ordinateur, il ne se lit pas encore : attendez avant de payer si vous n’avez pas
+              d’Android.
+            </p>
+          ) : null}
           {channels === null ? (
             <Loader2 className="mx-auto h-5 w-5 animate-spin text-rvp-soft" aria-label="Chargement" />
           ) : saleClosed ? (
@@ -353,7 +365,7 @@ export function UnlockSheet({ title, target, market, currency, onClose, onChange
             <Clock className="h-[26px] w-[26px] text-rvp-premium" aria-hidden />
           </span>
           <p className="text-[13.5px] leading-relaxed text-rvp-soft">
-            Vous recevrez une notification. {target.unit === "season" ? "La saison s’ouvrira" : target.unit === "episode" ? "L’épisode s’ouvrira" : "Le film s’ouvrira"} tout seul, ici et dans l’application.
+            Vous recevrez une notification. {target.unit === "season" ? "La saison s’ouvrira" : target.unit === "episode" ? "L’épisode s’ouvrira" : "Le film s’ouvrira"} tout seul{PREMIUM_VIDEO_ON_WEB ? ", ici et dans l’application." : " dans l’application Rivendy (Android)."}
           </p>
           <button type="button" onClick={onClose} className={sheetSecondary}>Fermer</button>
           {req?.unlock_id ? (

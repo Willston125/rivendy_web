@@ -104,3 +104,43 @@ export function loginDigitCandidates(phone: string): string[] {
   }
   return out.slice(0, 4);
 }
+
+/**
+ * Chiffres d'un numéro saisi, ou `null` s'il n'est pas utilisable comme numéro
+ * de connexion. MIROIR EXACT de l'app (`phone_login.dart : phoneDigitsOf`) et
+ * de la fonction serveur change-phone (`_shared/phone-login.ts : phoneDigits`).
+ */
+export function phoneDigitsOf(raw: string): string | null {
+  const s = (raw ?? "").trim();
+  if (!s || s.length > 32) return null;
+  if (!/^\+?[0-9 ().-]+$/.test(s)) return null;
+  const digits = s.replace(/\D/g, "");
+  return digits.length >= 8 && digits.length <= 15 ? digits : null;
+}
+
+/**
+ * Audit 22 (COMPTES-2) : enregistrer ce numéro change-t-il le NUMÉRO DE
+ * CONNEXION (identifiant `{chiffres}@nikey.app`) ? Alors le mot de passe est
+ * demandé et tout passe par change-phone, comme dans l'app
+ * (`phone_login.dart : phoneChangeMovesLogin`). Simple changement de
+ * présentation (espaces, « + »), ou compte sans numéro de connexion : `false`,
+ * le profil suffit.
+ */
+export function phoneChangeMovesLogin(loginDigits: string | null | undefined, newPhone: string): boolean {
+  if (!loginDigits) return false;
+  const digits = phoneDigitsOf(newPhone);
+  return digits !== null && digits !== loginDigits;
+}
+
+/** Motifs de refus de change-phone → phrase (miroir de l'app : phoneChangeMessage). */
+export function phoneChangeMessage(reason: string | null | undefined): string {
+  switch (reason) {
+    case "invalid_phone": return "Ce numéro n’est pas valide (8 à 15 chiffres).";
+    case "missing_password":
+    case "wrong_password": return "Mot de passe incorrect : votre numéro n’a pas été changé.";
+    case "phone_taken": return "Ce numéro est déjà celui d’un autre compte Rivendy.";
+    case "rate_limited": return "Trop de tentatives. Réessayez dans une heure.";
+    case "network": return "Connexion impossible. Vérifiez votre réseau et réessayez.";
+    default: return "Le numéro n’a pas pu être changé. Réessayez plus tard.";
+  }
+}

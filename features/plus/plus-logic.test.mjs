@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   offerBenefits, benefitGroups, compareRows, daysLabel, durationLabel, isValidPayerPhone, isValidOperatorReference,
   requestErrorMessage, declareErrorMessage, periodStatus, requestValidUntil, rejectReasons,
-  EXCLUSIVE_CONTENT_LIVE, EARLY_ACCESS_LIVE,
+  EXCLUSIVE_CONTENT_LIVE, EARLY_ACCESS_LIVE, PREMIUM_VIDEO_ON_WEB, PREMIUM_VIDEO_WHERE,
 } from "./plus-logic.ts";
 
 // Formules du 15/11 (lot 1), telles que les rend rivendy_offer_entitlements_resolved.
@@ -44,7 +44,21 @@ test("avantages rangés par usage : vendre, acheter, regarder (Comores)", () => 
   assert.ok(g.watch.includes("Tout Rivendy Play, sans publicité"));
   assert.ok(g.watch.includes("Toute la Musique Premium, sans publicité"));
   assert.ok(g.watch.includes("2 écrans en même temps"));
-  assert.equal(g.watch.at(-1), "Sur le site et dans l’application, avec le même compte");
+  // Audit 22 (PLAY-2) : tant que la vidéo Premium ne se lit pas sur le site, la
+  // formule ne promet pas « sur le site » pour les films et séries.
+  assert.equal(
+    g.watch.at(-1),
+    PREMIUM_VIDEO_ON_WEB
+      ? "Sur le site et dans l’application, avec le même compte"
+      : "Films et séries Premium dans l’application Rivendy (Android), sur le site bientôt ; la musique partout, avec le même compte",
+  );
+});
+
+test("audit 22 (PLAY-2) : sans vidéo Premium sur le site, aucune promesse « sur le site » pour Play", () => {
+  if (PREMIUM_VIDEO_ON_WEB) return;
+  const g = benefitGroups(MONTH_KM, KMF);
+  assert.ok(!g.watch.some((b) => b.startsWith("Sur le site")));
+  assert.ok(!PREMIUM_VIDEO_WHERE.toLowerCase().startsWith("sur le site"));
 });
 
 test("Djibouti : aucun avantage de livraison promis", () => {
