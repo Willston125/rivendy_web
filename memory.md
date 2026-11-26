@@ -821,3 +821,25 @@ réduction. L'app suit au lot 4 (parité).
 - **Textes** : réglages, pied de page, aide, conditions (« L'abonnement Rivendy+ et le Rivendy Pass sont payants… »),
   Mes ventes, espace vendeur. Le badge « Certifié » des boutiques reste.
 - Essais : `npm run check:plus` (13), `check:pass` (8), `check:delivery` (11), `check:create` (13). tsc 0, lint 0.
+
+## Audit 22, lot 3 : caisse, numéro, promesses Premium, cache, recherche (2026-11-26, branche `fix/audit22-lot-3`)
+
+Phrase du propriétaire (26/11) : « Je t'autorise à toucher la caisse du site et le changement de numéro pour l'audit 22 ».
+Aucun SQL, aucune fonction Edge. Proposition : `rivendy-docs/docs/audit-22-2026-11-23/lot3-proposition/`.
+
+- **Caisse Mobile Money (MKWEB-1)** : plus aucune consigne d'envoi ni référence de transaction AVANT la commande (l'argent
+  partait avant que la commande existe). Numéro payeur obligatoire (`p_payer_phone`) ; `p_transaction_ref` toujours NULL ;
+  la consigne n'apparaît que sur l'écran de confirmation : `createdTotals.amountDue` (montant du serveur), numéro Rivendy,
+  numéro payeur, motif `CMD-…`. L'équipe saisit sa référence en confirmant la réception (`admin_mark_order_paid`).
+  Déclarer la référence de l'acheteur après coup demanderait une fonction en base (`declare_order_payment`, pas faite).
+- **Changement de numéro (COMPTES-2)** : `phoneDigitsOf`, `phoneChangeMovesLogin`, `phoneChangeMessage`
+  (`lib/utils/phone-validator.ts`, MIROIR de l'app `phone_login.dart`). Autres chiffres que le numéro de connexion →
+  invite mot de passe → `change-phone` (profil ET identifiant ensemble) → `refreshSession` ; présentation seule → profil.
+- **Promesses Premium (PLAY-2)** : `PREMIUM_VIDEO_ON_WEB = false` et `PREMIUM_VIDEO_WHERE` (`features/plus/plus-logic.ts`).
+  Tant que la clé de signature Cloudflare Stream n'est pas posée, aucune vente ne promet les films Premium « sur le site » ;
+  le Pass prévient AVANT le paiement (Android seulement). Passer à `true` le jour où la lecture web est vérifiée.
+- **Cache (MKWEB-2)** : dans les fonctions `unstable_cache` (catalogue, fiche, similaires, boutique, annuaire), une erreur
+  Supabase LÈVE (un échec n'est pas mis en cache) et n'est rattrapée qu'hors du cache ; une fiche absente n'est jamais
+  en cache (sentinelle `not_cached_miss`).
+- **Recherche de l'en-tête (MKWEB-3)** : `fetchProducts` utilise `ilikeOrFilter` (même filtre que /search).
+- Essais : `npm run check` en entier (typecheck, lint 0, 194 vérifications) ; `check:phone` 12, `check:plus` 14.
