@@ -142,7 +142,7 @@ function PublishPanel({ variant, onClose }: { variant: "rail" | "top"; onClose: 
             <button type="button" onClick={() => { setFailed(false); setArtist(undefined); setAttempt((n) => n + 1); }} className={actionClass}>Réessayer</button>
           </Info>
         ) : phase === "become" ? (
-          <Info text="Pour publier votre musique, demandez d’abord votre compte artiste : Rivendy le vérifie (nom, droits sur votre musique), puis vous publiez singles, albums et stories.">
+          <Info text="Pour publier votre musique, créez d’abord votre compte artiste : il est prêt tout de suite, puis vous publiez singles, albums et stories.">
             <Link href={`${ARTIST_SPACE}#demande`} onClick={onClose} className={actionClass}>Devenir artiste</Link>
           </Info>
         ) : phase === "follow" ? (

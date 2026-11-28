@@ -52,7 +52,7 @@ export function MusicArtistSpaceView() {
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-rvm-soft @2xl:text-base">
           {known && music
             ? "Vos sorties, votre profil et vos écoutes. Tout se publie ici, comme dans l’application, avec le même compte."
-            : "Publiez vos singles, EP et albums sur Rivendy Musique, depuis le site ou l’application. Chaque compte artiste est vérifié par Rivendy avant la première sortie."}
+            : "Publiez vos singles, EP et albums sur Rivendy Musique, depuis le site ou l’application. Votre compte artiste est prêt tout de suite, et vos sorties sont en ligne quelques minutes après l’envoi."}
         </p>
       </header>
 
@@ -135,8 +135,8 @@ function SignInCard({ path }: { path: string }) {
 
 const ABOUT = [
   "Un compte Rivendy suffit : pas besoin d’être vendeur.",
-  "Rivendy vérifie votre profil : votre nom d’artiste, votre photo et vos droits sur votre musique.",
-  "Ensuite : singles, EP et albums, vérifiés par Rivendy avant la mise en ligne.",
+  "Votre profil est en ligne tout de suite ; seuls les noms d’artistes connus ou déjà pris passent par Rivendy.",
+  "Ensuite : singles, EP et albums, en ligne quelques minutes après l’envoi, le temps de préparer le son.",
   "Vos titres s’écoutent sur le site et dans l’application, avec le même compte.",
 ];
 
@@ -228,9 +228,9 @@ function ArtistCard({ artist, music }: { artist: MyArtist; music: boolean }) {
 }
 
 const STEPS = [
-  { title: "Demandez votre compte", text: "Ici ou dans l’application : c’est le même compte Rivendy." },
-  { title: "Rivendy vérifie", text: "Votre nom, votre photo et vos droits. Vous êtes prévenu par une notification." },
-  { title: "Publiez", text: "Singles, EP et albums, vérifiés par Rivendy avant la mise en ligne." },
+  { title: "Créez votre compte", text: "Ici ou dans l’application : c’est le même compte Rivendy, prêt tout de suite." },
+  { title: "Publiez", text: "Singles, EP et albums : en ligne quelques minutes après l’envoi, le temps de préparer le son." },
+  { title: "Rivendy regarde ensuite", text: "Les signalements et les noms d’artistes connus sont vérifiés ; ce qui enfreint les règles est retiré." },
 ];
 
 /** Colonne de droite : les étapes, les clips et les droits d'auteur (plus de renvoi vers Google Play). */

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 const STEPS = [
   { icon: Store, title: "Ouvrez votre boutique", text: "Nom, logo, description : votre boutique est prête en quelques minutes, sur le site ou dans l'application." },
-  { icon: ClipboardCheck, title: "Publiez vos articles", text: "Photos, prix, tailles, couleurs, note vocale. L'équipe Rivendy vérifie chaque annonce sous 24 h." },
+  { icon: ClipboardCheck, title: "Publiez vos articles", text: "Photos, prix, tailles, couleurs, note vocale. Votre annonce est en ligne tout de suite (sans numéro ni lien dans le texte : sinon l'équipe la corrige d'abord)." },
   { icon: PackageCheck, title: "Recevez des commandes", text: "Rivendy centralise les commandes et accompagne l'acheteur jusqu'à la livraison." },
   { icon: Wallet, title: "Encaissez votre prix", text: "Vous recevez exactement le prix que vous avez fixé, dès que l'acheteur confirme la réception." },
 ];

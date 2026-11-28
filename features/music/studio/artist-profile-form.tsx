@@ -120,10 +120,10 @@ export function ArtistProfileForm({ artist, onSaved }: { artist: MyArtist | null
   async function askNewName() {
     const next = await dialogs.ask({
       title: "Changer de nom d’artiste",
-      message: "Rivendy vérifie chaque changement de nom (usurpation). Votre nom actuel reste affiché en attendant.",
+      message: "Le nouveau nom s’affiche tout de suite. Un nom d’artiste connu, réservé ou déjà pris est d’abord vérifié par Rivendy.",
       placeholder: "Nouveau nom d’artiste",
       maxLength: ARTIST.nameMax,
-      confirmLabel: "Demander",
+      confirmLabel: "Changer",
     });
     if (next === null) return;
     await sendNameRequest(next);

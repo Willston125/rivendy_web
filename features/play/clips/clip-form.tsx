@@ -180,7 +180,7 @@ export function ClipFormView({ clipId }: { clipId: string }) {
       <ClipsPage>
         {heading}
         <EmptyState icon={MicVocal} title="Devenez artiste d’abord"
-          text="Demandez votre compte artiste : Rivendy le vérifie (nom, droits sur votre musique), puis vous publiez vos clips.">
+          text="Créez votre compte artiste : il est prêt tout de suite, puis vous publiez vos clips.">
           <Link href="/music/artiste#demande" prefetch={false} className={btnPrimary}>Devenir artiste</Link>
         </EmptyState>
       </ClipsPage>
