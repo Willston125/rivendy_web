@@ -244,7 +244,7 @@ test("teinte d'en-tête : assombrie jusqu'à un texte blanc lisible", () => {
 
 import {
   HOME_SHOWS, HOME_GRID, HOME_HIT, usefulRubrics, genreTone, rythmeTagline, GENRE_TONES, installHint, INSTALL_HINT_SNOOZE_MS, musicNavActive, releaseState, RELEASE_STATE_LABEL,
-  homeTop,
+  homeTop, releaseStateLabel,
 } from "./music-logic.ts";
 
 test("homeTop : une seule bannière en haut, jamais de pub pour Rivendy+ ni dans le doute", () => {
@@ -280,6 +280,15 @@ test("sorties d'un artiste : mêmes états et libellés que l'app", () => {
   assert.equal(releaseState(null, undefined), "draft");
   assert.equal(RELEASE_STATE_LABEL.pending, "En vérification");
   assert.equal(RELEASE_STATE_LABEL.published, "En ligne");
+});
+
+test("publication automatique (lot B) : en préparation, programmée, gardée", () => {
+  assert.equal(releaseStateLabel("pending", true), "En préparation");
+  assert.equal(releaseStateLabel("pending", false), "En vérification");
+  assert.equal(releaseStateLabel("pending", undefined), "En vérification");
+  assert.equal(releaseStateLabel("approved", true), "Programmée");
+  assert.equal(releaseStateLabel("approved", null), "Validée");
+  assert.equal(releaseStateLabel("published", true), "En ligne");
 });
 
 test("accueil, petit catalogue : pas de raccourci vers une page qui répète l'accueil ou une page vide", () => {

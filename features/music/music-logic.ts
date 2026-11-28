@@ -578,6 +578,17 @@ export const RELEASE_STATE_LABEL: Record<ReleaseState, string> = {
   draft: "Brouillon", rejected: "Refusée", pending: "En vérification", approved: "Validée", published: "En ligne", archived: "Retirée",
 };
 
+/**
+ * Publication automatique (lot B, 2026-11-28) : `publish_when_ready` distingue une sortie dont le
+ * son est EN PRÉPARATION (en ligne dans quelques minutes) d'une sortie gardée pour vérification, et
+ * une sortie validée qui attend sa date de sortie (« Programmée »).
+ */
+export function releaseStateLabel(state: ReleaseState, publishWhenReady: boolean | null | undefined): string {
+  if (publishWhenReady && state === "pending") return "En préparation";
+  if (publishWhenReady && state === "approved") return "Programmée";
+  return RELEASE_STATE_LABEL[state];
+}
+
 export type InstallHint = "ios" | "android" | null;
 /** « Plus tard » : l'invitation se tait 30 jours. */
 export const INSTALL_HINT_SNOOZE_MS = 30 * 24 * 3_600_000;

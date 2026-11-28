@@ -6,7 +6,7 @@ import { ChevronRight, Disc3, Plus } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { artistStatusOf } from "@/features/play/clips/clips-logic";
 import { cn } from "@/lib/utils/cn";
-import { RELEASE_STATE_LABEL, addedAtLabel, releaseKindLabel, releaseState, type ReleaseState } from "../music-logic";
+import { addedAtLabel, releaseKindLabel, releaseState, releaseStateLabel, type ReleaseState } from "../music-logic";
 import { loginHref } from "../music-pending";
 import { Cover, EmptyState, ListSkeleton, primaryButton, secondaryButton, useLoad } from "../music-ui";
 import { fetchMyArtist, fetchStudioReleases, fetchStudioStats } from "./studio-api";
@@ -23,10 +23,11 @@ const CHIP: Record<ReleaseState, string> = {
   archived: "bg-rvm-raised text-rvm-soft",
 };
 
-export function ReleaseStateChip({ state, className }: { state: ReleaseState; className?: string }) {
+export function ReleaseStateChip({ state, preparing, className }: { state: ReleaseState; preparing?: boolean | null; className?: string }) {
   return (
-    <span className={cn("inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-[12px] font-extrabold", CHIP[state], className)}>
-      {RELEASE_STATE_LABEL[state]}
+    <span className={cn("inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-[12px] font-extrabold",
+      preparing && state === "pending" ? "bg-rvm-accent/25 text-rvm-ink-accent" : CHIP[state], className)}>
+      {releaseStateLabel(state, preparing)}
     </span>
   );
 }
@@ -53,7 +54,7 @@ export function StudioReleaseList({ artistId, limit }: { artistId: string; limit
   if (list.data.length === 0) {
     return (
       <EmptyState icon={Disc3} title="Aucune sortie pour le moment"
-        text="Publiez votre premier single, EP ou album : Rivendy le vérifie puis le met en ligne."
+        text="Publiez votre premier single, EP ou album : il est en ligne quelques minutes après l’envoi."
         action={<Link href={NEW_RELEASE_PATH} className={primaryButton}><Plus className="h-4 w-4" strokeWidth={2.8} aria-hidden /> Nouvelle sortie</Link>} />
     );
   }
@@ -76,7 +77,7 @@ export function StudioReleaseList({ artistId, limit }: { artistId: string; limit
                   {[releaseKindLabel(r.kind), `${n} titre${n > 1 ? "s" : ""}`, state === "draft" && added ? `créée ${/^\d/.test(added) ? `le ${added}` : added}` : ""].filter(Boolean).join(" · ")}
                 </span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <ReleaseStateChip state={state} />
+                  <ReleaseStateChip state={state} preparing={r.publish_when_ready} />
                   {state === "published" && plays ? (
                     <span className="text-[12.5px] text-rvm-soft">{playsLabel(plays.month)} ce mois-ci · {plays.total} au total</span>
                   ) : null}

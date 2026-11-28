@@ -83,7 +83,7 @@ export function CreateOptions({ onPick }: { onPick: () => void }) {
         <Option href={MY_SHORTS_PATH} onPick={onPick} icon={SquarePlay} title="Mes Shorts"
           text="Vos Shorts libres : en vérification, en ligne, refusés." />
         <Option href={CLIP_SPACE_PATH} onPick={onPick} icon={MicVocal} title="Espace artiste"
-          text="Publiez vos clips musicaux : compte artiste vérifié par Rivendy." />
+          text="Publiez vos clips musicaux : compte artiste créé en un instant." />
         <Option href="/sell" onPick={onPick} icon={Tag} title="Vendre un article"
           text="Publier une annonce sur Rivendy Marketplace." />
       </nav>

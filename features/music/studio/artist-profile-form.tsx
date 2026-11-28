@@ -90,7 +90,7 @@ export function ArtistProfileForm({ artist, onSaved }: { artist: MyArtist | null
       const origin = originId || null;
       if (origin !== (artist?.island_id ?? null)) await setArtistOrigin(origin);
       dialogs.notify(next === "approved"
-        ? "Profil artiste mis à jour."
+        ? (artist ? "Profil artiste mis à jour." : "Compte artiste créé : vous pouvez publier vos clips et votre musique tout de suite.")
         : "Demande envoyée : Rivendy la vérifie, vous serez prévenu par une notification.", "success");
       setAvatar(null);
       setBanner(null);
@@ -133,8 +133,10 @@ export function ArtistProfileForm({ artist, onSaved }: { artist: MyArtist | null
     const p = next.trim() ? artistTextProblem(next, { min: ARTIST.nameMin, max: ARTIST.nameMax, field: "Nom d’artiste" }) : null;
     if (p) { dialogs.notify(p, "error"); return; }
     try {
-      await requestArtistName(next.trim());
-      dialogs.notify(next.trim() ? "Demande envoyée : Rivendy la vérifie, vous serez prévenu par une notification." : "Demande de changement de nom annulée.", "success");
+      const applied = await requestArtistName(next.trim());
+      dialogs.notify(!next.trim() ? "Demande de changement de nom annulée."
+        : applied ? `Nouveau nom enregistré : « ${next.trim()} ».`
+        : "Ce nom doit être vérifié par Rivendy (nom réservé, protégé ou déjà pris) : vous serez prévenu par une notification.", "success");
       onSaved();
     } catch (e) {
       dialogs.notify(e instanceof StudioError ? e.message : "Demande impossible pour le moment, réessayez.", "error");
@@ -191,8 +193,8 @@ export function ArtistProfileForm({ artist, onSaved }: { artist: MyArtist | null
               className={cn(field, "h-12", nameLocked && "bg-rvm-raised text-rvm-soft")} />
             {nameLocked ? (
               <span className={help}>
-                Nom validé par Rivendy. Pour le changer, faites une demande.{" "}
-                <button type="button" onClick={() => void askNewName()} className="font-bold text-rvm-ink-accent hover:underline">Demander un changement de nom</button>
+                Pour changer de nom d’artiste, utilisez ce bouton : le nouveau nom s’affiche tout de suite (sauf nom réservé, protégé ou déjà pris).{" "}
+                <button type="button" onClick={() => void askNewName()} className="font-bold text-rvm-ink-accent hover:underline">Changer de nom</button>
                 {artist?.name_request ? (
                   <span className="mt-1 block">
                     Demande en cours : « {artist.name_request} ».{" "}
@@ -200,7 +202,7 @@ export function ArtistProfileForm({ artist, onSaved }: { artist: MyArtist | null
                   </span>
                 ) : null}
               </span>
-            ) : <span className={help}>Votre vrai nom de scène. Rivendy le vérifie avant validation.</span>}
+            ) : <span className={help}>Votre vrai nom de scène. Les noms d’artistes connus et les noms déjà pris sont vérifiés par Rivendy.</span>}
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${ids}-genre`} className={label}>Genre musical</label>

@@ -125,7 +125,7 @@ function PublishPanel({ variant, onClose }: { variant: "rail" | "top"; onClose: 
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="font-rvm-display text-[22px] font-black leading-tight">Publier sur Rivendy Musique</h2>
-            <p className="mt-1 text-[13px] leading-snug text-rvm-soft">Singles, EP, albums et stories — pour les artistes vérifiés par Rivendy.</p>
+            <p className="mt-1 text-[13px] leading-snug text-rvm-soft">Singles, EP, albums et stories — en ligne tout de suite pour les artistes Rivendy.</p>
           </div>
           <button type="button" data-close onClick={onClose} aria-label="Fermer"
             className="-mr-1.5 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rvm-raised text-rvm-text hover:bg-rvm-raised-hover">

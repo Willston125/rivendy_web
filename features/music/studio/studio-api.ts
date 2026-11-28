@@ -17,7 +17,7 @@ import { artistErrorMessage, isoDay, studioErrorMessage, type Origin } from "./s
 /** Refus affichable : le message est prêt pour l'écran. */
 export class StudioError extends Error {}
 
-type RpcResult = { success?: boolean; error?: string | null; id?: string; status?: string };
+type RpcResult = { success?: boolean; error?: string | null; id?: string; status?: string; applied?: boolean };
 
 async function rpcJson(name: string, params: Record<string, unknown>, messageOf: (code: string | null | undefined) => string): Promise<RpcResult> {
   const { data, error } = await supabase.rpc(name, params);
@@ -89,9 +89,14 @@ export async function setMusicEnabled(on: boolean): Promise<void> {
   await rpcJson("play_artist_set_music", { p_on: on }, artistErrorMessage);
 }
 
-/** Demande de changement de nom d'un artiste validé ; vide = annuler la demande. */
-export async function requestArtistName(name: string): Promise<void> {
-  await rpcJson("play_artist_request_name", { p_name: name }, artistErrorMessage);
+/**
+ * Changement de nom d'un artiste validé ; vide = annuler la demande. Depuis la publication
+ * automatique (lot B), le nom change TOUT DE SUITE (vrai), sauf nom réservé, protégé ou déjà pris :
+ * alors une demande, vérifiée par Rivendy (faux).
+ */
+export async function requestArtistName(name: string): Promise<boolean> {
+  const res = await rpcJson("play_artist_request_name", { p_name: name }, artistErrorMessage);
+  return res.applied === true;
 }
 
 /** Origines actives : pays du monde, régions et îles (music_origins, comme l'app). */
@@ -113,6 +118,8 @@ export type StudioRelease = {
   cover_url: string | null; genre_id: string | null; island_id: string | null; release_date: string | null;
   explicit: boolean; status: string | null; review_status: string | null; review_reason: string | null;
   published_at: string | null; created_at: string; music_tracks: StudioTrack[];
+  /** Publication automatique (lot B) : son en préparation, ou validée en attente de sa date. */
+  publish_when_ready?: boolean | null;
 };
 
 /** StudioRelease.columns de l'app. */
@@ -120,22 +127,30 @@ const RELEASE_COLUMNS = "id, kind, title, featuring, description, cover_url, gen
   + "review_status, review_reason, published_at, created_at, "
   + "music_tracks(id, position, title, featuring, explicit, allow_shorts, audio_status, duration_seconds)";
 
+/** Lot B : avec publish_when_ready ; sans, tant que le SQL n'est pas appliqué. */
+const RELEASE_COLUMNS_AUTO = `publish_when_ready, ${RELEASE_COLUMNS}`;
+const missingAuto = (e: { message?: string } | null): boolean => !!e && /publish_when_ready/.test(e.message ?? "");
+
 function sorted(r: StudioRelease): StudioRelease {
   return { ...r, music_tracks: [...(r.music_tracks ?? [])].sort((a, b) => a.position - b.position) };
 }
 
 /** Mes sorties ENVOYÉES par moi, brouillons compris (la RLS rend celles de mon compte). */
 export async function fetchStudioReleases(artistId: string): Promise<StudioRelease[]> {
-  const { data, error } = await supabase.from("music_releases").select(RELEASE_COLUMNS)
+  const list = (columns: string) => supabase.from("music_releases").select(columns)
     .eq("artist_id", artistId).not("submitted_by", "is", null)
     .order("created_at", { ascending: false }).limit(100);
+  let { data, error } = await list(RELEASE_COLUMNS_AUTO);
+  if (missingAuto(error)) ({ data, error } = await list(RELEASE_COLUMNS));
   if (error) throw new Error(error.message);
   // Sélection composée (titres imbriqués) : le typage de supabase-js ne la lit pas.
   return ((data ?? []) as unknown as StudioRelease[]).map(sorted);
 }
 
 export async function fetchStudioRelease(id: string): Promise<StudioRelease | null> {
-  const { data, error } = await supabase.from("music_releases").select(RELEASE_COLUMNS).eq("id", id).maybeSingle();
+  const one = (columns: string) => supabase.from("music_releases").select(columns).eq("id", id).maybeSingle();
+  let { data, error } = await one(RELEASE_COLUMNS_AUTO);
+  if (missingAuto(error)) ({ data, error } = await one(RELEASE_COLUMNS));
   if (error) throw new Error(error.message);
   return data ? sorted(data as unknown as StudioRelease) : null;
 }

@@ -122,7 +122,7 @@ function StatusCard({ status, name, reason, artistId }: { status: string; name: 
       <p className={cn(display, "text-[20px] text-rvp-text")}>Vous êtes artiste ?</p>
       <ul className="mt-3 space-y-2 text-[14.5px] text-rvp-soft">
         <li>• Un compte Rivendy suffit : pas besoin d’être vendeur.</li>
-        <li>• Votre profil (nom, photo, genre) est vérifié par Rivendy.</li>
+        <li>• Votre profil (nom, photo, genre) est en ligne tout de suite ; les noms d’artistes connus sont vérifiés par Rivendy.</li>
         <li>• Vos clips sont toujours gratuits pour le public, avec J’aime, commentaires et abonnés.</li>
       </ul>
     </section>
@@ -158,8 +158,8 @@ function SideCard({ status }: { status: string }) {
         <ol className="mt-3 space-y-2.5 text-[14px] leading-6 text-rvp-soft">
           <li><strong className="text-rvp-text">1. Envoi</strong> directement chez Cloudflare, par morceaux : une coupure reprend où elle s’était arrêtée.</li>
           <li><strong className="text-rvp-text">2. Encodage</strong> de la vidéo, quelques minutes.</li>
-          <li><strong className="text-rvp-text">3. Vérification</strong> par Rivendy (droits, contenu).</li>
-          <li><strong className="text-rvp-text">4. En ligne</strong> dans Rivendy Clips, gratuit pour tous.</li>
+          <li><strong className="text-rvp-text">3. En ligne</strong> dans Rivendy Clips, gratuit pour tous, dès la fin de l’encodage.</li>
+          <li><strong className="text-rvp-text">4. Signalements</strong> : Rivendy regarde ensuite et retire ce qui enfreint les règles.</li>
         </ol>
       </aside>
     );

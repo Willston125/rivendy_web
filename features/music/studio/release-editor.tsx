@@ -135,7 +135,7 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
     if (!releaseKey) return;
     return onUploadSettled((item) => {
       if (item.releaseId !== releaseKey) return;
-      if (item.status === "done") dialogs.notify("Titre envoyé : Rivendy le préparera à la vérification.", "success");
+      if (item.status === "done") dialogs.notify("Titre envoyé : son volume et son extrait seront préparés à l’envoi de la sortie.", "success");
       fetchStudioRelease(releaseKey).then((fresh) => {
         if (fresh) setRelease(fresh);
         if (item.status === "done") forgetUploads([item.trackId]);
@@ -343,7 +343,7 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
       await submitRelease(fresh.id);
       await reload();
       setAttested(false);
-      dialogs.notify("Envoyée à Rivendy : vous serez prévenu dès qu’elle est vérifiée.", "success");
+      dialogs.notify("Envoyée : le son est préparé automatiquement, votre sortie sera en ligne dans quelques minutes. Vous serez prévenu par une notification.", "success");
     } catch (e) {
       setProblem(errorText(e));
     } finally {
@@ -355,7 +355,7 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
     if (!release) return;
     const published = state === "published";
     const ok = await dialogs.confirm({
-      title: published ? "Retirer de Rivendy Musique ?" : "Retirer de la vérification ?",
+      title: published ? "Retirer de Rivendy Musique ?" : release.publish_when_ready ? "Annuler l’envoi ?" : "Retirer de la vérification ?",
       message: published
         ? "La sortie n’est plus écoutable. Pour la remettre en ligne, il faudra contacter Rivendy."
         : "La sortie redevient un brouillon modifiable ; renvoyez-la quand elle est prête.",
@@ -435,7 +435,7 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
         <h1 className="min-w-0 font-rvm-display text-[26px] font-black leading-tight tracking-tight @2xl:text-4xl">
           {release ? release.title || "Sans titre" : "Nouvelle sortie"}
         </h1>
-        {release ? <ReleaseStateChip state={state} className="h-7 text-[12.5px]" /> : null}
+        {release ? <ReleaseStateChip state={state} preparing={release.publish_when_ready} className="h-7 text-[12.5px]" /> : null}
         {release && editable && !release.published_at ? (
           <button type="button" onClick={() => void removeDraft()} className="ml-auto h-10 rounded-full px-3 text-sm font-bold text-red-700 hover:bg-red-50">
             Supprimer ce brouillon
@@ -443,7 +443,7 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
         ) : null}
       </div>
 
-      {release ? <StateBanner state={state} reason={release.review_reason} /> : null}
+      {release ? <StateBanner state={state} reason={release.review_reason} preparing={release.publish_when_ready} /> : null}
 
       <div className="mt-5 grid items-start gap-5 @4xl:grid-cols-[340px_minmax(0,1fr)]">
         {/* ── Pochette et informations ── */}
@@ -513,7 +513,7 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
               </select>
             </Field>
             <Field id={`${ids}-date`} label={<span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-rvm-ink-accent" aria-hidden /> Date de sortie</span>}
-              hint={date ? undefined : "Dès la validation, si vous ne choisissez pas de date."}>
+              hint={date ? undefined : "Dès l’envoi, si vous ne choisissez pas de date."}>
               <input id={`${ids}-date`} type="date" value={date} min="1950-01-01" max={maxDate} onChange={(e) => setDate(e.target.value)} className={cn(field, "h-12")} />
             </Field>
             <label className="flex min-h-12 cursor-pointer items-center gap-3">
@@ -605,15 +605,15 @@ export function ReleaseEditor({ releaseId }: { releaseId: string }) {
                 </label>
                 <button type="button" onClick={() => void submit()} disabled={saving || blocker !== null || sending}
                   className={cn(primaryButton, "h-[52px] w-full text-[15px] @2xl:w-auto @2xl:self-start @2xl:px-10")}>
-                  {saving ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null} Envoyer à Rivendy
+                  {saving ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null} Publier
                 </button>
                 {problem ? <p role="alert" className="text-sm font-semibold text-red-700">{problem}</p>
                   : blocker ? <p className="text-[13px] text-rvm-soft">{blocker}</p> : null}
-                <p className="text-[12.5px] leading-snug text-rvm-muted">Rivendy vérifie chaque sortie avant la mise en ligne. Vous serez prévenu par une notification.</p>
+                <p className="text-[12.5px] leading-snug text-rvm-muted">Votre sortie est en ligne quelques minutes après l’envoi, le temps de préparer le son (sauf nom d’un artiste protégé ou fichier tiré d’une vidéo en ligne : Rivendy la vérifie d’abord). Vous serez prévenu par une notification.</p>
               </section>
-            ) : state === "pending" || state === "published" ? (
+            ) : state === "pending" || state === "published" || (state === "approved" && release?.publish_when_ready) ? (
               <button type="button" onClick={() => void withdraw()} className={cn(secondaryButton, "h-12 self-start border-rvm-ink-accent text-rvm-ink-accent")}>
-                {state === "pending" ? "Retirer de la vérification" : "Retirer de Rivendy Musique"}
+                {state === "published" ? "Retirer de Rivendy Musique" : release?.publish_when_ready ? "Annuler l’envoi" : "Retirer de la vérification"}
               </button>
             ) : null}
           </div>
@@ -645,7 +645,14 @@ function Field({ id, label: text, hint, children }: { id: string; label: ReactNo
 }
 
 /** Bandeau d'état, mêmes textes que l'app (notification au lieu de « dans l'app »). */
-function StateBanner({ state, reason }: { state: ReleaseState; reason: string | null }) {
+function StateBanner({ state, reason, preparing }: { state: ReleaseState; reason: string | null; preparing?: boolean | null }) {
+  // Publication automatique (lot B, 2026-11-28) : son en préparation, ou validée pour sa date.
+  if (preparing && (state === "pending" || state === "approved")) {
+    const text = state === "pending"
+      ? "Envoyée : le son est préparé automatiquement, la sortie sera en ligne dans quelques minutes. Vous serez prévenu par une notification."
+      : "Validée : elle sera en ligne à la date de sortie choisie. Elle n’est plus modifiable.";
+    return <p className="mt-3 max-w-3xl rounded-xl border border-green-700/35 bg-green-700/[0.08] p-3 text-sm leading-relaxed text-rvm-text">{text}</p>;
+  }
   const content: Partial<Record<ReleaseState, { text: string; tone: string }>> = {
     pending: { text: "Rivendy vérifie votre sortie : elle n’est plus modifiable. Vous serez prévenu par une notification.", tone: "border-rvm-ink-accent/40 bg-rvm-ink-accent/10" },
     rejected: { text: `Refusée${reason ? ` : ${reason}` : ""}. Corrigez puis renvoyez-la.`, tone: "border-red-700/35 bg-red-700/[0.07]" },
